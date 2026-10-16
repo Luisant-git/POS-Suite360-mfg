@@ -23,7 +23,7 @@ const ExpenseEntry = () => {
   const [amount, setAmount] = useState('');
   const [paymentModeId, setPaymentModeId] = useState('');
   const [notes, setNotes] = useState('');
-  
+
   // Date-wise Filter & Search State for History
   const [filterStartDate, setFilterStartDate] = useState(() => {
     const d = new Date();
@@ -178,7 +178,7 @@ const ExpenseEntry = () => {
       { header: 'Category', dataKey: '_category' },
       { header: 'Payment Mode', dataKey: '_mode' },
       { header: 'Description', dataKey: '_notes' },
-      { header: `Amount (${settings?.currency || 'RM'})`, dataKey: '_amount' },
+      { header: `Amount (${settings?.currencySymbol || 'RM'})`, dataKey: '_amount' },
     ];
     const rows = expenses.map((e: any, i: number) => ({
       _sno: i + 1,
@@ -198,7 +198,7 @@ const ExpenseEntry = () => {
       'Category': e.category?.name || '-',
       'Payment Mode': e.paymentMode?.name || '-',
       'Description': e.notes || '-',
-      [`Amount (${settings?.currency || 'RM'})`]: Number(e.amount),
+      [`Amount (${settings?.currencySymbol || 'RM'})`]: Number(e.amount),
     }));
     exportToExcel(exportData, 'Daily_Expenses_Report');
   };
@@ -221,24 +221,24 @@ const ExpenseEntry = () => {
 
   return (
     <div className="flex flex-col h-full bg-[#F3F4F6] font-sans">
-      
+
       {/* Header */}
       <div className="bg-[#0f172a] text-white px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between shadow-md gap-3">
         <div className="flex items-center gap-2">
           <Briefcase size={20} className="text-blue-400" />
           <h2 className="text-base font-bold tracking-wide uppercase">DAILY EXPENSES MANAGEMENT</h2>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={handleExcelExport}
             className="bg-[#10B981] hover:bg-[#059669] text-white text-[12px] font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm"
           >
             <Download size={14} /> <span className="hidden lg:inline">Export Excel</span>
           </button>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={handlePdfExport}
             className="bg-[#EF4444] hover:bg-[#DC2626] text-white text-[12px] font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm"
           >
@@ -253,7 +253,7 @@ const ExpenseEntry = () => {
       {/* Main Content */}
       <div className="flex-1 p-3 sm:p-4 overflow-auto overflow-x-auto">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full">
-          
+
           {/* Left Panel - Log New Expense */}
           <div className="w-full lg:w-1/3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col self-start">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -261,18 +261,18 @@ const ExpenseEntry = () => {
                 {editingId ? 'EDIT EXPENSE' : 'LOG NEW EXPENSE'}
               </h3>
             </div>
-            
+
             <div className="p-4 flex-1 flex flex-col gap-3.5">
               <div>
                 <label className="block text-[12px] font-bold text-black mb-1">Expense Date</label>
-                <input 
-                  type="date" 
-                  value={expenseDate} 
+                <input
+                  type="date"
+                  value={expenseDate}
                   onChange={(e) => setExpenseDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-black focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white" 
+                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-black focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-[12px] font-bold text-black mb-1">Expense Category *</label>
                 <SearchableSelect
@@ -285,12 +285,12 @@ const ExpenseEntry = () => {
 
               <div>
                 <label className="block text-[12px] font-bold text-black mb-1">Amount *</label>
-                <input 
-                  type="number" step="any" 
+                <input
+                  type="number" step="any"
                   value={amount}
                   placeholder="0.00"
                   onChange={(e) => setAmount(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-black focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-black focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
@@ -306,28 +306,28 @@ const ExpenseEntry = () => {
 
               <div>
                 <label className="block text-[12px] font-bold text-black mb-1">Description / Notes</label>
-                <textarea 
+                <textarea
                   rows={3}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Additional details..."
-                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-black focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none" 
+                  className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-bold text-black focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
                 ></textarea>
               </div>
 
               <div className="pt-2 flex gap-2">
-                <button 
+                <button
                   type="button"
-                  onClick={handleSave} 
-                  disabled={createMutation.isPending || updateMutation.isPending} 
+                  onClick={handleSave}
+                  disabled={createMutation.isPending || updateMutation.isPending}
                   className="flex-1 bg-[#0f172a] hover:bg-gray-800 text-white font-bold py-2.5 px-4 rounded shadow-md flex justify-center items-center gap-2 transition-colors disabled:opacity-50"
                 >
                   <PlusSquare size={18} /> {editingId ? (updateMutation.isPending ? 'Updating...' : 'Update Expense') : (createMutation.isPending ? 'Saving...' : 'Save Expense')}
                 </button>
                 {editingId && (
-                  <button 
+                  <button
                     type="button"
-                    onClick={resetForm} 
+                    onClick={resetForm}
                     className="bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 px-3 rounded shadow-md flex justify-center items-center gap-1.5 transition-colors"
                   >
                     <XCircle size={18} /> Cancel
@@ -351,20 +351,20 @@ const ExpenseEntry = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 items-end mb-2">
                 <div>
                   <label className="block text-[11px] font-bold text-black mb-1">From Date</label>
-                  <input 
-                    type="date" 
-                    value={filterStartDate} 
+                  <input
+                    type="date"
+                    value={filterStartDate}
                     onChange={(e) => setFilterStartDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white" 
+                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-black mb-1">To Date</label>
-                  <input 
-                    type="date" 
-                    value={filterEndDate} 
+                  <input
+                    type="date"
+                    value={filterEndDate}
                     onChange={(e) => setFilterEndDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white" 
+                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white"
                   />
                 </div>
                 <div>
@@ -378,12 +378,12 @@ const ExpenseEntry = () => {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-black mb-1">Search Description</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search notes or category..."
-                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white" 
+                    className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white"
                   />
                 </div>
               </div>
@@ -408,7 +408,7 @@ const ExpenseEntry = () => {
 
             {/* PDF Printable & Export Container */}
             <div id="daily-expenses-export" className="p-3 sm:p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
-              
+
               <div className="flex-1 overflow-auto overflow-x-auto rounded-lg border border-gray-200">
                 <table className="w-full text-sm text-left whitespace-nowrap min-w-[600px]">
                   <thead className="text-xs text-white uppercase bg-[#0f172a]">
@@ -438,7 +438,7 @@ const ExpenseEntry = () => {
                           <td className="px-3.5 py-2 text-right font-bold text-red-600 border-r border-gray-200">{formatCurrency(exp.amount)}</td>
                           <td className="px-3.5 py-2 text-center print:hidden">
                             <div className="flex items-center justify-center gap-1">
-                              <button 
+                              <button
                                 type="button"
                                 onClick={() => handleEdit(exp)}
                                 className="text-blue-600 hover:bg-blue-100 p-1.5 rounded transition-colors"
@@ -446,7 +446,7 @@ const ExpenseEntry = () => {
                               >
                                 <Edit size={15} />
                               </button>
-                              <button 
+                              <button
                                 type="button"
                                 onClick={() => handleDelete(exp.id)}
                                 className="text-red-500 hover:bg-red-100 p-1.5 rounded transition-colors"

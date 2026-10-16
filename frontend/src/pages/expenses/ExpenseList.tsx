@@ -53,7 +53,7 @@ const ExpenseList = () => {
       { header: 'Category', dataKey: '_category' },
       { header: 'Payment Mode', dataKey: '_mode' },
       { header: 'Notes', dataKey: '_notes' },
-      { header: `Amount (${settings?.currency || 'RM'})`, dataKey: '_amount' },
+      { header: `Amount (${settings?.currencySymbol || 'RM'})`, dataKey: '_amount' },
     ];
     const rows = expenses.map((e: any, i: number) => ({
       _sno: i + 1,
@@ -73,14 +73,14 @@ const ExpenseList = () => {
       'Category': e.category?.name || '-',
       'Payment Mode': e.paymentMode?.name || '-',
       'Notes': e.notes || '-',
-      [`Amount (${settings?.currency || 'RM'})`]: Number(e.amount),
+      [`Amount (${settings?.currencySymbol || 'RM'})`]: Number(e.amount),
     }));
     exportToExcel(exportData, 'Expense_History');
   };
 
   return (
     <div className="bg-[#F7F7F7] min-h-[calc(100vh-100px)] flex flex-col gap-4 p-3 sm:p-4 font-sans">
-      
+
       {/* Top Header Card */}
       <div className="bg-white border border-[#CBD5E1] shadow-sm rounded-lg p-3 sm:p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div className="flex items-center gap-3">
@@ -94,21 +94,21 @@ const ExpenseList = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Link 
-            to="/expenses/new" 
+          <Link
+            to="/expenses/new"
             className="bg-[#16A34A] hover:bg-[#15803D] text-white text-[12px] font-bold px-3.5 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm"
           >
             <Plus size={16} /> <span>NEW EXPENSE ENTRY</span>
           </Link>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={handleExcelExport}
             className="bg-[#10B981] hover:bg-[#059669] text-white text-[12px] font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm"
           >
             <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
           </button>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={handlePdfExport}
             className="bg-[#EF4444] hover:bg-[#DC2626] text-white text-[12px] font-bold px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors shadow-sm"
           >
@@ -122,18 +122,18 @@ const ExpenseList = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 items-end">
           <div>
             <label className="block text-[11px] font-bold text-black mb-1">From Date</label>
-            <input 
-              type="date" 
-              value={startDate} 
+            <input
+              type="date"
+              value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 rounded text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white"
             />
           </div>
           <div>
             <label className="block text-[11px] font-bold text-black mb-1">To Date</label>
-            <input 
-              type="date" 
-              value={endDate} 
+            <input
+              type="date"
+              value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className="w-full px-3 py-1.5 border border-gray-300 rounded text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white"
             />
@@ -148,15 +148,15 @@ const ExpenseList = () => {
             />
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => refetch()}
               className="bg-[#3B82F6] hover:bg-[#2563EB] text-white text-[12px] font-bold px-4 py-1.5 rounded flex items-center gap-1 transition-colors w-full justify-center shadow-sm"
             >
               <Filter size={14} /> Apply Filter
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => { setStartDate(''); setEndDate(''); setCategoryId(''); setSearchQuery(''); }}
               className="bg-gray-200 hover:bg-gray-300 text-black text-[12px] font-bold px-3 py-1.5 rounded transition-colors whitespace-nowrap flex items-center gap-1"
             >
@@ -168,9 +168,9 @@ const ExpenseList = () => {
 
       {/* Expense List Table Container */}
       <div className="bg-white border border-[#CBD5E1] shadow-sm rounded-lg overflow-hidden flex flex-col flex-1">
-        
+
         <div id="expense-list-export" className="p-3 sm:p-4 flex flex-col flex-1">
-          
+
           <div className="flex-1 overflow-y-auto custom-scrollbar overflow-x-auto">
             <table className="w-full text-left text-[12px] whitespace-nowrap min-w-[700px] border-collapse">
               <thead>
