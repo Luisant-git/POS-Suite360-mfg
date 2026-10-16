@@ -451,7 +451,11 @@ const Estimation = () => {
   const onError = (errors: any) => {
     let errorMessage = 'Validation failed. Please ensure all items have a Rate and Quantity > 0.';
     
-    if (errors.items && Array.isArray(errors.items)) {
+    if (errors.customerId) {
+      errorMessage = 'Please select a Customer before saving.';
+    } else if (errors.paymentModeId) {
+      errorMessage = 'Please select a Payment Mode before saving.';
+    } else if (errors.items && Array.isArray(errors.items)) {
       for (const item of errors.items) {
         if (item?.quantity?.message === 'Qty > Stock') {
           errorMessage = 'Validation failed: Quantity exceeds available stock.';
@@ -466,6 +470,8 @@ const Estimation = () => {
           break;
         }
       }
+    } else if (errors.items) {
+      errorMessage = 'Please add at least one product before saving.';
     }
     
     toast.error(errorMessage);
@@ -628,13 +634,6 @@ const Estimation = () => {
           >
             <Printer size={16} /> SAVE & PRINT (F10)
           </button>
-          <button 
-            type="button"
-            onClick={handleWhatsApp}
-            className="bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
-          >
-            <WhatsAppIcon size={16} /> WhatsApp
-          </button>
         </div>
         <button 
           type="button"
@@ -737,8 +736,33 @@ const Estimation = () => {
               </select>
             </div>
 
-            <div className="w-full lg:flex-1 lg:max-w-[200px]">
-              <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Payment Mode</label>
+            <div className="w-full lg:flex-1 lg:max-w-[220px]">
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-[11px] font-bold text-[#1F2937]">Payment Mode</label>
+                <div className="flex gap-1">
+                  {paymentModes.filter((pm: any) => ['cash', 'credit'].includes(pm.name?.toLowerCase())).map((pm: any) => {
+                    const isCredit = pm.name?.toLowerCase() === 'credit';
+                    const isSelected = Number(watch('paymentModeId')) === pm.id;
+                    return (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => {
+                          setValue('paymentModeId', pm.id);
+                          if (pm.name?.toLowerCase() === 'cash') setValue('customerId', 0);
+                        }}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
+                          isCredit
+                            ? isSelected ? 'bg-rose-500 text-white shadow-sm' : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
+                            : isSelected ? 'bg-[#22C55E] text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {pm.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <select
                 {...register('paymentModeId')}
                 onChange={(e) => {
@@ -748,7 +772,14 @@ const Estimation = () => {
                     setValue('customerId', 0);
                   }
                 }}
-                className="w-full px-2 py-1.5 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] bg-white"
+                className={`w-full px-2 py-1.5 border rounded text-[13px] outline-none font-bold transition-colors ${
+                  (() => {
+                    const pm = paymentModes.find((p: any) => p.id === Number(watch('paymentModeId')));
+                    if (pm?.name?.toLowerCase() === 'credit') return 'border-rose-400 bg-rose-50 text-rose-700';
+                    if (pm?.name?.toLowerCase() === 'cash') return 'border-emerald-400 bg-emerald-50 text-emerald-700';
+                    return 'border-[#D1D5DB] bg-white';
+                  })()
+                }`}
               >
                 <option value="0">Select Payment Mode...</option>
                 {paymentModes.map((pm: any) => (

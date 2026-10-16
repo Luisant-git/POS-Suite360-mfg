@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2, Save, X, Printer, RefreshCw, List, UserPlus, AlertTriangle, FileText, Clock } from 'lucide-react';
+import { Plus, Trash2, Save, X, Printer, RefreshCw, List, UserPlus, AlertTriangle, FileText, Clock, DollarSign } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
@@ -161,61 +161,82 @@ const POS = () => {
   const editPrefilledRef = useRef<string | null>(null);
   const editPrefilledWithProductsRef = useRef(false);
 
-  // ── Keyboard navigation helper ──────────────────────────────────────────
+  // ── Keyboard navigation helper (Nasa logic) ─────────────────────────────
   // Each interactive cell in the table has data-row and data-col attributes.
-  // Columns: 0=product, 1=qty, 2=rate, 3=discPct, 4=discAmt
+  // Columns: 1=qty, 2=rate, 3=discPercent, 4=discAmt
   const focusCell = (row: number, col: number) => {
-    if (col === 0) {
-      const el = document.querySelector<HTMLElement>(`[data-row-product="${row}"]`);
-      if (el) { el.focus(); }
-    } else {
+    setTimeout(() => {
       const el = document.querySelector<HTMLElement>(`[data-row="${row}"][data-col="${col}"]`);
       if (el) { el.focus(); (el as HTMLInputElement).select?.(); }
-    }
+    }, 10);
   };
 
   const handleCellKey = (e: React.KeyboardEvent, rowIndex: number, col: number, totalCols: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      // Enter always goes to next row
       const nextRow = rowIndex + 1;
       if (nextRow < fields.length) {
-        focusCell(nextRow, 0);
+        setTimeout(() => {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+          if (selectEl) selectEl.focus();
+        }, 80);
       } else {
         append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 });
-        setTimeout(() => focusCell(nextRow, 0), 80);
+        setTimeout(() => {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+          if (selectEl) selectEl.focus();
+        }, 100);
       }
     } else if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       const nextCol = col + 1;
-      if (nextCol < totalCols) {
+      if (nextCol <= totalCols) {
         focusCell(rowIndex, nextCol);
       } else {
         const nextRow = rowIndex + 1;
         if (nextRow < fields.length) {
-          focusCell(nextRow, 0);
+          setTimeout(() => {
+            const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+            if (selectEl) selectEl.focus();
+          }, 80);
         } else {
           append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 });
-          setTimeout(() => focusCell(nextRow, 0), 80);
+          setTimeout(() => {
+            const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+            if (selectEl) selectEl.focus();
+          }, 100);
         }
       }
-    } else if (e.key === 'Tab' && e.shiftKey) {
-      e.preventDefault();
-      const prevCol = col - 1;
-      if (prevCol >= 0) focusCell(rowIndex, prevCol);
-      else if (rowIndex > 0) focusCell(rowIndex - 1, totalCols - 1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      focusCell(rowIndex + 1, col);
+    } else if (e.key === 'ArrowRight') {
+      if ((e.target as HTMLInputElement).selectionStart === (e.target as HTMLInputElement).value.length) {
+        e.preventDefault();
+        const nextCol = col + 1;
+        if (nextCol <= totalCols) focusCell(rowIndex, nextCol);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      if ((e.target as HTMLInputElement).selectionStart === 0) {
+        e.preventDefault();
+        const prevCol = col - 1;
+        if (prevCol >= 1) focusCell(rowIndex, prevCol);
+        else if (prevCol === 0) {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${rowIndex}"] input`);
+          if (selectEl) selectEl.focus();
+        }
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (rowIndex > 0) focusCell(rowIndex - 1, col);
-    } else if (e.key === 'Delete' && e.ctrlKey) {
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (rowIndex < fields.length - 1) focusCell(rowIndex + 1, col);
+    } else if (e.ctrlKey && e.key === 'Delete') {
       e.preventDefault();
       if (fields.length > 1) {
         remove(rowIndex);
-        // focus the same row index (or previous if last row deleted)
-        setTimeout(() => focusCell(Math.min(rowIndex, fields.length - 2), col), 50);
+        setTimeout(() => {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${Math.max(0, rowIndex - 1)}"] input`);
+          if (selectEl) selectEl.focus();
+        }, 50);
       }
     }
   };
@@ -367,6 +388,17 @@ const POS = () => {
   const watchRoundOff = watch('roundOff');
   const selectedCustomerId = watch('customerId');
 
+  // Customer fixed product rates query
+  const { data: customerRates = [] } = useQuery({
+    queryKey: ['customer-rates', selectedCustomerId],
+    queryFn: async () => {
+      if (!selectedCustomerId) return [];
+      const res = await api.get(`/customers/${selectedCustomerId}/rates`);
+      return res.data;
+    },
+    enabled: !!selectedCustomerId && (!!settings?.enableCustomerWiseRate || !!(settings as any)?.enableCustomerRates),
+  });
+
   const selectedCustomer = customers.find((c: any) => c.id === Number(selectedCustomerId));
   const watchPaymentModeId = watch('paymentModeId');
   const isCashMode = paymentModes.find((p: any) => p.id === Number(watchPaymentModeId))?.name?.toLowerCase() === 'cash';
@@ -445,9 +477,12 @@ const POS = () => {
       else if (rateType === 'MRP') rate = Number(item.mrp) || 0;
       
       // Override with custom customer rate if enabled
-      if (settings?.enableCustomerWiseRate && selectedCustomer?.productRates && !item.isService) {
-        const customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === item.id);
-        if (customRate && customRate.rate > 0) {
+      if ((settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && !item.isService) {
+        let customRate = customerRates?.find((r: any) => r.productId === item.id);
+        if (!customRate && selectedCustomer?.productRates) {
+          customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === item.id);
+        }
+        if (customRate && Number(customRate.rate) > 0) {
           rate = Number(customRate.rate);
         }
       }
@@ -456,7 +491,7 @@ const POS = () => {
     }
   };
 
-  // Recalculate rates if rateType or selectedCustomer changes
+  // Recalculate rates if rateType, selectedCustomer, or customerRates changes
   const watchRateType = watch('rateType');
   useEffect(() => {
     if (editId) return; // In edit mode, preserve the originally billed rates (the Rate Type select recomputes on change)
@@ -470,9 +505,12 @@ const POS = () => {
         if (watchRateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
         else if (watchRateType === 'MRP') rate = Number(product.mrp) || 0;
         
-        if (settings?.enableCustomerWiseRate && selectedCustomer?.productRates) {
-          const customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
-          if (customRate && customRate.rate > 0) {
+        if (settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) {
+          let customRate = customerRates?.find((r: any) => r.productId === product.id);
+          if (!customRate && selectedCustomer?.productRates) {
+            customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
+          }
+          if (customRate && Number(customRate.rate) > 0) {
             rate = Number(customRate.rate);
           }
         }
@@ -482,7 +520,26 @@ const POS = () => {
       }
     });
     // Triggers calculation effect indirectly since items changed
-  }, [watchRateType, selectedCustomerId, settings?.enableCustomerWiseRate, selectedCustomer]);
+  }, [watchRateType, selectedCustomerId, settings?.enableCustomerWiseRate, selectedCustomer, customerRates]);
+
+  // Mutation to quickly save custom fixed rate for customer from POS
+  const saveCustomerRateMutation = useMutation({
+    mutationFn: async ({ productId, rate }: { productId: number; rate: number }) => {
+      if (!selectedCustomerId) return;
+      await api.post(`/customers/${selectedCustomerId}/rates`, {
+        rates: [{ productId, rate }]
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customerRates', selectedCustomerId] });
+      queryClient.invalidateQueries({ queryKey: ['customer-rates', selectedCustomerId] });
+      toast.success('Customer fixed rate saved!');
+    },
+    onError: () => {
+      toast.error('Failed to save customer rate.');
+    }
+  });
 
   const createMutation = useMutation({
     mutationFn: (data: SaleFormValues) => editId
@@ -560,9 +617,9 @@ const POS = () => {
       return;
     }
     
-    const validItems = data.items.filter(item => item.productId > 0 || item.serviceItemId);
+    const validItems = data.items.filter(item => (item.productId && item.productId > 0) || item.serviceItemId);
     if (validItems.length === 0) {
-      toast.error('Please add at least one product or service before saving.');
+      toast.error('Please add at least one product before saving.');
       return;
     }
 
@@ -623,22 +680,32 @@ const POS = () => {
   };
 
   const onError = (errors: any) => {
-    const messages: string[] = [];
-    const seen = new Set<string>();
-    const walk = (obj: any) => {
-      if (!obj || typeof obj !== 'object') return;
-      if (typeof obj.message === 'string' && obj.message && !seen.has(obj.message)) {
-        seen.add(obj.message);
-        messages.push(obj.message);
+    let errorMessage = 'Validation failed. Please ensure all items have a Rate and Quantity > 0.';
+    
+    if (errors.customerId) {
+      errorMessage = 'Please select a Customer before saving.';
+    } else if (errors.paymentModeId) {
+      errorMessage = 'Please select a Payment Mode before saving.';
+    } else if (errors.items && Array.isArray(errors.items)) {
+      for (const item of errors.items) {
+        if (item?.quantity?.message === 'Qty > Stock') {
+          errorMessage = 'Validation failed: Quantity exceeds available stock.';
+          break;
+        }
+        if (item?.quantity?.message === 'Quantity must be > 0') {
+          errorMessage = 'Validation failed: Quantity must be greater than 0.';
+          break;
+        }
+        if (item?.rate?.message === 'Rate is required') {
+          errorMessage = 'Validation failed: Rate is required for all items.';
+          break;
+        }
       }
-      for (const key of Object.keys(obj)) walk(obj[key]);
-    };
-    walk(errors);
-    if (messages.length && messages[0] !== 'At least one item is required') {
-      toast.error(`Validation failed: ${messages[0]}`);
-    } else {
-      toast.error(messages.length ? 'Validation failed: At least one item is required.' : 'Validation failed. Please ensure all items have a Rate and Quantity > 0.');
+    } else if (errors.items) {
+      errorMessage = 'Please add at least one product before saving.';
     }
+    
+    toast.error(errorMessage);
     console.error(errors);
   };
 
@@ -779,6 +846,10 @@ const POS = () => {
       } else if (e.key === 'F2') {
         e.preventDefault();
         append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 });
+        setTimeout(() => {
+          const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
+          if (inputs.length > 0) inputs[inputs.length - 1].focus();
+        }, 100);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -927,8 +998,33 @@ const POS = () => {
               </select>
             </div>
 
-            <div className="w-full lg:flex-1 lg:max-w-[200px]">
-              <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Payment Mode</label>
+            <div className="w-full lg:flex-1 lg:max-w-[220px]">
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-[11px] font-bold text-[#1F2937]">Payment Mode</label>
+                <div className="flex gap-1">
+                  {paymentModes.filter((pm: any) => ['cash', 'credit'].includes(pm.name?.toLowerCase())).map((pm: any) => {
+                    const isCredit = pm.name?.toLowerCase() === 'credit';
+                    const isSelected = Number(watch('paymentModeId')) === pm.id;
+                    return (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => {
+                          setValue('paymentModeId', pm.id);
+                          if (pm.name?.toLowerCase() === 'cash') setValue('customerId', 0);
+                        }}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
+                          isCredit
+                            ? isSelected ? 'bg-rose-500 text-white shadow-sm' : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
+                            : isSelected ? 'bg-[#22C55E] text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {pm.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <select
                 {...register('paymentModeId')}
                 onChange={(e) => {
@@ -938,7 +1034,14 @@ const POS = () => {
                     setValue('customerId', 0);
                   }
                 }}
-                className="w-full px-2 py-1.5 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] bg-white"
+                className={`w-full px-2 py-1.5 border rounded text-[13px] outline-none font-bold transition-colors ${
+                  (() => {
+                    const pm = paymentModes.find((p: any) => p.id === Number(watch('paymentModeId')));
+                    if (pm?.name?.toLowerCase() === 'credit') return 'border-rose-400 bg-rose-50 text-rose-700';
+                    if (pm?.name?.toLowerCase() === 'cash') return 'border-emerald-400 bg-emerald-50 text-emerald-700';
+                    return 'border-[#D1D5DB] bg-white';
+                  })()
+                }`}
               >
                 <option value="0">Select Payment Mode...</option>
                 {paymentModes.map((pm: any) => (
@@ -954,7 +1057,13 @@ const POS = () => {
         <div className="shrink-0 flex flex-wrap justify-end gap-2 p-2 bg-white border-b border-[#E5E7EB]">
           <button 
             type="button"
-            onClick={() => append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 })}
+            onClick={() => {
+              append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 });
+              setTimeout(() => {
+                const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
+                if (inputs.length > 0) inputs[inputs.length - 1].focus();
+              }, 100);
+            }}
             className="border border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <Plus size={14} /> Add Row (F2)
@@ -1005,50 +1114,75 @@ const POS = () => {
           <table className="w-full border-collapse md:min-w-[900px] whitespace-nowrap responsive-table">
             <thead>
               <tr className="bg-[#0F172A] text-white">
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-10">#</th>
-                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155]">Product Code / Name (Searchable Dropdown)</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Stock</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Unit</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-10">#</th>
+                <th className="px-2 py-2 text-left text-[12px] font-bold border border-[#334155]">Product Code / Name</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Stock</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Unit</th>
 
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Qty</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-28">Rate</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Disc %</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Disc Amt</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">Qty</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-28">Rate</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Disc %</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">Disc Amt</th>
                 {settings?.enableTax && (
                   <>
-                    <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Tax %</th>
-                    <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Tax Amt</th>
+                    <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Tax %</th>
+                    <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">Tax Amt</th>
                   </>
                 )}
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-32">Total</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-16">Act</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-32">Total</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-16">Act</th>
               </tr>
             </thead>
             <tbody>
               {fields.map((field, index) => {
-                const totalCols = settings?.enableTax ? 5 : 5; // product=0,qty=1,rate=2,discPct=3,discAmt=4
+                const totalCols = 4; // qty=1, rate=2, discPercent=3, discAmt=4
                 return (
                 <tr key={field.id} className="border-b border-[#E5E7EB] hover:bg-[#F9FAFB]">
                   <td data-label="#" className="px-2 py-1 text-center text-[13px] border-r border-[#E5E7EB]">{index + 1}</td>
                   <td data-label="Product" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <SearchableSelect
-                      value={watch(`items.${index}.productId`)}
-                      tabIndex={0}
-                      dataAttr={{ 'data-row-product': String(index) }}
-                      autoFocus={index === 0 && fields.length === 1 && watch(`items.${index}.productId`) === 0}
-                      onTabNext={() => focusCell(index, 1)}
-                      onChange={(val) => {
-                        setValue(`items.${index}.productId`, Number(val));
-                        handleProductChange(index, String(val));
-                      }}
-                      options={[
-                        { label: 'Type product name / code...', value: 0 },
-                        ...products.map((p: any) => ({ 
-                          label: p.isService ? `[Service] ${p.code} - ${p.name}` : `${p.code} - ${p.name}`, 
-                          value: p.id 
-                        }))
-                      ]}
-                    />
+                    <div data-row-product={index} onKeyDownCapture={(e) => {
+                      if (e.ctrlKey && e.key === 'Delete' && fields.length > 1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        remove(index);
+                        setTimeout(() => {
+                          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${Math.max(0, index - 1)}"] input`);
+                          if (selectEl) selectEl.focus();
+                        }, 50);
+                      }
+                    }}>
+                      <SearchableSelect
+                        value={watch(`items.${index}.productId`)}
+                        autoFocus={index === fields.length - 1 && watch(`items.${index}.productId`) === 0}
+                        onChange={(val) => {
+                          setValue(`items.${index}.productId`, Number(val));
+                          handleProductChange(index, String(val));
+                          if (Number(val) === 0) {
+                            if (index === fields.length - 1) {
+                              append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 });
+                              setTimeout(() => {
+                                const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
+                                if (inputs.length > 0) inputs[inputs.length - 1].focus();
+                              }, 100);
+                            } else {
+                              setTimeout(() => {
+                                const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${index + 1}"] input`);
+                                if (selectEl) selectEl.focus();
+                              }, 100);
+                            }
+                          } else {
+                            setTimeout(() => focusCell(index, 1), 100);
+                          }
+                        }}
+                        options={[
+                          { label: 'Type product name / code...', value: 0 },
+                          ...products.map((p: any) => ({ 
+                            label: p.isService ? `[Service] ${p.code} - ${p.name}` : `${p.code} - ${p.name}`, 
+                            value: p.id 
+                          }))
+                        ]}
+                      />
+                    </div>
                   </td>
                   <td data-label="Stock" className="px-2 py-1 border-r border-[#E5E7EB] text-center">
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold text-white ${watch(`items.${index}.stock`) > 0 ? 'bg-[#059669]' : 'bg-[#EF4444]'}`}>
@@ -1070,31 +1204,47 @@ const POS = () => {
                     />
                   </td>
                   <td data-label="Rate" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
-                      {...register(`items.${index}.rate`)} 
-                      data-row={index} data-col={2}
-                      type="number" step="0.01" placeholder="0.00" 
-                      onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 2, totalCols)}
-                      className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors ${(() => {
-                        const pId = watch(`items.${index}.productId`);
-                        const prod = products.find((p: any) => p.id === Number(pId));
-                        const currentRate = Number(watch(`items.${index}.rate`)) || 0;
-                        if (prod && currentRate > 0 && currentRate <= Number(prod.purchaseRate)) {
-                          return 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-100 text-red-700';
-                        }
-                        return 'border-[#CBD5E1] bg-white focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-[#1E293B]';
-                      })()}`}
-                      onBlur={(e) => {
-                        const enteredRate = Number(e.target.value);
-                        const pId = watch(`items.${index}.productId`);
-                        const product = products.find((p: any) => p.id === Number(pId));
-                        if (product && enteredRate > 0 && enteredRate <= Number(product.purchaseRate)) {
-                          toast.error(`Loss Warning: Selling below purchase rate (${formatCurrency(product.purchaseRate)})!`, { duration: 4000 });
-                        }
-                        register(`items.${index}.rate`).onBlur(e);
-                      }}
-                    />
+                    <div className="flex items-center gap-1">
+                      <input 
+                        {...register(`items.${index}.rate`)} 
+                        data-row={index} data-col={2}
+                        type="number" step="0.01" placeholder="0.00" 
+                        onFocus={(e) => e.target.select()}
+                        onKeyDown={(e) => handleCellKey(e, index, 2, totalCols)}
+                        className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors ${(() => {
+                          const pId = watch(`items.${index}.productId`);
+                          const prod = products.find((p: any) => p.id === Number(pId));
+                          const currentRate = Number(watch(`items.${index}.rate`)) || 0;
+                          if (prod && currentRate > 0 && currentRate <= Number(prod.purchaseRate)) {
+                            return 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-100 text-red-700';
+                          }
+                          return 'border-[#CBD5E1] bg-white focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-black font-bold';
+                        })()}`}
+                        onBlur={(e) => {
+                          const enteredRate = Number(e.target.value);
+                          const pId = watch(`items.${index}.productId`);
+                          const product = products.find((p: any) => p.id === Number(pId));
+                          if (product && enteredRate > 0 && enteredRate <= Number(product.purchaseRate)) {
+                            toast.error(`Loss Warning: Selling below purchase rate (${formatCurrency(product.purchaseRate)})!`, { duration: 4000 });
+                          }
+                          register(`items.${index}.rate`).onBlur(e);
+                        }}
+                      />
+                      {(settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && !!selectedCustomerId && Number(watch(`items.${index}.productId`)) > 0 && Number(watch(`items.${index}.rate`)) > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const pId = Number(watch(`items.${index}.productId`));
+                            const rVal = Number(watch(`items.${index}.rate`));
+                            saveCustomerRateMutation.mutate({ productId: pId, rate: rVal });
+                          }}
+                          className="p-1 bg-green-50 text-green-600 border border-green-300 rounded hover:bg-green-600 hover:text-white transition-colors shrink-0"
+                          title="Save this rate as customer fixed rate"
+                        >
+                          <DollarSign size={11} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td data-label="Disc %" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 

@@ -84,8 +84,8 @@ const SalesList = () => {
                 onClick={() => { setPaymentFilter(mode); setCurrentPage(1); }}
                 className={`px-4 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
                   paymentFilter === mode
-                    ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]'
-                    : 'bg-white text-[#1E3A8A] border-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white'
+                    ? 'bg-[#1E3A8A] text-white border-[#1E3A8A] shadow-sm'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
                 }`}
               >
                 {mode}
@@ -154,8 +154,14 @@ const SalesList = () => {
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{sale.customer?.name || 'Counter Sale'}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-bold text-right">{formatCurrency(sale.grandTotal)}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-center">
-                      <span className="bg-[#22C55E] text-white px-2 py-0.5 rounded text-[11px] font-bold tracking-wide">
-                        {sale.paymentMode?.name || '-'}
+                      <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold tracking-wide ${
+                        sale.paymentMode?.name?.toLowerCase() === 'credit'
+                          ? 'bg-rose-500 text-white'
+                          : sale.paymentMode?.name?.toLowerCase() === 'cash'
+                          ? 'bg-[#22C55E] text-white'
+                          : 'bg-[#3B82F6] text-white'
+                      }`}>
+                        {sale.paymentMode?.name?.toUpperCase() || '-'}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-center">

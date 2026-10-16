@@ -143,10 +143,14 @@ const SalesView = () => {
           <div>
             <h2 className="text-[22px] font-bold text-[#1E293B]">Invoice {sale.invoiceNo}</h2>
             <div className="flex gap-2 items-center text-[13px] text-gray-500 mt-1">
-              <span>{new Date(sale.date).toISOString().split('T')[0]}</span>
+              <span>{sale.date ? new Date(sale.date).toISOString().split('T')[0] : ''}</span>
               <span>•</span>
-              <span className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-100 px-2 py-0.5 rounded">
-                <CheckCircle2 size={12} /> PAID
+              <span className={`flex items-center gap-1 font-bold px-2.5 py-0.5 rounded text-[11px] ${
+                sale.paymentMode?.name?.toLowerCase() === 'credit'
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-[#22C55E] text-white'
+              }`}>
+                {sale.paymentMode?.name?.toLowerCase() === 'credit' ? 'CREDIT' : <><CheckCircle2 size={12} /> PAID</>}
               </span>
             </div>
           </div>
@@ -191,8 +195,14 @@ const SalesView = () => {
               </div>
               <div className="text-right">
                 <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Payment Details</p>
-                <p className="font-bold text-[14px] text-gray-800">{sale.paymentMode?.name || 'CASH'}</p>
-                <p className="text-[13px] text-gray-600 mt-1">Status: Paid</p>
+                <p className={`font-bold text-[14px] inline-block px-2.5 py-0.5 rounded ${
+                  sale.paymentMode?.name?.toLowerCase() === 'credit'
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-[#22C55E] text-white'
+                }`}>
+                  {sale.paymentMode?.name?.toUpperCase() || 'CASH'}
+                </p>
+                <p className="text-[13px] text-gray-600 mt-1">Status: {sale.paymentMode?.name?.toLowerCase() === 'credit' ? 'Credit' : 'Paid'}</p>
               </div>
             </div>
           </div>
