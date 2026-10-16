@@ -170,4 +170,260 @@ export class ReportsService {
       materialsUsed: Object.values(materialsUsed),
     };
   }
+
+  async getSupplierOutstanding(supplierId: number) {
+    const supplier = await this.prisma.supplier.findUnique({
+      where: { id: supplierId },
+    });
+    if (!supplier) return 0;
+
+    const creditMode = await this.prisma.paymentMode.findFirst({
+      where: { name: { equals: 'Credit', mode: 'insensitive' } }
+    });
+    const creditModeId = creditMode?.id || -1;
+
+    const purchases = await this.prisma.purchase.aggregate({
+      where: { 
+        supplierId,
+        paymentModeId: creditModeId
+      },
+      _sum: { grandTotal: true },
+    });
+
+    const payments = await this.prisma.supplierPayment.aggregate({
+      where: { supplierId },
+      _sum: { amount: true },
+    });
+
+    const purchaseReturns = await this.prisma.purchaseReturn.aggregate({
+      where: { supplierId },
+      _sum: { totalAmount: true },
+    });
+
+    const openingBalance = Number(supplier.openingBalance) || 0;
+    const isOpeningCredit = supplier.openingBalanceType === 'Cr'; // Cr means we owe them
+    const isOpeningDebit = supplier.openingBalanceType === 'Dr';
+    
+    let totalOwed = 0;
+    if (isOpeningCredit) totalOwed += openingBalance;
+    if (isOpeningDebit) totalOwed -= openingBalance;
+
+    const totalPurchases = Number(purchases._sum.grandTotal) || 0;
+    const totalPaid = Number(payments._sum.amount) || 0;
+    const totalReturns = Number(purchaseReturns._sum.totalAmount) || 0;
+
+    return totalOwed + totalPurchases - totalPaid - totalReturns;
+  }
+
+  async getProductWiseSales(fromDate?: string, toDate?: string, productId?: number, supplierId?: number) {
+    const whereDate: any = {};
+    if (fromDate || toDate) {
+      whereDate.date = {};
+      if (fromDate) {
+        whereDate.date.gte = new Date(`${fromDate}T00:00:00+08:00`);
+      }
+      if (toDate) {
+        whereDate.date.lte = new Date(`${toDate}T23:59:59.999+08:00`);
+      }
+    }
+
+    const saleItems = await this.prisma.saleItem.findMany({
+      where: {
+        sale: whereDate,
+        ...(productId ? { productId } : {}),
+        ...(supplierId ? { product: { supplierId } } : {}),
+      },
+      include: {
+        sale: {
+          include: {
+            customer: true,
+            paymentMode: true,
+          }
+        },
+        product: {
+          include: {
+            supplier: true,
+            category: true,
+            unit: true,
+          }
+        }
+      },
+      orderBy: {
+        sale: { date: 'desc' }
+      }
+    });
+
+    const productGroups: any = {};
+
+    for (const item of saleItems) {
+      if (!item.product) continue;
+      
+      const productKey = `${item.product.code ? item.product.code + ' - ' : ''}${item.product.name}`;
+      
+      if (!productGroups[productKey]) {
+        productGroups[productKey] = {
+          productId: item.productId,
+          productName: productKey,
+          rawProductName: item.product.name,
+          productCode: item.product.code || '',
+          barcode: item.product.barcode || '',
+          categoryName: item.product.category?.name || 'General',
+          unitName: item.product.unit?.name || '',
+          supplierId: item.product.supplierId || null,
+          supplierName: item.product.supplier?.name || 'Unassigned Supplier',
+          items: [],
+          totalQty: 0,
+          totalValue: 0,
+          totalCost: 0,
+          totalProfit: 0,
+        };
+      }
+
+      const qty = Number(item.quantity) || 0;
+      const value = Number(item.amount) || 0;
+      const purchaseRate = Number(item.product.purchaseRate) || 0;
+      const cost = qty * purchaseRate;
+      const profit = value - cost;
+
+      productGroups[productKey].items.push({
+        saleId: item.saleId,
+        invoiceNo: item.sale?.invoiceNo || '-',
+        date: item.sale?.date || new Date(),
+        customerName: item.sale?.customer?.name || 'Cash Customer',
+        customerPhone: item.sale?.customer?.phone || '',
+        paymentMode: item.sale?.paymentMode?.name || '-',
+        qty: qty,
+        rate: Number(item.rate) || (qty > 0 ? value / qty : 0),
+        value: value,
+        cost: cost,
+        profit: profit,
+      });
+
+      productGroups[productKey].totalQty += qty;
+      productGroups[productKey].totalValue += value;
+      productGroups[productKey].totalCost += cost;
+      productGroups[productKey].totalProfit += profit;
+    }
+
+    return Object.values(productGroups).sort((a: any, b: any) => a.productName.localeCompare(b.productName));
+  }
+
+  async getSupplierWiseSales(fromDate?: string, toDate?: string, supplierId?: number) {
+    const whereDate: any = {};
+    if (fromDate || toDate) {
+      whereDate.date = {};
+      if (fromDate) {
+        whereDate.date.gte = new Date(`${fromDate}T00:00:00+08:00`);
+      }
+      if (toDate) {
+        whereDate.date.lte = new Date(`${toDate}T23:59:59.999+08:00`);
+      }
+    }
+
+    const saleItems = await this.prisma.saleItem.findMany({
+      where: {
+        sale: whereDate,
+        ...(supplierId ? { product: { supplierId } } : {}),
+      },
+      include: {
+        sale: {
+          include: {
+            customer: true,
+            paymentMode: true,
+          }
+        },
+        product: {
+          include: {
+            supplier: true,
+            unit: true,
+          }
+        }
+      },
+      orderBy: {
+        sale: { date: 'desc' }
+      }
+    });
+
+    const supplierGroups: Record<string, any> = {};
+
+    for (const item of saleItems) {
+      const supplier = item.product?.supplier;
+      const supplierKey = supplier ? `supplier-${supplier.id}` : 'supplier-unassigned';
+      const supplierName = supplier?.name || 'Unassigned / Direct Purchase';
+
+      if (!supplierGroups[supplierKey]) {
+        supplierGroups[supplierKey] = {
+          supplierId: supplier?.id || null,
+          supplierName: supplierName,
+          supplierCode: supplier?.id ? `SUP-${supplier.id}` : '-',
+          phone: supplier?.phone || '-',
+          contactPerson: supplier?.contactPerson || '',
+          outstandingBalance: 0,
+          productsMap: {},
+          totalQty: 0,
+          totalSalesValue: 0,
+          totalCostValue: 0,
+          totalMargin: 0,
+          itemsCount: 0,
+        };
+      }
+
+      const qty = Number(item.quantity) || 0;
+      const value = Number(item.amount) || 0;
+      const purchaseRate = Number(item.product?.purchaseRate || 0);
+      const cost = qty * purchaseRate;
+      const profit = value - cost;
+
+      const pId: number = item.productId || 0;
+      if (!supplierGroups[supplierKey].productsMap[pId]) {
+        supplierGroups[supplierKey].productsMap[pId] = {
+          productId: pId,
+          productName: item.product?.name || 'Unknown',
+          productCode: item.product?.code || '',
+          unitName: item.product?.unit?.name || '',
+          purchaseRate: purchaseRate,
+          sellingRate: Number(item.product?.sellingRate || 0),
+          qty: 0,
+          salesValue: 0,
+          costValue: 0,
+          margin: 0,
+          invoices: [],
+        };
+      }
+
+      const prod = supplierGroups[supplierKey].productsMap[pId];
+      prod.qty += qty;
+      prod.salesValue += value;
+      prod.costValue += cost;
+      prod.margin += profit;
+      prod.invoices.push({
+        invoiceNo: item.sale?.invoiceNo || '-',
+        date: item.sale?.date || new Date(),
+        customerName: item.sale?.customer?.name || 'Cash Customer',
+        qty,
+        rate: Number(item.rate) || (qty > 0 ? value / qty : 0),
+        value,
+      });
+
+      supplierGroups[supplierKey].totalQty += qty;
+      supplierGroups[supplierKey].totalSalesValue += value;
+      supplierGroups[supplierKey].totalCostValue += cost;
+      supplierGroups[supplierKey].totalMargin += profit;
+      supplierGroups[supplierKey].itemsCount += 1;
+    }
+
+    // Calculate live outstanding balance for each supplier in the report
+    const groupsArray: any[] = Object.values(supplierGroups);
+    for (const group of groupsArray) {
+      if (group.supplierId) {
+        group.outstandingBalance = await this.getSupplierOutstanding(group.supplierId);
+      } else {
+        group.outstandingBalance = 0;
+      }
+      group.products = Object.values(group.productsMap).sort((a: any, b: any) => b.salesValue - a.salesValue);
+      delete group.productsMap;
+    }
+
+    return groupsArray.sort((a: any, b: any) => a.supplierName.localeCompare(b.supplierName));
+  }
 }

@@ -25,4 +25,32 @@ export class ReportsController {
     }
     return this.reportsService.getBatchProfitAndLoss(workName, productId);
   }
+
+  @Get('product-wise-sales')
+  async getProductWiseSales(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('productId') productId?: string,
+    @Query('supplierId') supplierId?: string,
+  ) {
+    return this.reportsService.getProductWiseSales(
+      fromDate,
+      toDate,
+      productId ? Number(productId) : undefined,
+      supplierId ? Number(supplierId) : undefined,
+    );
+  }
+
+  @Get('supplier-wise-sales')
+  async getSupplierWiseSales(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('supplierId') supplierId?: string,
+  ) {
+    return this.reportsService.getSupplierWiseSales(
+      fromDate,
+      toDate,
+      supplierId ? Number(supplierId) : undefined,
+    );
+  }
 }
