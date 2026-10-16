@@ -63,39 +63,6 @@ const ProfitLossReport = () => {
     netProfit: 0,
   };
 
-  const _exportToCsv = () => {
-    const rows = [
-      ['POS SUITE 360 - Profit & Loss Statement'],
-      ['Period:', `${fromDate} to ${toDate}`],
-      [],
-      ['I. OPERATING REVENUE', 'AMOUNT'],
-      ['Gross Sales', safePnl.grossSales],
-      ['Sales Returns', `-${safePnl.totalSalesReturns}`],
-      ['NET OPERATING REVENUE', safePnl.netOperatingRevenue],
-      [],
-      ['II. COST OF GOODS SOLD', 'AMOUNT'],
-      ['Gross Purchases', safePnl.grossPurchases],
-      ['Purchase Returns', `-${safePnl.totalPurchaseReturns}`],
-      ['NET COST OF GOODS SOLD', safePnl.netCogs],
-      ['GROSS PROFIT', safePnl.grossProfit],
-      [],
-      ['III. OPERATING EXPENSES', 'AMOUNT'],
-      ...safePnl.itemizedExpenses.map((exp: any) => [exp.name, exp.amount]),
-      ['TOTAL OPERATING EXPENSES', safePnl.totalExpenses],
-      [],
-      ['NET PROFIT FOR PERIOD', safePnl.netProfit]
-    ];
-
-    const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `PNL_Statement_${fromDate}_to_${toDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const chartData = pnl ? [
     { name: 'Gross Sales', value: safePnl.grossSales, color: '#2563EB' },
     { name: 'Sales Returns', value: safePnl.totalSalesReturns, color: '#93C5FD' },

@@ -27,19 +27,6 @@ const indianStates = [
   "35 - Andaman & Nicobar Islands", "36 - Telangana", "37 - Andhra Pradesh", "38 - Ladakh"
 ];
 
-const _WhatsAppIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    className={className}
-  >
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
-  </svg>
-);
-
 const numberToWords = (num: number): string => {
   if (!num || num === 0) return "ZERO";
   const a = ["", "ONE ", "TWO ", "THREE ", "FOUR ", "FIVE ", "SIX ", "SEVEN ", "EIGHT ", "NINE ", "TEN ", "ELEVEN ", "TWELVE ", "THIRTEEN ", "FOURTEEN ", "FIFTEEN ", "SIXTEEN ", "SEVENTEEN ", "EIGHTEEN ", "NINETEEN "];
@@ -502,95 +489,6 @@ const Estimation = () => {
     addCustomerMutation.mutate(newCustomer);
   };
 
-  const _handleWhatsApp = async () => {
-    if (!selectedCustomerId) {
-      toast.error('Please select a customer first.');
-      return;
-    }
-    const customer = customers.find((c: any) => c.id === Number(selectedCustomerId));
-    const phone = customer?.phone || '';
-    if (!phone) {
-      toast.error('Selected customer does not have a phone number.');
-      return;
-    }
-
-    const element = document.getElementById('printable-receipt');
-    if (!element) return;
-
-    toast.loading('Sending invoice directly to WhatsApp...', { id: 'whatsapp-toast' });
-
-    const opt = {
-      margin: 0.5,
-      filename: `Estimation_${watch('estimationNo')}.pdf`,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const },
-      enableLinks: true
-    };
-
-    let originalParent: ParentNode | null = null;
-    let nextSibling: ChildNode | null = null;
-
-    try {
-      // Temporarily move to body so html2canvas doesn't get clipped by overflow-hidden containers
-      originalParent = element.parentNode;
-      nextSibling = element.nextSibling;
-      document.body.appendChild(element);
-
-      // Remove hidden temporarily and force flex layout for PDF generation
-      element.classList.remove('hidden');
-      element.style.display = 'flex';
-      element.style.minHeight = '250mm';
-      element.style.width = '210mm'; // Force A4 width
-
-      // Position fixed behind everything so it renders in viewport but isn't visible to user
-      element.style.position = 'fixed';
-      element.style.left = '0';
-      element.style.top = '0';
-      element.style.zIndex = '-9999';
-
-      // Manually hide all toaster notifications so they don't get captured in the PDF
-      const toasters = document.querySelectorAll('div[id^="hot-toast-"], [role="status"], .go3958317564');
-      toasters.forEach(t => { (t as HTMLElement).style.opacity = '0'; });
-
-      // Generate base64 PDF
-      const pdfBase64 = await html2pdf().set(opt).from(element).output('datauristring');
-
-      const message = `Hello ${customer.name},\n\nHere is your invoice ${watch('estimationNo')}.\nTotal Amount: ${formatCurrency(watch('netAmount'))}\n\nThank you for your business!`;
-
-      // Send to backend WhatsApp integration
-      await api.post('/whatsapp/send-pdf', {
-        phone: phone,
-        base64Pdf: pdfBase64,
-        filename: `Estimation_${watch('estimationNo')}.pdf`,
-        caption: message
-      });
-
-      // Restore toasters
-      toasters.forEach(t => { (t as HTMLElement).style.opacity = '1'; });
-
-      toast.success('Invoice sent successfully to WhatsApp!', { id: 'whatsapp-toast' });
-
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Failed to send WhatsApp message. Is the backend authenticated?', { id: 'whatsapp-toast' });
-    } finally {
-      // Restore element state
-      element.classList.add('hidden');
-      element.style.display = '';
-      element.style.minHeight = '';
-      element.style.width = '';
-      element.style.position = '';
-      element.style.left = '';
-      element.style.top = '';
-      element.style.zIndex = '';
-
-      // Move back to original parent
-      if (originalParent && element.parentNode === document.body) {
-        originalParent.insertBefore(element, nextSibling);
-      }
-    }
-  };
 
   // Keyboard Shortcuts
   useEffect(() => {
