@@ -412,11 +412,11 @@ const Suppliers = () => {
               ) : (
                 filteredSuppliers.map((supplier: any, index: number) => (
                   <tr key={supplier.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F9F9F9]'} hover:bg-blue-50`}>
-                    <td data-label="#" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-gray-700">{index + 1}</td>
+                    <td data-label="#" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-black font-bold">{index + 1}</td>
                     <td data-label="Supplier Name" className="px-3 py-3 border-r border-[#E5E7EB] font-bold text-[#3B82F6]">{supplier.name}</td>
-                    <td data-label="Mobile" className="px-3 py-3 border-r border-[#E5E7EB] font-medium text-gray-700">{supplier.phone || '-'}</td>
-                    <td data-label="Complete Address" className="px-3 py-3 border-r border-[#E5E7EB] text-gray-600 truncate max-w-[200px]">{supplier.address || '-'}</td>
-                    <td data-label="Opening Bal" className="px-3 py-3 border-r border-[#E5E7EB] text-right font-bold text-gray-800">
+                    <td data-label="Mobile" className="px-3 py-3 border-r border-[#E5E7EB] font-bold text-black font-bold">{supplier.phone || '-'}</td>
+                    <td data-label="Complete Address" className="px-3 py-3 border-r border-[#E5E7EB] text-black font-bold truncate max-w-[200px]">{supplier.address || '-'}</td>
+                    <td data-label="Opening Bal" className="px-3 py-3 border-r border-[#E5E7EB] text-right font-bold text-black font-bold">
                       {formatCurrency(supplier.openingBalance)} ({supplier.openingBalanceType})
                     </td>
                     <td data-label="Actions" className="px-3 py-3 text-center">

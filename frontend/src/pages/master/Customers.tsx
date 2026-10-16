@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Users, Grid, Maximize, Minimize, Search, Eye } from 'lucide-react';
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { Edit, Trash2, CheckCircle, Users, Grid, Maximize, Minimize, Search, Eye, DollarSign } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 import { useSettings } from '../../contexts/SettingsContext';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
 import CustomerViewModal from '../../components/CustomerViewModal';
-import AddCustomRateModal from '../../components/AddCustomRateModal';
+import CustomerRatesModal from '../../components/CustomerRatesModal';
 import { useNavigate } from 'react-router-dom';
 
 const indianStates = [
@@ -38,10 +38,6 @@ const customerSchema = z.object({
   openingBalanceType: z.string().default('Dr'),
   creditLimit: z.coerce.number().default(0),
   creditDays: z.coerce.number().default(30),
-  productRates: z.array(z.object({
-    productId: z.coerce.number().min(1, 'Product is required'),
-    rate: z.coerce.number().min(0, 'Rate must be positive')
-  })).optional()
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -56,7 +52,7 @@ const Customers = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullTable, setIsFullTable] = useState(false);
-  const [isAddRateModalOpen, setIsAddRateModalOpen] = useState(false);
+  const [selectedCustomerForRates, setSelectedCustomerForRates] = useState<any>(null);
   const { formatCurrency, settings } = useSettings();
 
   const { register, handleSubmit, reset, setValue, control, formState: { errors } } = useForm<CustomerFormValues>({
@@ -74,23 +70,12 @@ const Customers = () => {
       openingBalanceType: 'Dr',
       creditLimit: '' as any,
       creditDays: '' as any,
-      productRates: []
     }
-  });
-
-  const { fields: rateFields, append: appendRate, remove: removeRate } = useFieldArray({
-    control,
-    name: 'productRates'
   });
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => (await api.get('/customers')).data
-  });
-
-  const { data: products = [] } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => (await api.get('/products')).data
   });
 
   const filteredCustomers = customers.filter((c: any) => {
@@ -166,10 +151,6 @@ const Customers = () => {
     setValue('openingBalanceType', customer.openingBalanceType || 'Dr');
     setValue('creditLimit', Number(customer.creditLimit));
     setValue('creditDays', Number(customer.creditDays));
-    setValue('productRates', customer.productRates ? customer.productRates.map((pr: any) => ({
-      productId: Number(pr.productId),
-      rate: Number(pr.rate)
-    })) : []);
   };
 
   useEffect(() => {
@@ -360,66 +341,6 @@ const Customers = () => {
               </div>
             </div>
 
-            {settings?.enableCustomerWiseRate && (
-              <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-3 rounded-md flex flex-col gap-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-[12px] font-bold text-[#1E3A8A]">Custom Product Rates</label>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddRateModalOpen(true)}
-                    className="bg-[#3B82F6] hover:bg-[#2563EB] text-white text-[11px] px-2 py-1 rounded"
-                  >
-                    + Add Rate
-                  </button>
-                </div>
-                {rateFields.length === 0 ? (
-                  <p className="text-[11px] text-[#64748B] italic text-center py-2">No custom rates added. Standard retail rates will apply.</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {rateFields.map((field, index) => (
-                      <div key={field.id} className="flex gap-2 items-center">
-                        <div className="flex-1">
-                          <Controller
-                            name={`productRates.${index}.productId`}
-                            control={control}
-                            render={({ field }) => (
-                              <Select
-                                {...field}
-                                options={products.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` }))}
-                                value={field.value ? { value: field.value, label: products.find((p: any) => p.id === field.value)?.name || 'Select Product' } : null}
-                                onChange={(val: any) => field.onChange(val?.value || 0)}
-                                className="text-[12px]"
-                                placeholder="Select Product"
-                                styles={{
-                                  control: (base: any) => ({ ...base, minHeight: '32px', borderColor: '#CBD5E1' })
-                                }}
-                              />
-                            )}
-                          />
-                        </div>
-                        <div className="w-24">
-                          <input
-                            {...register(`productRates.${index}.rate`)}
-                            type="number"
-                            placeholder="Rate"
-                            step="0.01"
-                            className="w-full px-2 py-1.5 border border-[#CBD5E1] rounded text-[12px] outline-none text-right"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeRate(index)}
-                          className="text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={mutation.isPending}
@@ -496,24 +417,35 @@ const Customers = () => {
               ) : (
                 filteredCustomers.map((customer: any, index: number) => (
                   <tr key={customer.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F9F9F9]'} hover:bg-blue-50`}>
-                    <td data-label="#" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-gray-700">{index + 1}</td>
+                    <td data-label="#" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-black font-bold">{index + 1}</td>
                     <td data-label="Customer Name" className="px-3 py-3 border-r border-[#E5E7EB] font-bold text-[#3B82F6]">{customer.name}</td>
-                    <td data-label="Mobile" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-medium text-gray-700">{customer.phone || '-'}</td>
-                    <td data-label="Billing Address" className="px-3 py-3 border-r border-[#E5E7EB] text-gray-600 truncate max-w-[200px]">{customer.address || '-'}</td>
-                    <td data-label="Opening Bal" className="px-3 py-3 border-r border-[#E5E7EB] text-right font-bold text-gray-800">
+                    <td data-label="Mobile" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-black font-bold">{customer.phone || '-'}</td>
+                    <td data-label="Billing Address" className="px-3 py-3 border-r border-[#E5E7EB] text-black font-bold truncate max-w-[200px]">{customer.address || '-'}</td>
+                    <td data-label="Opening Bal" className="px-3 py-3 border-r border-[#E5E7EB] text-right font-bold text-black font-bold">
                       {formatCurrency(customer.openingBalance)} ({customer.openingBalanceType})
                     </td>
                     <td data-label="Actions" className="px-3 py-3 text-center">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex justify-center items-center gap-1.5">
+                        {(settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && (
+                          <button type="button"
+                            onClick={() => setSelectedCustomerForRates(customer)}
+                            className="text-[#059669] border border-[#059669] rounded px-1.5 py-1 hover:bg-[#059669] hover:text-white transition-colors text-[11px] font-bold flex items-center gap-1"
+                            title="Fix Product Rates"
+                          >
+                            <DollarSign size={12} /> Rates
+                          </button>
+                        )}
                         <button type="button"
                           onClick={() => setItemToView(customer)}
                           className="text-[#10B981] border border-[#10B981] rounded p-1 hover:bg-[#10B981] hover:text-white transition-colors"
+                          title="View Customer"
                         >
                           <Eye size={12} />
                         </button>
                         <button type="button"
                           onClick={() => handleEdit(customer)}
                           className="text-[#3B82F6] border border-[#3B82F6] rounded p-1 hover:bg-[#3B82F6] hover:text-white transition-colors"
+                          title="Edit Customer"
                         >
                           <Edit size={12} />
                         </button>
@@ -522,6 +454,7 @@ const Customers = () => {
                             setItemToDelete(customer);
                           }}
                           className="text-[#EF4444] border border-[#EF4444] rounded p-1 hover:bg-[#EF4444] hover:text-white transition-colors"
+                          title="Delete Customer"
                         >
                           <Trash2 size={12} />
                         </button>
@@ -559,12 +492,13 @@ const Customers = () => {
         customer={itemToView}
       />
 
-      <AddCustomRateModal
-        isOpen={isAddRateModalOpen}
-        onClose={() => setIsAddRateModalOpen(false)}
-        onAdd={(productId, rate) => appendRate({ productId, rate })}
-        products={products}
-      />
+      {/* Customer Fixed Rates Modal */}
+      {selectedCustomerForRates && (
+        <CustomerRatesModal
+          customer={selectedCustomerForRates}
+          onClose={() => setSelectedCustomerForRates(null)}
+        />
+      )}
     </div>
   );
 };

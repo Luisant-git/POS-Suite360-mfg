@@ -29,6 +29,7 @@ const MODULES = [
     icon: <Shield size={18} />,
     permissions: [
       { id: 'purchase_entry', name: 'Purchase Entry' },
+      { id: 'purchase_list', name: 'Purchase List' },
       { id: 'purchase_return', name: 'Purchase Return' },
       { id: 'purchase_payments', name: 'Supplier Payments' },
     ]
@@ -88,12 +89,15 @@ const MODULES = [
       { id: 'reports_purchase_return', name: 'Purchase Return Report' },
       { id: 'reports_sales', name: 'Sales Report' },
       { id: 'reports_sales_return', name: 'Sales Return Report' },
+      { id: 'reports_product_wise_sales', name: 'Product & Supplier Wise Sales Report' },
       { id: 'reports_estimations', name: 'Estimation Report' },
       { id: 'reports_rm_purchase', name: 'RM Purchase Report' },
       { id: 'reports_production', name: 'Production Report' },
       { id: 'reports_batch_pnl', name: 'Batch P&L Report' },
       { id: 'reports_stock', name: 'Stock As On Date' },
       { id: 'reports_profit_ledger', name: 'Profit / Ledger' },
+      { id: 'reports_customer_receipts', name: 'Customer Receipts & Overdue Report' },
+      { id: 'reports_supplier_payments', name: 'Supplier Payments & Payables Report' },
       { id: 'reports_service_sales', name: 'Service Sales Report' },
     ]
   },

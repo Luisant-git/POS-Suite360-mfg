@@ -580,9 +580,9 @@ const Products = () => {
               ) : (
                 filteredProducts.map((product: any, index: number) => (
                   <tr key={product.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F9F9F9]'} hover:bg-blue-50`}>
-                    <td data-label="#" className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-gray-700">{index + 1}</td>
+                    <td data-label="#" className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-black font-bold">{index + 1}</td>
                     <td data-label="Code" className="px-3 py-2.5 border-r border-[#E5E7EB] font-bold text-[#3B82F6]">{product.code}</td>
-                    <td data-label="Product Description" className="px-3 py-2.5 border-r border-[#E5E7EB] font-bold text-[#1F2937]">
+                    <td data-label="Product Description" className="px-3 py-2.5 border-r border-[#E5E7EB] font-bold text-black font-bold">
                       <div className="whitespace-normal min-w-[150px] max-w-[250px] break-words">
                         {product.name}
                       </div>
@@ -593,15 +593,15 @@ const Products = () => {
                     <td data-label="Brand" className="px-3 py-2.5 border-r border-[#E5E7EB]">
                       <span className="text-[10px] font-bold text-[#D97706] uppercase bg-[#FEF3C7] px-2 py-0.5 rounded">{product.brand?.name || '-'}</span>
                     </td>
-                    <td data-label="Stock" className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold">
+                    <td data-label="Stock" className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-black font-bold">
                       {product.currentStock} {product.unit?.name}
                     </td>
                     {settings?.enableTax && (
-                      <td data-label="Tax %" className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-medium">
+                      <td data-label="Tax %" className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-black font-bold">
                         {product.taxPercent ? `${Number(product.taxPercent)}%` : '0%'}
                       </td>
                     )}
-                    <td data-label="Pur Rate" className="px-3 py-2.5 border-r border-[#E5E7EB] text-right text-gray-600 font-medium">{formatCurrency(product.purchaseRate)}</td>
+                    <td data-label="Pur Rate" className="px-3 py-2.5 border-r border-[#E5E7EB] text-right text-black font-bold">{formatCurrency(product.purchaseRate)}</td>
                     <td data-label="Wholesale" className="px-3 py-2.5 border-r border-[#E5E7EB] text-right font-bold text-[#16A34A]">{formatCurrency(product.wholesaleRate)}</td>
                     <td data-label="Sale Rate" className="px-3 py-2.5 border-r border-[#E5E7EB] text-right font-bold text-[#3B82F6]">{formatCurrency(product.sellingRate)}</td>
                     <td data-label="Actions" className="px-3 py-2.5 text-center">
