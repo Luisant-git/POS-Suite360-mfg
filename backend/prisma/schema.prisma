@@ -254,6 +254,7 @@ model Purchase {
 
   items           PurchaseItem[]
   purchaseReturns PurchaseReturn[]
+  supplierPaymentAllocations SupplierPaymentAllocation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -331,6 +332,7 @@ model Sale {
 
   items        SaleItem[]
   salesReturns SalesReturn[]
+  customerReceiptAllocations CustomerReceiptAllocation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -441,8 +443,20 @@ model SupplierPayment {
   userId Int
   user   User @relation(fields: [userId], references: [id])
 
+  allocations SupplierPaymentAllocation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model SupplierPaymentAllocation {
+  id                Int             @id @default(autoincrement())
+  supplierPaymentId Int
+  supplierPayment   SupplierPayment @relation(fields: [supplierPaymentId], references: [id], onDelete: Cascade)
+  purchaseId        Int?
+  purchase          Purchase?       @relation(fields: [purchaseId], references: [id])
+  amount            Decimal
+  createdAt         DateTime        @default(now())
 }
 
 model CustomerReceipt {
@@ -467,8 +481,20 @@ model CustomerReceipt {
   userId Int
   user   User @relation(fields: [userId], references: [id])
 
+  allocations CustomerReceiptAllocation[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CustomerReceiptAllocation {
+  id                Int             @id @default(autoincrement())
+  customerReceiptId Int
+  customerReceipt   CustomerReceipt @relation(fields: [customerReceiptId], references: [id], onDelete: Cascade)
+  saleId            Int?
+  sale              Sale?           @relation(fields: [saleId], references: [id])
+  amount            Decimal
+  createdAt         DateTime        @default(now())
 }
 
 // ------------------------------------------------------
