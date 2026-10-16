@@ -91,13 +91,10 @@ const PurchaseEntry = () => {
   const printAfterSaveRef = useRef(false);
 
   const focusCell = (row: number, col: number) => {
-    if (col === 0) {
-      const el = document.querySelector<HTMLElement>(`[data-row-product="${row}"]`);
-      if (el) el.focus();
-    } else {
+    setTimeout(() => {
       const el = document.querySelector<HTMLElement>(`[data-row="${row}"][data-col="${col}"]`);
       if (el) { el.focus(); (el as HTMLInputElement).select?.(); }
-    }
+    }, 10);
   };
 
   const handleCellKey = (e: React.KeyboardEvent, rowIndex: number, col: number, totalCols: number) => {
@@ -105,37 +102,67 @@ const PurchaseEntry = () => {
       e.preventDefault();
       const nextRow = rowIndex + 1;
       if (nextRow < fields.length) {
-        focusCell(nextRow, 0);
+        setTimeout(() => {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+          if (selectEl) selectEl.focus();
+        }, 80);
       } else {
-        append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 });
-        setTimeout(() => focusCell(nextRow, 0), 80);
+        append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 });
+        setTimeout(() => {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+          if (selectEl) selectEl.focus();
+        }, 100);
       }
     } else if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault();
       const nextCol = col + 1;
-      if (nextCol < totalCols) focusCell(rowIndex, nextCol);
-      else {
+      if (nextCol <= totalCols) {
+        focusCell(rowIndex, nextCol);
+      } else {
         const nextRow = rowIndex + 1;
-        if (nextRow < fields.length) focusCell(nextRow, 0);
-        else {
-          append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 });
-          setTimeout(() => focusCell(nextRow, 0), 80);
+        if (nextRow < fields.length) {
+          setTimeout(() => {
+            const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+            if (selectEl) selectEl.focus();
+          }, 80);
+        } else {
+          append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 });
+          setTimeout(() => {
+            const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${nextRow}"] input`);
+            if (selectEl) selectEl.focus();
+          }, 100);
         }
       }
-    } else if (e.key === 'Tab' && e.shiftKey) {
-      e.preventDefault();
-      const prevCol = col - 1;
-      if (prevCol >= 0) focusCell(rowIndex, prevCol);
-      else if (rowIndex > 0) focusCell(rowIndex - 1, totalCols - 1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault(); focusCell(rowIndex + 1, col);
+    } else if (e.key === 'ArrowRight') {
+      if ((e.target as HTMLInputElement).selectionStart === (e.target as HTMLInputElement).value.length) {
+        e.preventDefault();
+        const nextCol = col + 1;
+        if (nextCol <= totalCols) focusCell(rowIndex, nextCol);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      if ((e.target as HTMLInputElement).selectionStart === 0) {
+        e.preventDefault();
+        const prevCol = col - 1;
+        if (prevCol >= 1) focusCell(rowIndex, prevCol);
+        else if (prevCol === 0) {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${rowIndex}"] input`);
+          if (selectEl) selectEl.focus();
+        }
+      }
     } else if (e.key === 'ArrowUp') {
-      e.preventDefault(); if (rowIndex > 0) focusCell(rowIndex - 1, col);
-    } else if (e.key === 'Delete' && e.ctrlKey) {
+      e.preventDefault();
+      if (rowIndex > 0) focusCell(rowIndex - 1, col);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (rowIndex < fields.length - 1) focusCell(rowIndex + 1, col);
+    } else if (e.ctrlKey && e.key === 'Delete') {
       e.preventDefault();
       if (fields.length > 1) {
         remove(rowIndex);
-        setTimeout(() => focusCell(Math.min(rowIndex, fields.length - 2), col), 50);
+        setTimeout(() => {
+          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${Math.max(0, rowIndex - 1)}"] input`);
+          if (selectEl) selectEl.focus();
+        }, 50);
       }
     }
   };
@@ -278,6 +305,7 @@ const PurchaseEntry = () => {
         }
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['nextEntryNo'] });
+        queryClient.invalidateQueries({ queryKey: ['purchases'] });
         reset();
         navigate('/purchase');
       }, 100);
@@ -341,7 +369,28 @@ const PurchaseEntry = () => {
   };
 
   const onError = (errors: any) => {
-    toast.error('Validation failed. Please fill all required fields correctly.');
+    let errorMessage = 'Validation failed. Please ensure all items have a Rate and Quantity > 0.';
+    
+    if (errors.supplierId) {
+      errorMessage = 'Please select a Supplier before saving.';
+    } else if (errors.paymentModeId) {
+      errorMessage = 'Please select a Payment Mode before saving.';
+    } else if (errors.items && Array.isArray(errors.items)) {
+      for (const item of errors.items) {
+        if (item?.quantity?.message === 'Quantity must be > 0') {
+          errorMessage = 'Validation failed: Quantity must be greater than 0.';
+          break;
+        }
+        if (item?.pRate?.message === 'Purchase Rate is required' || item?.pRate) {
+          errorMessage = 'Validation failed: Rate is required for all items.';
+          break;
+        }
+      }
+    } else if (errors.items) {
+      errorMessage = 'Please add at least one product before saving.';
+    }
+    
+    toast.error(errorMessage);
     console.error(errors);
   };
 
@@ -382,6 +431,10 @@ const PurchaseEntry = () => {
       } else if (e.key === 'F2') {
         e.preventDefault();
         append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 });
+        setTimeout(() => {
+          const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
+          if (inputs.length > 0) inputs[inputs.length - 1].focus();
+        }, 100);
       } else if (e.key === 'F4') {
         e.preventDefault();
         handleClear();
@@ -419,14 +472,28 @@ const PurchaseEntry = () => {
 
 
 
-  // Auto-focus first row product on mount
+  // Keyboard shortcuts (F10 Save, Esc Close, F4 Reset)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const el = document.querySelector<HTMLElement>('[data-row-product="0"]');
-      el?.focus();
-    }, 200);
-    return () => clearTimeout(timer);
-  }, []);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F10') {
+        e.preventDefault();
+        handleSubmit(onSubmit as any, onError)();
+      } else if (e.key === 'Escape') {
+        if (isSupplierModalOpen || isSaveModalOpen || isLeaveModalOpen) {
+          setIsSupplierModalOpen(false);
+          setIsSaveModalOpen(false);
+          setIsLeaveModalOpen(false);
+        } else {
+          setIsLeaveModalOpen(true);
+        }
+      } else if (e.key === 'F4') {
+        e.preventDefault();
+        handleClear();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSubmit, isSupplierModalOpen, isSaveModalOpen, isLeaveModalOpen, onSubmit, onError]);
 
   const selectedSupplierId = watch('supplierId');
   const selectedSupplier = suppliers.find((s: any) => s.id === Number(selectedSupplierId));
@@ -542,10 +609,16 @@ const PurchaseEntry = () => {
         <div className="shrink-0 flex flex-wrap justify-end gap-2 p-2 bg-white border-b border-[#E5E7EB]">
           <button 
             type="button"
-            onClick={() => append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 })}
+            onClick={() => {
+              append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 });
+              setTimeout(() => {
+                const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
+                if (inputs.length > 0) inputs[inputs.length - 1].focus();
+              }, 100);
+            }}
             className="border border-[#0B355B] text-[#0B355B] hover:bg-[#0B355B] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
-            <PlusCircle size={14} /> Add Row
+            <PlusCircle size={14} /> Add Row (F2)
           </button>
           <button 
             type="button"
@@ -576,24 +649,24 @@ const PurchaseEntry = () => {
           <table className="w-full border-collapse border border-[#E5E7EB] md:min-w-[1200px] whitespace-nowrap responsive-table">
             <thead>
               <tr className="bg-[#0F172A] text-white">
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-10">#</th>
-                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155]">Item Code / Name (Searchable Dropdown)</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Qty</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Unit</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">PRate</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">WRate</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">SRate</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">MRP</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Disc %</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Disc Amt</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-10">#</th>
+                <th className="px-2 py-2 text-left text-[12px] font-bold border border-[#334155]">Item Code / Name</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Qty</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Unit</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">PRate</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">WRate</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">SRate</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">MRP</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Disc %</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">Disc Amt</th>
                 {settings?.enableTax && (
                   <>
-                    <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Tax %</th>
-                    <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Tax Amt</th>
+                    <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-20">Tax %</th>
+                    <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-24">Tax Amt</th>
                   </>
                 )}
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-28">Total</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-16">Act</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-28">Total</th>
+                <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-16">Act</th>
               </tr>
             </thead>
             <tbody>
@@ -601,62 +674,87 @@ const PurchaseEntry = () => {
                 <tr key={field.id} className="border-b border-[#E5E7EB] hover:bg-[#F9FAFB]">
                   <td data-label="#" className="px-2 py-1 text-center text-[13px] border-r border-[#E5E7EB]">{index + 1}</td>
                   <td data-label="Product" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <SearchableSelect
-                      value={watch(`items.${index}.productId`)}
-                      tabIndex={0}
-                      dataAttr={{ 'data-row-product': String(index) }}
-                      autoFocus={index === 0 && fields.length === 1 && watch(`items.${index}.productId`) === 0}
-                      onTabNext={() => focusCell(index, 1)}
-                      onChange={(val) => {
-                        setValue(`items.${index}.productId`, Number(val));
-                        handleProductChange(index, String(val));
-                      }}
-                      options={[
-                        { label: 'Type product name / code...', value: 0 },
-                        ...products.map((p: any) => ({ label: `${p.code} - ${p.name}`, value: p.id }))
-                      ]}
-                    />
+                    <div data-row-product={index} onKeyDownCapture={(e) => {
+                      if (e.ctrlKey && e.key === 'Delete' && fields.length > 1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        remove(index);
+                        setTimeout(() => {
+                          const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${Math.max(0, index - 1)}"] input`);
+                          if (selectEl) selectEl.focus();
+                        }, 50);
+                      }
+                    }}>
+                      <SearchableSelect
+                        value={watch(`items.${index}.productId`)}
+                        autoFocus={index === fields.length - 1 && watch(`items.${index}.productId`) === 0}
+                        onChange={(val) => {
+                          setValue(`items.${index}.productId`, Number(val));
+                          handleProductChange(index, String(val));
+                          if (Number(val) === 0) {
+                            if (index === fields.length - 1) {
+                              append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 });
+                              setTimeout(() => {
+                                const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
+                                if (inputs.length > 0) inputs[inputs.length - 1].focus();
+                              }, 100);
+                            } else {
+                              setTimeout(() => {
+                                const selectEl = document.querySelector<HTMLElement>(`[data-row-product="${index + 1}"] input`);
+                                if (selectEl) selectEl.focus();
+                              }, 100);
+                            }
+                          } else {
+                            setTimeout(() => focusCell(index, 1), 100);
+                          }
+                        }}
+                        options={[
+                          { label: 'Type product name / code...', value: 0 },
+                          ...products.map((p: any) => ({ label: `${p.code} - ${p.name}`, value: p.id }))
+                        ]}
+                      />
+                    </div>
                   </td>
-                  <td data-label="Stock" className="px-2 py-1 border-r border-[#E5E7EB]">
+                  <td data-label="Qty" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
                       {...register(`items.${index}.quantity`)}
                       data-row={index} data-col={1}
                       type="number" min="1" placeholder="0" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 1, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 1, 7)}
                       className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-center" 
                     />
                   </td>
                   <td data-label="Unit" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input {...register(`items.${index}.unit`)} type="text" readOnly tabIndex={-1} className="w-full px-1 py-1 bg-transparent text-[13px] outline-none text-center" />
                   </td>
-                  <td data-label="Qty" className="px-2 py-1 border-r border-[#E5E7EB]">
+                  <td data-label="PRate" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
                       {...register(`items.${index}.pRate`)}
                       data-row={index} data-col={2}
                       type="number" step="0.01" placeholder="0.00" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 2, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 2, 7)}
                       className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
                     />
                   </td>
-                  <td data-label="Free" className="px-2 py-1 border-r border-[#E5E7EB]">
+                  <td data-label="WRate" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
                       {...register(`items.${index}.wRate`)}
                       data-row={index} data-col={3}
                       type="number" step="0.01" placeholder="0.00" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 3, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 3, 7)}
                       className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
                     />
                   </td>
-                  <td data-label="Pur Rate" className="px-2 py-1 border-r border-[#E5E7EB]">
+                  <td data-label="SRate" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
                       {...register(`items.${index}.sRate`)}
                       data-row={index} data-col={4}
                       type="number" step="0.01" placeholder="0.00" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 4, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 4, 7)}
                       className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
                     />
                   </td>
@@ -666,7 +764,7 @@ const PurchaseEntry = () => {
                       data-row={index} data-col={5}
                       type="number" step="0.01" placeholder="0.00" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 5, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 5, 7)}
                       className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
                     />
                   </td>
@@ -676,7 +774,7 @@ const PurchaseEntry = () => {
                       data-row={index} data-col={6}
                       type="number" step="0.01" placeholder="0" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 6, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 6, 7)}
                       onChange={(e) => {
                         register(`items.${index}.discPercent`).onChange(e);
                         const pct = Number(e.target.value) || 0;
@@ -694,7 +792,7 @@ const PurchaseEntry = () => {
                       data-row={index} data-col={7}
                       type="number" step="0.01" placeholder="0.00" 
                       onFocus={(e) => e.target.select()}
-                      onKeyDown={(e) => handleCellKey(e, index, 7, 8)}
+                      onKeyDown={(e) => handleCellKey(e, index, 7, 7)}
                       onChange={(e) => {
                         register(`items.${index}.discAmt`).onChange(e);
                         const amt = Number(e.target.value) || 0;
@@ -1002,7 +1100,7 @@ const PurchaseEntry = () => {
       <LeaveConfirmModal 
         isOpen={isLeaveModalOpen} 
         onClose={() => setIsLeaveModalOpen(false)} 
-        onConfirm={() => navigate('/dashboard')} 
+        onConfirm={() => navigate('/purchase')} 
       />
 
     </div>

@@ -6,13 +6,14 @@ import api from '../../services/api';
 import { useSettings } from '../../contexts/SettingsContext';
 import ViewPurchaseModal from './ViewPurchaseModal';
 import PaginationControls from '../../components/PaginationControls';
+import TableLoader from '../../components/TableLoader';
 
 const PurchaseList = () => {
   const { formatCurrency } = useSettings();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [paymentModeFilter, setPaymentModeFilter] = useState('');
   const [viewId, setViewId] = useState<number | null>(null);
-  const [paymentFilter, setPaymentFilter] = useState<string>('All');
 
   // Fetch Purchases
   const { data: purchases = [], isLoading } = useQuery({
@@ -23,23 +24,28 @@ const PurchaseList = () => {
     },
   });
 
+  // Fetch Payment Modes
+  const { data: paymentModes = [] } = useQuery({
+    queryKey: ['paymentModes'],
+    queryFn: async () => (await api.get('/payment-modes')).data,
+  });
+
   // Pagination & Filtering Logic
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const paymentModeNames: string[] = Array.from(
-    new Set(purchases.map((p: any) => p.paymentMode?.name).filter(Boolean))
-  ) as string[];
-
   const filteredPurchases = purchases.filter((purchase: any) => {
-    const modeMatch = paymentFilter === 'All' || purchase.paymentMode?.name === paymentFilter;
+    if (paymentModeFilter && Number(purchase.paymentModeId) !== Number(paymentModeFilter)) {
+      return false;
+    }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       const invoiceMatch = purchase.invoiceNo?.toLowerCase().includes(term);
       const supplierMatch = purchase.supplier?.name?.toLowerCase().includes(term);
-      return modeMatch && (invoiceMatch || supplierMatch);
+      const suppInvMatch = purchase.supplierInvoiceNo?.toLowerCase().includes(term);
+      return invoiceMatch || supplierMatch || suppInvMatch;
     }
-    return modeMatch;
+    return true;
   });
 
   const totalPages = Math.ceil(filteredPurchases.length / entriesPerPage);
@@ -68,51 +74,53 @@ const PurchaseList = () => {
       <div className="flex flex-col flex-1 overflow-hidden">
         
         {/* Controls / Filters */}
-        <div className="bg-white p-3 border-b border-[#E5E7EB] shrink-0 flex flex-col gap-3">
-          {/* Payment Mode Filter Buttons */}
-          <div className="flex flex-wrap gap-2">
-            {['All', ...paymentModeNames].map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => { setPaymentFilter(mode); setCurrentPage(1); }}
-                className={`px-4 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${
-                  paymentFilter === mode
-                    ? 'bg-[#1E3A8A] text-white border-[#1E3A8A]'
-                    : 'bg-white text-[#1E3A8A] border-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white'
-                }`}
-              >
-                {mode}
-                <span className="ml-1.5 opacity-70">
-                  ({mode === 'All' ? purchases.length : purchases.filter((p: any) => p.paymentMode?.name === mode).length})
-                </span>
-              </button>
-            ))}
+        <div className="bg-white p-3 border-b border-[#E5E7EB] shrink-0 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <div className="flex items-center gap-2 text-[12px] font-bold text-black font-bold">
+            <span>Show</span>
+            <select 
+              className="border border-[#ccc] rounded px-2 py-1 outline-none text-black font-bold bg-white"
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+            <span>entries</span>
           </div>
 
-          {/* Search & Entries */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <div className="flex items-center gap-2 text-[12px] font-bold text-gray-700">
-              <span>Show</span>
+          <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5">
+              <label className="text-[12px] font-bold text-black font-bold hidden sm:block">Payment Mode:</label>
               <select
-                className="border border-[#ccc] rounded px-2 py-1 outline-none text-[#1F2937] bg-white"
-                value={entriesPerPage}
-                onChange={(e) => { setEntriesPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                value={paymentModeFilter}
+                onChange={(e) => {
+                  setPaymentModeFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1.5 border border-[#ccc] rounded outline-none text-[12px] text-black font-bold bg-white focus:border-[#3B82F6]"
               >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
+                <option value="">All Payment Modes</option>
+                {paymentModes.map((pm: any) => (
+                  <option key={pm.id} value={pm.id}>{pm.name}</option>
+                ))}
               </select>
-              <span>entries</span>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <label className="text-[12px] font-bold text-[#1F2937] hidden sm:block">Search:</label>
-              <input
-                type="text"
+
+            <div className="flex items-center gap-2">
+              <label className="text-[12px] font-bold text-black font-bold hidden sm:block">Search:</label>
+              <input 
+                type="text" 
                 placeholder="Search invoices..."
                 value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full sm:w-64 px-3 py-1.5 border border-[#ccc] rounded outline-none text-[12px] focus:border-[#3B82F6]"
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-64 px-3 py-1.5 border border-[#ccc] rounded outline-none text-[12px] text-black font-bold placeholder:font-normal focus:border-[#3B82F6]"
               />
             </div>
           </div>
@@ -134,26 +142,28 @@ const PurchaseList = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-[#73879C]">Loading...</td>
-                </tr>
+                <TableLoader columns={7} />
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-[#73879C]">No purchase invoices found matching your criteria.</td>
+                  <td colSpan={7} className="px-3 py-4 text-center text-[#73879C] font-bold">No purchase invoices found matching your criteria.</td>
                 </tr>
               ) : (
                 paginatedPurchases.map((purchase: any, index: number) => (
                   <tr key={purchase.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-[#F9F9F9]' : 'bg-white'} hover:bg-blue-50`}>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.date ? new Date(purchase.date).toISOString().split('T')[0] : '-'}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#64748B] font-medium">{purchase.invoiceNo}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#3B82F6] font-bold cursor-pointer hover:underline">{purchase.supplierInvoiceNo || '-'}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.supplier?.name || 'Unknown Supplier'}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-bold text-right">{formatCurrency(purchase.grandTotal)}</td>
+                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-black font-bold">
+                      {purchase.date ? new Date(purchase.date).toLocaleDateString() : '-'}
+                    </td>
+                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-black font-bold">{purchase.invoiceNo}</td>
+                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#3B82F6] font-bold cursor-pointer hover:underline" onClick={() => setViewId(purchase.id)}>
+                      {purchase.supplierInvoiceNo || '-'}
+                    </td>
+                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-black font-bold">{purchase.supplier?.name || 'Unknown Supplier'}</td>
+                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-black font-bold text-right">{formatCurrency(purchase.grandTotal)}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-center">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold tracking-wide ${
-                        purchase.paymentMode?.name === 'Cash' ? 'bg-[#06B6D4] text-white' : 
-                        purchase.paymentMode?.name === 'Credit' ? 'bg-[#22C55E] text-white' :
-                        'bg-[#22C55E] text-white'
+                      <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold tracking-wide ${
+                        purchase.paymentMode?.name?.toLowerCase() === 'credit'
+                          ? 'bg-rose-500 text-white'
+                          : 'bg-[#22C55E] text-white'
                       }`}>
                         {purchase.paymentMode?.name?.toUpperCase() || 'PAID'}
                       </span>

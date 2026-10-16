@@ -48,8 +48,11 @@ export default function ViewPurchaseModal({ purchaseId, onClose }: Props) {
               {purchase.supplierInvoiceNo && (
                 <p className="font-bold text-[#333] text-[14px] mt-1">Supp. Inv. No: <span className="font-normal">{purchase.supplierInvoiceNo}</span></p>
               )}
-              <p className="text-[12px] text-gray-500 uppercase tracking-wider font-bold mt-3 mb-1">Payment</p>
-              <p className="font-bold text-[#10B981] text-[14px] bg-[#D1FAE5] inline-block px-2 py-0.5 rounded">{purchase.paymentMode?.name}</p>
+              <p className={`font-bold text-[14px] inline-block px-2.5 py-0.5 rounded ${
+                purchase.paymentMode?.name?.toLowerCase() === 'credit'
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-[#22C55E] text-white'
+              }`}>{purchase.paymentMode?.name?.toUpperCase() || 'PAID'}</p>
             </div>
           </div>
           
