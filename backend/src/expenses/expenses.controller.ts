@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Put, Delete } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 
@@ -20,4 +20,15 @@ export class ExpensesController {
   findOne(@Param('id') id: string) {
     return this.expensesService.findOne(+id);
   }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() updateData: any) {
+    return this.expensesService.update(+id, updateData);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.expensesService.remove(+id);
+  }
 }
+
