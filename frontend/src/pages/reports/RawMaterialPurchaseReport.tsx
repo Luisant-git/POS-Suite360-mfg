@@ -6,12 +6,13 @@ import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import PaginationControls from '../../components/PaginationControls';
 import RawMaterialPurchaseModal from '../raw-materials/RawMaterialPurchaseModal';
 
 const RawMaterialPurchaseReport = () => {
   const navigate = useNavigate();
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState(''); 
   const [supplierId, setSupplierId] = useState('');
@@ -43,6 +44,8 @@ const RawMaterialPurchaseReport = () => {
         invoiceNo: p.invoiceNo || '-',
         date: new Date(p.date).toISOString().split('T')[0],
         supplierName: p.supplier?.name || '-',
+        rawInvoiceValue: Number(p.subtotal) || 0,
+        rawNetAmount: Number(p.grandTotal) || 0,
         invoiceValue: formatCurrency(p.subtotal),
         transportCharge: p.transportCharge ? formatCurrency(p.transportCharge) : '-',
         wages: p.wages ? formatCurrency(p.wages) : '-',
@@ -61,6 +64,9 @@ const RawMaterialPurchaseReport = () => {
       p.netAmount.toLowerCase().includes(term)
     );
   });
+
+  const totalInvoiceValue = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawInvoiceValue) || 0), 0);
+  const totalNetAmount = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawNetAmount) || 0), 0);
 
   const [entriesPerPage, setEntriesPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
@@ -184,16 +190,70 @@ const RawMaterialPurchaseReport = () => {
               />
             </div>
             <button type="button" 
-              onClick={() => exportToExcel(purchases, `RMPurchase_Report_${fromDate}_to_${toDate}`)}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              onClick={() => {
+                const exportData = filteredPurchases.map((p: any) => ({
+                  'Entry No': p.entryNo,
+                  'Supplier Invoice No': p.invoiceNo,
+                  'Date': p.date,
+                  'Supplier Name': p.supplierName,
+                  'Invoice Value': p.invoiceValue,
+                  'Transport': p.transportCharge,
+                  'Wages': p.wages,
+                  'Net Amount': p.netAmount,
+                }));
+                exportData.push({
+                  'Entry No': '',
+                  'Supplier Invoice No': '',
+                  'Date': '',
+                  'Supplier Name': 'TOTAL:',
+                  'Invoice Value': formatCurrency(totalInvoiceValue),
+                  'Transport': '',
+                  'Wages': '',
+                  'Net Amount': formatCurrency(totalNetAmount),
+                });
+                exportToExcel(exportData, `RMPurchase_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: 'Raw Material Purchase Report',
+                  totalCount: filteredPurchases.length
+                });
+              }}
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button" 
+              onClick={() => {
+                const cols: PdfColumn[] = [
+                  { header: 'Entry No', dataKey: 'entryNo' },
+                  { header: 'Supp. Inv. No', dataKey: 'invoiceNo' },
+                  { header: 'Date', dataKey: 'date' },
+                  { header: 'Supplier Name', dataKey: 'supplierName' },
+                  { header: 'Invoice Value', dataKey: 'invoiceValue' },
+                  { header: 'Transport', dataKey: 'transportCharge' },
+                  { header: 'Wages', dataKey: 'wages' },
+                  { header: 'Net Amount', dataKey: 'netAmount' },
+                ];
+                const pdfData = [...filteredPurchases, {
+                  entryNo: '',
+                  invoiceNo: '',
+                  date: '',
+                  supplierName: 'TOTAL:',
+                  invoiceValue: formatCurrency(totalInvoiceValue),
+                  transportCharge: '',
+                  wages: '',
+                  netAmount: formatCurrency(totalNetAmount)
+                }];
+                exportTableToPdf(cols, pdfData, `RMPurchase_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Raw Material Purchase Report', settings?.shopName, filteredPurchases.length);
+              }}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
             <button type="button" 
               onClick={() => navigate('/raw-materials/purchase')}
-              className="text-[#64748B] border border-[#CBD5E1] hover:bg-gray-50 px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="bg-[#1E3A8A] hover:bg-[#172554] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Plus size={14} /> New RM Purchase
+              <Plus size={14} /> <span className="hidden sm:inline">New RM Purchase</span>
             </button>
           </div>
         </div>

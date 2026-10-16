@@ -5,12 +5,15 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
+import { useSettings } from '../../contexts/SettingsContext';
 import PaginationControls from '../../components/PaginationControls';
 import ProductionModal from '../production/ProductionModal';
 import Select from 'react-select';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 const ProductionReport = () => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState(''); 
   const [workName, setWorkName] = useState('');
@@ -257,16 +260,66 @@ const ProductionReport = () => {
               />
             </div>
             <button type="button" 
-              onClick={() => exportToExcel(productions, `Production_Report_${fromDate}_to_${toDate}`)}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              onClick={() => {
+                const totalIntake = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.intakeQuantity) || 0), 0);
+                const totalProducedSum = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.outcomeQuantity) || 0), 0);
+                const exportData = filteredProductions.map((p: any) => ({
+                  'Date': p.date,
+                  'Batch / Work Name': p.workName,
+                  'Raw Material Used': p.rawMaterial,
+                  'Intake Qty': p.intakeQuantity,
+                  'Finished Product Output': p.finishedProduct,
+                  'Produced Qty': p.outcomeQuantity,
+                }));
+                exportData.push({
+                  'Date': '',
+                  'Batch / Work Name': '',
+                  'Raw Material Used': 'TOTAL:',
+                  'Intake Qty': totalIntake,
+                  'Finished Product Output': 'TOTAL:',
+                  'Produced Qty': totalProducedSum,
+                });
+                exportToExcel(exportData, `Production_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: 'Production Report',
+                  totalCount: filteredProductions.length
+                });
+              }}
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button" 
+              onClick={() => {
+                const totalIntake = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.intakeQuantity) || 0), 0);
+                const totalProducedSum = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.outcomeQuantity) || 0), 0);
+                const cols: PdfColumn[] = [
+                  { header: 'Date', dataKey: 'date' },
+                  { header: 'Batch / Work Name', dataKey: 'workName' },
+                  { header: 'Raw Material', dataKey: 'rawMaterial' },
+                  { header: 'Intake Qty', dataKey: 'intakeQuantity' },
+                  { header: 'Finished Product', dataKey: 'finishedProduct' },
+                  { header: 'Produced Qty', dataKey: 'outcomeQuantity' },
+                ];
+                const pdfData = [...filteredProductions, {
+                  date: '',
+                  workName: '',
+                  rawMaterial: 'TOTAL:',
+                  intakeQuantity: totalIntake.toString(),
+                  finishedProduct: 'TOTAL:',
+                  outcomeQuantity: totalProducedSum.toString()
+                }];
+                exportTableToPdf(cols, pdfData, `Production_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Production Report', settings?.shopName, filteredProductions.length);
+              }}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
             <button type="button" 
               onClick={() => navigate('/production/new')}
-              className="text-[#64748B] border border-[#CBD5E1] hover:bg-gray-50 px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="bg-[#1E3A8A] hover:bg-[#172554] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Plus size={14} /> New Production Entry
+              <Plus size={14} /> <span className="hidden sm:inline">New Production Entry</span>
             </button>
           </div>
         </div>

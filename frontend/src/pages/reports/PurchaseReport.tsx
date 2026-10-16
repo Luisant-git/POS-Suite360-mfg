@@ -6,6 +6,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import ViewPurchaseModal from '../purchase/ViewPurchaseModal';
 import PaginationControls from '../../components/PaginationControls';
 
@@ -51,6 +52,8 @@ const PurchaseReport = () => {
         date: new Date(p.date).toISOString().split('T')[0],
         supplierName: p.supplier?.name || '-',
         mode: p.paymentMode?.name || '-',
+        rawTotalAmount: Number(p.subtotal) || 0,
+        rawNetAmount: Number(p.grandTotal) || 0,
         totalAmount: formatCurrency(p.subtotal),
         taxAmount: formatCurrency(p.tax),
         transportCharge: formatCurrency(p.transportCharge || 0),
@@ -72,6 +75,9 @@ const PurchaseReport = () => {
       p.netAmount.toLowerCase().includes(term)
     );
   });
+
+  const totalPurchasesAmount = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawNetAmount) || 0), 0);
+  const totalSubtotal = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawTotalAmount) || 0), 0);
 
   const [entriesPerPage, setEntriesPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
@@ -228,7 +234,7 @@ const PurchaseReport = () => {
             </div>
             <button type="button" 
               onClick={() => {
-                const exportData = purchases.map((p: any) => ({
+                const exportData = filteredPurchases.map((p: any) => ({
                   'Entry No': p.entryNo,
                   'Supplier Invoice No': p.invoiceNo,
                   'Date': p.date,
@@ -240,17 +246,61 @@ const PurchaseReport = () => {
                   'Wages': p.wages,
                   'Net Amount': p.netAmount
                 }));
-                exportToExcel(exportData, `Purchase_Report_${fromDate}_to_${toDate}`);
+                exportData.push({
+                  'Entry No': '',
+                  'Supplier Invoice No': '',
+                  'Date': '',
+                  'Supplier Name': '',
+                  'Payment Mode': 'TOTAL:',
+                  'Total Amount': formatCurrency(totalSubtotal),
+                  'Tax Amount': '',
+                  'Transport': '',
+                  'Wages': '',
+                  'Net Amount': formatCurrency(totalPurchasesAmount)
+                });
+                exportToExcel(exportData, `Purchase_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: 'Purchase Report',
+                  totalCount: filteredPurchases.length
+                });
               }}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="shrink-0 bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button"
+              onClick={() => {
+                const cols: PdfColumn[] = [
+                  { header: 'Entry No', dataKey: 'entryNo' },
+                  { header: 'Supp. Inv. No', dataKey: 'invoiceNo' },
+                  { header: 'Date', dataKey: 'date' },
+                  { header: 'Supplier Name', dataKey: 'supplierName' },
+                  { header: 'Payment Mode', dataKey: 'mode' },
+                  { header: 'Total Amount', dataKey: 'totalAmount' },
+                  { header: 'Tax Amount', dataKey: 'taxAmount' },
+                  { header: 'Net Amount', dataKey: 'netAmount' },
+                ];
+                const pdfData = [...filteredPurchases, {
+                  entryNo: '',
+                  invoiceNo: '',
+                  date: '',
+                  supplierName: '',
+                  mode: 'TOTAL:',
+                  totalAmount: formatCurrency(totalSubtotal),
+                  taxAmount: '',
+                  netAmount: formatCurrency(totalPurchasesAmount)
+                }];
+                exportTableToPdf(cols, pdfData, `Purchase_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Purchase Report', settings?.shopName, filteredPurchases.length);
+              }}
+              className="shrink-0 bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
             <button type="button" 
               onClick={() => navigate('/purchase/new')}
-              className="text-[#64748B] border border-[#CBD5E1] hover:bg-gray-50 px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="bg-[#1E3A8A] hover:bg-[#172554] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Plus size={14} /> New Purchase Entry
+              <Plus size={14} /> <span className="hidden sm:inline">New Purchase Entry</span>
             </button>
           </div>
         </div>
@@ -280,23 +330,24 @@ const PurchaseReport = () => {
               ) : (
                 paginatedPurchases.map((p: any, index: number) => (
                   <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-medium">{p.entryNo}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-bold">{p.entryNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-black">{p.invoiceNo}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-medium">{p.date}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-bold">{p.date}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-black">{p.supplierName}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0]">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        p.mode === 'Cash' ? 'bg-[#06B6D4] text-white' : 
+                        p.mode?.toLowerCase() === 'credit' ? 'bg-rose-500 text-white' :
+                        p.mode?.toLowerCase() === 'cash' ? 'bg-[#22C55E] text-white' :
                         p.mode === 'Card' ? 'bg-[#0EA5E9] text-white' : 
                         'bg-[#14B8A6] text-white'
                       }`}>
                         {p.mode}
                       </span>
                     </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-medium">{p.totalAmount}</td>
-                    {settings?.enableTax && <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-medium">{p.taxAmount}</td>}
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-medium">{p.transportCharge}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-medium">{p.wages}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-bold">{p.totalAmount}</td>
+                    {settings?.enableTax && <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-bold">{p.taxAmount}</td>}
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-bold">{p.transportCharge}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-bold">{p.wages}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-[#10B981]">{p.netAmount}</td>
                     <td className="px-4 py-3 text-center">
                       <button type="button" 

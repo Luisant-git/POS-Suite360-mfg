@@ -4,11 +4,12 @@ import { Download, Box, Activity } from 'lucide-react';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import { useSettings } from '../../contexts/SettingsContext';
 import PaginationControls from '../../components/PaginationControls';
 
 const StockReport = () => {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: async () => (await api.get('/categories')).data });
   const { data: brands = [] } = useQuery({ queryKey: ['brands'], queryFn: async () => (await api.get('/brands')).data });
 
@@ -35,10 +36,13 @@ const StockReport = () => {
         categoryName: p.category?.name || '-',
         currentQty: `${p.currentStock} ${p.unit?.shortCode || p.unit?.name || ''}`.trim(),
         purRate: formatCurrency(p.purchaseRate),
+        rawStockValue: Number(p.currentStock) * Number(p.purchaseRate),
         stockValue: formatCurrency(Number(p.currentStock) * Number(p.purchaseRate)),
       }));
     },
   });
+
+  const totalStockValue = products.reduce((sum: number, p: any) => sum + (Number(p.rawStockValue) || 0), 0);
 
   const [entriesPerPage, setEntriesPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
@@ -130,15 +134,65 @@ const StockReport = () => {
             <Box size={16} />
             <h2 className="font-bold text-[13px] tracking-wide text-[#334155]">STOCK AS ON DATE REPORT</h2>
           </div>
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <button type="button" 
-              onClick={() => exportToExcel(products, 'Stock_Report')}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              onClick={() => {
+                const exportData = products.map((p: any) => ({
+                  'Item Code': p.code,
+                  'Product Name': p.name,
+                  'Brand': p.brandName,
+                  'Category': p.categoryName,
+                  'Current Qty': p.currentQty,
+                  'Pur Rate': p.purRate,
+                  'Stock Value': p.stockValue,
+                }));
+                exportData.push({
+                  'Item Code': '',
+                  'Product Name': '',
+                  'Brand': '',
+                  'Category': '',
+                  'Current Qty': '',
+                  'Pur Rate': 'TOTAL VALUE:',
+                  'Stock Value': formatCurrency(totalStockValue) as any,
+                });
+                exportToExcel(exportData, 'Stock_Report', {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: 'Stock Report',
+                  totalCount: products.length
+                });
+              }}
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
             </button>
-            <button type="button" className="bg-[#64748B] hover:bg-[#475569] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors">
-              <Activity size={14} /> Live Inventory Valuation
+            <button type="button"
+              onClick={() => {
+                const cols: PdfColumn[] = [
+                  { header: 'Item Code', dataKey: 'code' },
+                  { header: 'Product Name', dataKey: 'name' },
+                  { header: 'Brand', dataKey: 'brandName' },
+                  { header: 'Category', dataKey: 'categoryName' },
+                  { header: 'Current Qty', dataKey: 'currentQty' },
+                  { header: 'Pur Rate', dataKey: 'purRate' },
+                  { header: 'Stock Value', dataKey: 'stockValue' },
+                ];
+                const pdfData = [...products, {
+                  code: '',
+                  name: '',
+                  brandName: '',
+                  categoryName: '',
+                  currentQty: '',
+                  purRate: 'TOTAL VALUE:',
+                  stockValue: formatCurrency(totalStockValue)
+                }];
+                exportTableToPdf(cols, pdfData, 'Stock_Report', 'Stock Report', settings?.shopName, products.length);
+              }}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
+            </button>
+            <button type="button" className="bg-[#64748B] hover:bg-[#475569] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors">
+              <Activity size={14} /> <span className="hidden sm:inline">Live Valuation</span>
             </button>
           </div>
         </div>

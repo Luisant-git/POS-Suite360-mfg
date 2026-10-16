@@ -6,6 +6,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import InvoicePrintModal from '../../components/InvoicePrintModal';
 import ViewSalesModal from '../sales/ViewSalesModal';
 import PaginationControls from '../../components/PaginationControls';
@@ -235,17 +236,53 @@ const SalesReport = () => {
                   'Total Birds': s.totalBirds,
                   'Total Amount': s.netPayable
                 }));
-                exportToExcel(exportData, `Sales_Report_${fromDate}_to_${toDate}`);
+                exportData.push({
+                  'Invoice No': '',
+                  'Date': '',
+                  'Customer Name': '',
+                  'Payment Mode': 'TOTAL:',
+                  'Total Birds': '',
+                  'Total Amount': formatCurrency(totalSalesAmount)
+                });
+                exportToExcel(exportData, `Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: 'Sales Report',
+                  totalCount: filteredSales.length
+                });
               }}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="shrink-0 bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button"
+              onClick={() => {
+                const cols: PdfColumn[] = [
+                  { header: 'Invoice No', dataKey: 'invoiceNo' },
+                  { header: 'Date', dataKey: 'date' },
+                  { header: 'Customer Name', dataKey: 'customerName' },
+                  { header: 'Payment Mode', dataKey: 'paymentMode' },
+                  { header: 'Total Birds', dataKey: 'totalBirds' },
+                  { header: 'Total Amount', dataKey: 'netPayable' },
+                ];
+                const pdfData = [...filteredSales, {
+                  invoiceNo: '',
+                  date: '',
+                  customerName: '',
+                  paymentMode: 'TOTAL:',
+                  totalBirds: '',
+                  netPayable: formatCurrency(totalSalesAmount)
+                }];
+                exportTableToPdf(cols, pdfData, `Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Sales Report', settings?.shopName, filteredSales.length);
+              }}
+              className="shrink-0 bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
             <button type="button" 
               onClick={() => navigate('/sales/pos')}
               className="bg-[#1E3A8A] hover:bg-[#172554] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Plus size={14} /> New POS Bill
+              <Plus size={14} /> <span className="hidden sm:inline">New POS Bill</span>
             </button>
           </div>
         </div>
@@ -272,10 +309,16 @@ const SalesReport = () => {
                   <React.Fragment key={s.id}>
                     <tr className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-[#3B82F6] cursor-pointer hover:underline">{s.invoiceNo}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#475569]">{s.date}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#334155]">{s.customerName}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-black font-bold">{s.date}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-black font-bold">{s.customerName}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-center">
-                      <span className="bg-[#64748B] text-white px-2 py-0.5 rounded text-[10px] font-bold">
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                        s.paymentMode?.toLowerCase() === 'credit'
+                          ? 'bg-rose-500 text-white'
+                          : s.paymentMode?.toLowerCase() === 'cash'
+                          ? 'bg-[#22C55E] text-white'
+                          : 'bg-[#3B82F6] text-white'
+                      }`}>
                         {s.paymentMode}
                       </span>
                     </td>

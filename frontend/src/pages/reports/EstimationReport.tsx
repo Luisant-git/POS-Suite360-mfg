@@ -6,13 +6,14 @@ import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import InvoicePrintModal from '../../components/InvoicePrintModal';
 import ViewEstimationModal from '../sales/ViewEstimationModal';
 import PaginationControls from '../../components/PaginationControls';
 
 const EstimationReport = () => {
   const navigate = useNavigate();
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [customerId, setCustomerId] = useState('');
@@ -220,11 +221,44 @@ const EstimationReport = () => {
                   'Status': e.status,
                   'Total Amount': e.netPayable
                 }));
-                exportToExcel(exportData, `Estimation_Report_${fromDate}_to_${toDate}`);
+                exportData.push({
+                  'Estimation No': '',
+                  'Date': '',
+                  'Customer Name': '',
+                  'Status': 'TOTAL:',
+                  'Total Amount': formatCurrency(totalEstimationAmount)
+                });
+                exportToExcel(exportData, `Estimation_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: 'Estimation Report',
+                  totalCount: filteredEstimations.length
+                });
               }}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button"
+              onClick={() => {
+                const cols: PdfColumn[] = [
+                  { header: 'Estimation No', dataKey: 'estimationNo' },
+                  { header: 'Date', dataKey: 'date' },
+                  { header: 'Customer Name', dataKey: 'customerName' },
+                  { header: 'Status', dataKey: 'status' },
+                  { header: 'Total Amount', dataKey: 'netPayable' },
+                ];
+                const pdfData = [...filteredEstimations, {
+                  estimationNo: '',
+                  date: '',
+                  customerName: '',
+                  status: 'TOTAL:',
+                  netPayable: formatCurrency(totalEstimationAmount)
+                }];
+                exportTableToPdf(cols, pdfData, `Estimation_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Estimation Report', settings?.shopName, filteredEstimations.length);
+              }}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
           </div>
         </div>

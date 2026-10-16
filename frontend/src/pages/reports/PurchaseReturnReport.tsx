@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CornerDownLeft, Package, Search, Filter } from 'lucide-react';
+import { CornerDownLeft, Package, Search, Filter, Download } from 'lucide-react';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { useSettings } from '../../contexts/SettingsContext';
 import PaginationControls from '../../components/PaginationControls';
+import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 
 const PurchaseReturnReport = () => {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
 
   const { data: returns = [], isLoading } = useQuery({
     queryKey: ['purchase-returns'],
@@ -38,6 +40,8 @@ const PurchaseReturnReport = () => {
     return match;
   });
 
+  const totalReturnsAmount = filteredReturns.reduce((sum: number, r: any) => sum + (Number(r.totalAmount) || 0), 0);
+
   const [entriesPerPage, setEntriesPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -52,13 +56,57 @@ const PurchaseReturnReport = () => {
         <div className="bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col flex-1 overflow-hidden">
           {/* Header */}
           <div className="bg-[#F8F9FA] border-b border-[#E6E9ED] px-4 py-3">
-            <div className="flex items-start md:items-center justify-between gap-2 text-[#F59E0B]">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[#F59E0B]">
               <div className="flex items-center gap-2">
                 <CornerDownLeft size={18} className="shrink-0" />
                 <h2 className="font-bold text-[13px] md:text-[14px] uppercase tracking-wide">Purchase Returns Audit & History Report</h2>
               </div>
-              <div className="bg-[#FACC15] text-[#854D0E] font-bold text-[11px] px-3 py-1 rounded-sm shadow-sm shrink-0 whitespace-nowrap">
-                {returns.length} Returns
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="bg-[#FACC15] text-[#854D0E] font-bold text-[11px] px-3 py-1.5 rounded shadow-sm shrink-0 whitespace-nowrap flex items-center h-[30px]">
+                  {returns.length} Returns
+                </div>
+                <button type="button"
+                  onClick={() => {
+                    const cols: PdfColumn[] = [
+                      { header: 'S.No', dataKey: '_sno' },
+                      { header: 'Return No', dataKey: 'returnNo' },
+                      { header: 'Return Date', dataKey: '_date' },
+                      { header: 'Supplier Name', dataKey: '_supplier' },
+                      { header: 'Remarks', dataKey: 'remarks' },
+                      { header: 'Claim Amount', dataKey: '_amount' },
+                    ];
+                    const rows = filteredReturns.map((ret: any, i: number) => ({
+                      _sno: i + 1,
+                      returnNo: ret.returnNo,
+                      _date: ret.date ? new Date(ret.date).toISOString().split('T')[0] : '-',
+                      _supplier: ret.supplier?.name || 'Unknown',
+                      remarks: ret.remarks || '-',
+                      _amount: formatCurrency(ret.totalAmount),
+                    }));
+                    rows.push({ _sno: '', returnNo: '', _date: '', _supplier: '', remarks: 'TOTAL AMOUNT:', _amount: formatCurrency(totalReturnsAmount) });
+                    exportTableToPdf(cols, rows, 'Purchase_Return_Report', 'Purchase Return Report', settings?.shopName, filteredReturns.length);
+                  }}
+                  className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center justify-center gap-1.5 text-[12px] font-bold whitespace-nowrap transition-colors shrink-0"
+                >
+                  <Download size={13} /> <span className="hidden sm:inline">Export PDF</span>
+                </button>
+                <button type="button"
+                  onClick={() => {
+                    const exportData = filteredReturns.map((ret: any, i: number) => ({
+                      'S.No': i + 1,
+                      'Return No': ret.returnNo,
+                      'Return Date': ret.date ? new Date(ret.date).toISOString().split('T')[0] : '-',
+                      'Supplier Name': ret.supplier?.name || 'Unknown',
+                      'Remarks': ret.remarks || '-',
+                      'Claim Amount': Number(ret.totalAmount) || 0,
+                    }));
+                    exportData.push({ 'S.No': '', 'Return No': '', 'Return Date': '', 'Supplier Name': '', 'Remarks': 'TOTAL AMOUNT:', 'Claim Amount': formatCurrency(totalReturnsAmount) as any });
+                    exportToExcel(exportData, 'Purchase_Return_Report', { shopName: settings?.shopName || 'MY SHOP', title: 'Purchase Return Report', totalCount: filteredReturns.length });
+                  }}
+                  className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center justify-center gap-1.5 text-[12px] font-bold whitespace-nowrap transition-colors shrink-0"
+                >
+                  <Download size={13} /> <span className="hidden sm:inline">Export Excel</span>
+                </button>
               </div>
             </div>
           </div>

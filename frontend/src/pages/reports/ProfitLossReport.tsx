@@ -6,9 +6,11 @@ import { format, startOfMonth, startOfYear } from 'date-fns';
 import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
+import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 
 const ProfitLossReport = () => {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [activePreset, setActivePreset] = useState<string>('month');
@@ -166,13 +168,64 @@ const ProfitLossReport = () => {
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end mt-2 lg:mt-0">
           <button 
-            onClick={exportToCsv}
-            className="bg-white border border-gray-300 hover:bg-gray-50 text-green-700 px-2 py-1 rounded flex items-center gap-1 font-bold text-[12px] transition-colors shadow-sm"
+            onClick={() => {
+              const exportData = [
+                { 'Particulars': 'I. OPERATING REVENUE', 'Amount': '' },
+                { 'Particulars': 'Gross Sales', 'Amount': safePnl.grossSales },
+                { 'Particulars': 'Sales Returns', 'Amount': -safePnl.totalSalesReturns },
+                { 'Particulars': 'NET OPERATING REVENUE', 'Amount': safePnl.netOperatingRevenue },
+                { 'Particulars': '', 'Amount': '' },
+                { 'Particulars': 'II. COST OF GOODS SOLD', 'Amount': '' },
+                { 'Particulars': 'Add: Gross Purchases', 'Amount': safePnl.grossPurchases },
+                { 'Particulars': 'Less: Purchase Returns', 'Amount': -safePnl.totalPurchaseReturns },
+                { 'Particulars': 'NET COST OF GOODS SOLD', 'Amount': safePnl.netCogs },
+                { 'Particulars': 'GROSS PROFIT', 'Amount': safePnl.grossProfit },
+                { 'Particulars': '', 'Amount': '' },
+                { 'Particulars': 'III. OPERATING EXPENSES', 'Amount': '' },
+                { 'Particulars': 'TOTAL OPERATING EXPENSES', 'Amount': safePnl.totalExpenses },
+                { 'Particulars': '', 'Amount': '' },
+                { 'Particulars': 'NET PROFIT FOR PERIOD', 'Amount': safePnl.netProfit }
+              ];
+              exportToExcel(exportData, `PNL_Statement_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+                shopName: settings?.shopName || 'MY SHOP',
+                title: `Profit & Loss Statement (${fromDate || 'All Time'} to ${toDate || 'All Time'})`,
+              });
+            }}
+            className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors shadow-sm"
           >
-            <Download size={14} /> Export
+            <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
           </button>
-          <button className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2 py-1 rounded flex items-center gap-1 font-bold text-[12px] transition-colors shadow-sm" onClick={() => window.print()}>
-            <Printer size={14} /> Print
+          <button
+            onClick={() => {
+              const cols: PdfColumn[] = [
+                { header: 'Particulars', dataKey: 'label' },
+                { header: 'Amount', dataKey: 'value' },
+              ];
+              const rows = [
+                { label: 'I. OPERATING REVENUE', value: '' },
+                { label: 'Gross Sales', value: formatCurrency(safePnl.grossSales) },
+                { label: 'Sales Returns', value: `-${formatCurrency(safePnl.totalSalesReturns)}` },
+                { label: 'NET OPERATING REVENUE', value: formatCurrency(safePnl.netOperatingRevenue) },
+                { label: '', value: '' },
+                { label: 'II. COST OF GOODS SOLD', value: '' },
+                { label: 'Add: Gross Purchases', value: formatCurrency(safePnl.grossPurchases) },
+                { label: 'Less: Purchase Returns', value: `-${formatCurrency(safePnl.totalPurchaseReturns)}` },
+                { label: 'NET COST OF GOODS SOLD', value: formatCurrency(safePnl.netCogs) },
+                { label: 'GROSS PROFIT', value: formatCurrency(safePnl.grossProfit) },
+                { label: '', value: '' },
+                { label: 'III. OPERATING EXPENSES', value: '' },
+                { label: 'TOTAL OPERATING EXPENSES', value: formatCurrency(safePnl.totalExpenses) },
+                { label: '', value: '' },
+                { label: 'NET PROFIT FOR PERIOD', value: formatCurrency(safePnl.netProfit) },
+              ];
+              exportTableToPdf(cols, rows, `PNL_${fromDate || 'all'}_to_${toDate || 'all'}`, `Profit & Loss Statement: ${fromDate || 'All Time'} to ${toDate || 'All Time'}`, settings?.shopName);
+            }}
+            className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center justify-center gap-1.5 font-bold text-[12px] whitespace-nowrap transition-colors shadow-sm"
+          >
+            <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
+          </button>
+          <button className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-2.5 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm" onClick={() => window.print()}>
+            <Printer size={14} /> <span className="hidden sm:inline">Print</span>
           </button>
         </div>
       </div>

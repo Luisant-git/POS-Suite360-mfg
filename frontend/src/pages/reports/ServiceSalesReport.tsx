@@ -7,6 +7,7 @@ import api from '../../services/api';
 import ServiceReceiptPrintModal from '../../components/ServiceReceiptPrintModal';
 import PaginationControls from '../../components/PaginationControls';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 
 const ServiceSalesReport = () => {
   const navigate = useNavigate();
@@ -73,18 +74,67 @@ const ServiceSalesReport = () => {
   };
 
   const handleExport = () => {
-    const rows = filteredSales.map((s: any) => ({
+    const rows: any[] = filteredSales.map((s: any) => ({
       'Invoice No': s.invoiceNo,
       'Date': new Date(s.date).toLocaleDateString('en-IN'),
       'Customer': s.customer?.name || 'Cash Customer',
       'Services': s.items?.map((i: any) => i.serviceName).join(', '),
-      'Payment Mode': s.paymentMode?.name,
+      'Payment Mode': s.paymentMode?.name || '-',
       'Subtotal': Number(s.subtotal || 0).toFixed(2),
       'Discount': Number(s.discount || 0).toFixed(2),
       'Tax': Number(s.tax || 0).toFixed(2),
       'Grand Total': Number(s.grandTotal || 0).toFixed(2),
     }));
-    exportToExcel(rows, `Service_Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`);
+    rows.push({
+      'Invoice No': '',
+      'Date': '',
+      'Customer': '',
+      'Services': '',
+      'Payment Mode': 'TOTAL:',
+      'Subtotal': '',
+      'Discount': formatCurrency(totalDiscount),
+      'Tax': formatCurrency(totalTax),
+      'Grand Total': formatCurrency(totalRevenue),
+    });
+    exportToExcel(rows, `Service_Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
+      shopName: settings?.shopName || 'MY SHOP',
+      title: 'Service Sales Report',
+      totalCount: filteredSales.length
+    });
+  };
+
+  const handleExportPdf = () => {
+    const cols: PdfColumn[] = [
+      { header: 'Invoice No', dataKey: 'invoiceNo' },
+      { header: 'Date', dataKey: 'date' },
+      { header: 'Customer', dataKey: 'customer' },
+      { header: 'Payment Mode', dataKey: 'mode' },
+      { header: 'Subtotal', dataKey: 'subtotal' },
+      { header: 'Discount', dataKey: 'discount' },
+      { header: 'Tax', dataKey: 'tax' },
+      { header: 'Grand Total', dataKey: 'grandTotal' },
+    ];
+    const rows = filteredSales.map((s: any) => ({
+      invoiceNo: s.invoiceNo,
+      date: new Date(s.date).toLocaleDateString('en-IN'),
+      customer: s.customer?.name || 'Cash Customer',
+      mode: s.paymentMode?.name || '-',
+      subtotal: formatCurrency(s.subtotal || 0),
+      discount: formatCurrency(s.discount || 0),
+      tax: formatCurrency(s.tax || 0),
+      grandTotal: formatCurrency(s.grandTotal || 0),
+    }));
+    rows.push({
+      invoiceNo: '',
+      date: '',
+      customer: '',
+      mode: 'TOTAL:',
+      subtotal: '',
+      discount: formatCurrency(totalDiscount),
+      tax: formatCurrency(totalTax),
+      grandTotal: formatCurrency(totalRevenue),
+    });
+    exportTableToPdf(cols, rows, `Service_Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Service Sales Report', settings?.shopName, filteredSales.length);
   };
 
   const handlePrintSummaryReport = () => {
@@ -246,9 +296,14 @@ ${totalTax > 0 ? `<div style="display:flex;justify-content:space-between;font-si
                 />
               </div>
               <button type="button" onClick={handleExport} disabled={filteredSales.length === 0}
-                className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors disabled:opacity-50"
+                className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors disabled:opacity-50"
               >
-                <Download size={14} /> Export Excel
+                <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+              </button>
+              <button type="button" onClick={handleExportPdf} disabled={filteredSales.length === 0}
+                className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors disabled:opacity-50"
+              >
+                <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
               </button>
               <button type="button" onClick={handlePrintSummaryReport} disabled={filteredSales.length === 0}
                 className="bg-[#047857] hover:bg-[#065F46] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors disabled:opacity-50"

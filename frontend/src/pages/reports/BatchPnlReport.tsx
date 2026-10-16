@@ -5,10 +5,11 @@ import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
 import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
+import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import Select from 'react-select';
 
 const BatchPnlReport = () => {
-  const { formatCurrency } = useSettings();
+  const { formatCurrency, settings } = useSettings();
   const [workName, setWorkName] = useState('');
   const [productId, setProductId] = useState('');
 
@@ -188,12 +189,12 @@ const BatchPnlReport = () => {
             <h2 className="font-bold text-[13px] tracking-wide">RAW MATERIALS CONSUMED</h2>
           </div>
           {reportData && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button type="button" 
                 onClick={() => window.print()}
-                className="bg-white border border-[#CBD5E1] text-[#334155] hover:bg-gray-50 px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+                className="bg-white border border-[#CBD5E1] text-[#334155] hover:bg-gray-50 px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
               >
-                <FileText size={14} /> Print Report
+                <FileText size={14} /> <span className="hidden sm:inline">Print Report</span>
               </button>
               <button type="button" 
                 onClick={() => {
@@ -217,11 +218,44 @@ const BatchPnlReport = () => {
                   'Quantity Consumed': '',
                   'Total Cost': reportData.profit
                 });
-                exportToExcel(exportData, `Batch_PnL_${workName}`);
+                exportToExcel(exportData, `Batch_PnL_${workName || 'Report'}`, {
+                  shopName: settings?.shopName || 'MY SHOP',
+                  title: `Batch P&L Report - ${workName}`,
+                  totalCount: reportData.materialsUsed.length
+                });
               }}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
-              <Download size={14} /> Export Excel
+              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+            </button>
+            <button type="button" 
+              onClick={() => {
+                const cols: PdfColumn[] = [
+                  { header: 'Raw Material Name', dataKey: 'name' },
+                  { header: 'Quantity Consumed', dataKey: 'quantity' },
+                  { header: 'Total Cost', dataKey: 'cost' },
+                ];
+                const pdfData = [...reportData.materialsUsed.map((m: any) => ({
+                  ...m,
+                  cost: formatCurrency(m.cost)
+                })), {
+                  name: 'TOTAL COST',
+                  quantity: '',
+                  cost: formatCurrency(reportData.totalCost)
+                }, {
+                  name: 'POTENTIAL REVENUE',
+                  quantity: '',
+                  cost: formatCurrency(reportData.totalRevenue)
+                }, {
+                  name: 'NET PROFIT',
+                  quantity: '',
+                  cost: formatCurrency(reportData.profit)
+                }];
+                exportTableToPdf(cols, pdfData, `Batch_PnL_${workName || 'Report'}`, `Batch P&L Report - ${workName}`, settings?.shopName, reportData.materialsUsed.length);
+              }}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+            >
+              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
             </div>
           )}
