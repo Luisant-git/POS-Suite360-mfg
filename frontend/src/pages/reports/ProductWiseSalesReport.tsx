@@ -814,7 +814,7 @@ const ProductWiseSalesReport = () => {
                               )}
                             </td>
                             <td className="px-3 py-1 border-r border-[#E2E8F0] text-black font-bold">
-                              {group.supplierName}
+                              {group.supplierName && group.supplierName !== 'Unassigned Supplier' ? group.supplierName : '-'}
                             </td>
                             <td className="px-3 py-1 border-r border-[#E2E8F0] text-right text-black font-bold">
                               {item.qty}
