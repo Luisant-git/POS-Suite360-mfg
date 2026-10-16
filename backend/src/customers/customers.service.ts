@@ -82,4 +82,47 @@ export class CustomersService {
       where: { id },
     });
   }
+
+  async getCustomerRates(customerId: number) {
+    return this.prisma.customerProductRate.findMany({
+      where: { customerId },
+      include: { product: true },
+      orderBy: { productId: 'asc' },
+    });
+  }
+
+  async upsertCustomerRate(customerId: number, productId: number, rate: number) {
+    return this.prisma.customerProductRate.upsert({
+      where: {
+        customerId_productId: { customerId, productId },
+      },
+      update: { rate },
+      create: { customerId, productId, rate },
+    });
+  }
+
+  async setCustomerRates(customerId: number, rates: { productId: number; rate: number }[], replaceAll = true) {
+    if (replaceAll) {
+      await this.prisma.customerProductRate.deleteMany({ where: { customerId } });
+      const validRates = rates.filter(item => item.productId > 0 && item.rate > 0);
+      if (validRates.length > 0) {
+        await this.prisma.customerProductRate.createMany({
+          data: validRates.map(item => ({
+            customerId,
+            productId: Number(item.productId),
+            rate: Number(item.rate)
+          }))
+        });
+      }
+      return this.getCustomerRates(customerId);
+    }
+    const results = [];
+    for (const item of rates) {
+      if (item.productId > 0) {
+        const res = await this.upsertCustomerRate(customerId, Number(item.productId), Number(item.rate));
+        results.push(res);
+      }
+    }
+    return results;
+  }
 }

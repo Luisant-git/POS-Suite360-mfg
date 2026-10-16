@@ -31,4 +31,21 @@ export class CustomersController {
   remove(@Param('id') id: string) {
     return this.customersService.remove(+id);
   }
+
+  @Get(':id/rates')
+  getCustomerRates(@Param('id') id: string) {
+    return this.customersService.getCustomerRates(+id);
+  }
+
+  @Post(':id/rates')
+  setCustomerRates(@Param('id') id: string, @Body() body: any) {
+    if (Array.isArray(body)) {
+      return this.customersService.setCustomerRates(+id, body, true);
+    } else if (body?.rates && Array.isArray(body.rates)) {
+      return this.customersService.setCustomerRates(+id, body.rates, false);
+    } else if (body?.productId) {
+      return this.customersService.upsertCustomerRate(+id, +body.productId, +body.rate);
+    }
+    return [];
+  }
 }
