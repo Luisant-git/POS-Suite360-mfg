@@ -63,7 +63,7 @@ const ProfitLossReport = () => {
     netProfit: 0,
   };
 
-  const exportToCsv = () => {
+  const _exportToCsv = () => {
     const rows = [
       ['POS SUITE 360 - Profit & Loss Statement'],
       ['Period:', `${fromDate} to ${toDate}`],
@@ -115,7 +115,7 @@ const ProfitLossReport = () => {
   const grossProfitMargin = safePnl.netOperatingRevenue > 0 ? (safePnl.grossProfit / safePnl.netOperatingRevenue) * 100 : 0;
   const netProfitMargin = safePnl.netOperatingRevenue > 0 ? (safePnl.netProfit / safePnl.netOperatingRevenue) * 100 : 0;
 
-  const presetBtnClass = (preset: string) => 
+  const presetBtnClass = (preset: string) =>
     `px-2 py-0.5 text-[11px] rounded transition-colors shadow-sm font-bold ${activePreset === preset ? 'bg-[#1F2937] text-white shadow-md' : 'text-gray-700 hover:bg-white bg-transparent'}`;
 
   return (
@@ -133,8 +133,8 @@ const ProfitLossReport = () => {
             </span>
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-gray-500">From:</span>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={fromDate}
                 onChange={(e) => handleCustomDateChange(true, e.target.value)}
                 className="border border-gray-300 rounded px-2 py-0.5 text-[12px] font-bold w-full"
@@ -142,14 +142,14 @@ const ProfitLossReport = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[12px] text-gray-500">To:</span>
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={toDate}
                 onChange={(e) => handleCustomDateChange(false, e.target.value)}
                 className="border border-gray-300 rounded px-2 py-0.5 text-[12px] font-bold w-full"
               />
             </div>
-            <button 
+            <button
               onClick={() => refetch()}
               className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3 py-1 rounded flex items-center justify-center gap-1 font-bold text-[12px] transition-colors shadow-sm w-full sm:w-auto mt-2 sm:mt-0"
             >
@@ -167,7 +167,7 @@ const ProfitLossReport = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-start lg:justify-end mt-2 lg:mt-0">
-          <button 
+          <button
             onClick={() => {
               const exportData = [
                 { 'Particulars': 'I. OPERATING REVENUE', 'Amount': '' },
@@ -254,7 +254,7 @@ const ProfitLossReport = () => {
                   <div className="flex items-center gap-2"><span>I. OPERATING REVENUE</span></div>
                   <div>AMOUNT</div>
                 </div>
-                
+
                 <div className="flex justify-between py-1 text-gray-700 shrink-0">
                   <span>Gross Sales Revenue (Cash & Credit Sales)</span>
                   <div className="flex gap-4">
@@ -262,7 +262,7 @@ const ProfitLossReport = () => {
                     <span className="font-bold w-20 text-right">{formatCurrency(safePnl.grossSales)}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between py-1 text-[#EF4444] border-b border-gray-100 mb-1 shrink-0">
                   <span>Less: Sales Returns</span>
                   <div className="flex gap-4">
@@ -281,7 +281,7 @@ const ProfitLossReport = () => {
                   <div className="flex items-center gap-2"><span>II. COST OF GOODS SOLD (COGS)</span></div>
                   <div>AMOUNT</div>
                 </div>
-                
+
                 <div className="flex justify-between py-1 text-gray-700 shrink-0">
                   <span>Gross Purchases</span>
                   <div className="flex gap-4">
@@ -289,7 +289,7 @@ const ProfitLossReport = () => {
                     <span className="font-bold w-20 text-right">{formatCurrency(safePnl.grossPurchases)}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex justify-between py-1 text-[#059669] border-b border-gray-100 mb-1 shrink-0">
                   <span>Less: Purchase Returns</span>
                   <div className="flex gap-4">
@@ -316,7 +316,7 @@ const ProfitLossReport = () => {
                   <div className="flex items-center gap-2"><span>III. OPERATING EXPENSES (ITEMIZED)</span></div>
                   <div>AMOUNT</div>
                 </div>
-                
+
                 {safePnl.itemizedExpenses.length === 0 ? (
                   <div className="py-1 text-gray-400 italic text-[11px] border-b border-gray-100 mb-1 shrink-0">
                     No operating expenses recorded for this period
@@ -340,7 +340,7 @@ const ProfitLossReport = () => {
               </>
             )}
           </div>
-          
+
           {/* Footer - Net Profit */}
           <div className={`${isLoss ? 'bg-[#EF4444]' : 'bg-[#10B981]'} text-white px-4 py-3 sm:py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 shrink-0`}>
             <div>
@@ -356,7 +356,7 @@ const ProfitLossReport = () => {
 
         {/* Right Side: Charts & Analytics */}
         <div className="lg:col-span-4 flex flex-col gap-3 min-h-0 print:hidden">
-          
+
           <div className="bg-white p-3 rounded shadow-sm border border-gray-200 flex-1 flex flex-col min-h-0">
             <h3 className="text-[12px] font-bold text-[#1E3A8A] uppercase mb-2 flex items-center gap-1 shrink-0">
               <PieChartIcon size={14} /> Revenue vs Cost Breakdown
@@ -366,9 +366,9 @@ const ProfitLossReport = () => {
                 {['today', 'month', 'custom'].includes(activePreset) ? (
                   <BarChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                    <XAxis dataKey="name" tick={{fontSize: 9}} interval={0} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={(val) => `RS ${val}`} tick={{fontSize: 9}} axisLine={false} tickLine={false} />
-                    <Tooltip cursor={{fill: 'transparent'}} formatter={(val) => formatCurrency(val as number)} contentStyle={{ fontSize: '11px', borderRadius: '4px' }} />
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(val) => `RS ${val}`} tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'transparent' }} formatter={(val) => formatCurrency(val as number)} contentStyle={{ fontSize: '11px', borderRadius: '4px' }} />
                     <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={40}>
                       {barData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -405,9 +405,9 @@ const ProfitLossReport = () => {
 
           <div className="bg-white p-3 rounded shadow-sm border border-gray-200 shrink-0">
             <h3 className="text-[12px] font-bold text-[#D97706] uppercase mb-2 flex items-center gap-1">
-               Key Financial Ratios
+              Key Financial Ratios
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               <div className="bg-gray-50 border border-gray-200 rounded p-2 text-center">
                 <p className="text-[10px] font-bold text-gray-500 mb-0.5">Gross Margin</p>
@@ -423,7 +423,7 @@ const ProfitLossReport = () => {
               </div>
             </div>
           </div>
-          
+
         </div>
       </div>
     </div>

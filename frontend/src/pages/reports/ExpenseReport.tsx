@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText, Filter, RotateCcw, Search, Calendar } from 'lucide-react';
+import { Download, FileText, Filter, RotateCcw, Calendar } from 'lucide-react';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import { exportToExcel } from '../../utils/exportExcel';
 import { useSettings } from '../../contexts/SettingsContext';

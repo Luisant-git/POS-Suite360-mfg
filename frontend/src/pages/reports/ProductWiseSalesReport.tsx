@@ -1,23 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Package, 
-  Truck, 
-  Calendar, 
-  Download, 
-  Printer, 
-  Search, 
-  DollarSign, 
-  TrendingUp, 
-  Layers, 
-  AlertCircle, 
-  ChevronDown, 
-  ChevronUp, 
-  Eye, 
+import {
+  Package,
+  Truck,
+  Calendar,
+  Download,
+  Search,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Eye,
   Loader2,
-  Filter,
-  RefreshCw,
   Maximize2,
   Minimize2,
   RotateCcw
@@ -94,7 +88,7 @@ const ProductWiseSalesReport = () => {
   };
 
   // Reset Filters to Today defaults
-  const isReset = 
+  const isReset =
     fromDate === today &&
     toDate === today &&
     !selectedProductId &&
@@ -121,7 +115,7 @@ const ProductWiseSalesReport = () => {
   });
 
   // Fetch Product Wise Sales Data
-  const { data: productReportData = [], isLoading: isProductLoading, refetch: refetchProduct } = useQuery({
+  const { data: productReportData = [], isLoading: isProductLoading } = useQuery({
     queryKey: ['product-wise-sales', fromDate, toDate, selectedProductId, selectedSupplierId],
     queryFn: async () => {
       const { data } = await api.get('/reports/product-wise-sales', {
@@ -138,7 +132,7 @@ const ProductWiseSalesReport = () => {
   });
 
   // Fetch Supplier Wise Sales Data
-  const { data: supplierReportData = [], isLoading: isSupplierLoading, refetch: refetchSupplier } = useQuery({
+  const { data: supplierReportData = [], isLoading: isSupplierLoading } = useQuery({
     queryKey: ['supplier-wise-sales', fromDate, toDate, selectedSupplierId],
     queryFn: async () => {
       const { data } = await api.get('/reports/supplier-wise-sales', {
@@ -161,7 +155,7 @@ const ProductWiseSalesReport = () => {
     if (!searchQuery.trim()) return productReportData;
     const q = searchQuery.toLowerCase();
     return productReportData.filter((group: any) => {
-      const matchHeader = 
+      const matchHeader =
         group.productName?.toLowerCase().includes(q) ||
         group.productCode?.toLowerCase().includes(q) ||
         group.supplierName?.toLowerCase().includes(q) ||
@@ -180,12 +174,12 @@ const ProductWiseSalesReport = () => {
     if (!searchQuery.trim()) return supplierReportData;
     const q = searchQuery.toLowerCase();
     return supplierReportData.filter((group: any) => {
-      const matchSupplier = 
+      const matchSupplier =
         group.supplierName?.toLowerCase().includes(q) ||
         group.supplierCode?.toLowerCase().includes(q) ||
         group.phone?.toLowerCase().includes(q) ||
         group.contactPerson?.toLowerCase().includes(q);
-      const matchProducts = group.products?.some((p: any) => 
+      const matchProducts = group.products?.some((p: any) =>
         p.productName?.toLowerCase().includes(q) ||
         p.productCode?.toLowerCase().includes(q)
       );
@@ -232,11 +226,11 @@ const ProductWiseSalesReport = () => {
   const toggleAllGroups = (expand: boolean) => {
     const updated: Record<string, boolean> = {};
     if (viewMode === 'product') {
-      filteredProductGroups.forEach((g: any, idx: number) => {
+      filteredProductGroups.forEach((_g: any, idx: number) => {
         updated[`prod-${idx}`] = expand;
       });
     } else {
-      filteredSupplierGroups.forEach((g: any, idx: number) => {
+      filteredSupplierGroups.forEach((_g: any, idx: number) => {
         updated[`sup-${idx}`] = expand;
       });
     }
@@ -277,8 +271,8 @@ const ProductWiseSalesReport = () => {
       });
 
       exportToExcel(
-        exportData, 
-        `Product_Wise_Sales_${fromDate || 'all'}_to_${toDate || 'all'}`, 
+        exportData,
+        `Product_Wise_Sales_${fromDate || 'all'}_to_${toDate || 'all'}`,
         'Product Sales'
       );
     } else {
@@ -315,8 +309,8 @@ const ProductWiseSalesReport = () => {
       });
 
       exportToExcel(
-        exportData, 
-        `Supplier_Wise_Sales_and_Payables_${fromDate || 'all'}_to_${toDate || 'all'}`, 
+        exportData,
+        `Supplier_Wise_Sales_and_Payables_${fromDate || 'all'}_to_${toDate || 'all'}`,
         'Supplier Sales'
       );
     }
@@ -357,11 +351,11 @@ const ProductWiseSalesReport = () => {
       });
 
       exportTableToPdf(
-        cols, 
-        pdfData, 
-        `Product_Wise_Sales_${fromDate || 'all'}_to_${toDate || 'all'}`, 
-        'Product Wise Sales Report', 
-        settings?.shopName, 
+        cols,
+        pdfData,
+        `Product_Wise_Sales_${fromDate || 'all'}_to_${toDate || 'all'}`,
+        'Product Wise Sales Report',
+        settings?.shopName,
         pdfData.length
       );
     } else {
@@ -397,11 +391,11 @@ const ProductWiseSalesReport = () => {
       });
 
       exportTableToPdf(
-        cols, 
-        pdfData, 
-        `Supplier_Wise_Sales_${fromDate || 'all'}_to_${toDate || 'all'}`, 
-        'Supplier Wise Sales & Outstanding Report', 
-        settings?.shopName, 
+        cols,
+        pdfData,
+        `Supplier_Wise_Sales_${fromDate || 'all'}_to_${toDate || 'all'}`,
+        'Supplier Wise Sales & Outstanding Report',
+        settings?.shopName,
         pdfData.length
       );
     }
@@ -423,8 +417,8 @@ const ProductWiseSalesReport = () => {
                 {viewMode === 'product' ? 'PRODUCT WISE SALES REPORT' : 'SUPPLIER WISE SALES & OUTSTANDING REPORT'}
               </h1>
               <p className="text-xs text-black font-bold hidden sm:block">
-                {viewMode === 'product' 
-                  ? 'Item-by-item sales breakdown with invoice-level tracking and margins' 
+                {viewMode === 'product'
+                  ? 'Item-by-item sales breakdown with invoice-level tracking and margins'
                   : 'Supplier sales revenue, gross margin contribution, and real-time outstanding payables'}
               </p>
             </div>
@@ -436,22 +430,20 @@ const ProductWiseSalesReport = () => {
               <button
                 type="button"
                 onClick={() => setViewMode('product')}
-                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded text-[11px] sm:text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  viewMode === 'product'
-                    ? 'bg-[#0F172A] text-white shadow-sm'
-                    : 'text-black hover:text-[#0F172A]'
-                }`}
+                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded text-[11px] sm:text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'product'
+                  ? 'bg-[#0F172A] text-white shadow-sm'
+                  : 'text-black hover:text-[#0F172A]'
+                  }`}
               >
                 <Package size={13} /> Product Wise
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('supplier')}
-                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded text-[11px] sm:text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  viewMode === 'supplier'
-                    ? 'bg-[#E11D48] text-white shadow-sm'
-                    : 'text-black hover:text-[#E11D48]'
-                }`}
+                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded text-[11px] sm:text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'supplier'
+                  ? 'bg-[#E11D48] text-white shadow-sm'
+                  : 'text-black hover:text-[#E11D48]'
+                  }`}
               >
                 <Truck size={13} /> Supplier Wise
               </button>
@@ -479,11 +471,10 @@ const ProductWiseSalesReport = () => {
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold rounded transition-colors shadow-sm ${
-                isExpanded 
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200' 
-                  : 'bg-[#1E293B] text-white hover:bg-[#0F172A]'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold rounded transition-colors shadow-sm ${isExpanded
+                ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                : 'bg-[#1E293B] text-white hover:bg-[#0F172A]'
+                }`}
             >
               {isExpanded ? (
                 <><Minimize2 size={13} /> <span className="hidden sm:inline">Exit Full View</span></>
@@ -561,82 +552,76 @@ const ProductWiseSalesReport = () => {
             <button
               type="button"
               onClick={() => applyDatePreset('today')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
-                isPresetActive('today')
-                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-              }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('today')
+                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+                }`}
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('yesterday')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
-                isPresetActive('yesterday')
-                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-              }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('yesterday')
+                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+                }`}
             >
               Yesterday
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('week')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
-                isPresetActive('week')
-                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-              }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('week')
+                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+                }`}
             >
               Last 7 Days
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('month')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
-                isPresetActive('month')
-                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-              }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('month')
+                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+                }`}
             >
               This Month
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('all')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
-                isPresetActive('all')
-                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-              }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('all')
+                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+                }`}
             >
               All Time
             </button>
-            
+
             <div className="ml-auto flex items-center gap-1.5">
-              <button 
-                type="button" 
-                onClick={handleResetFilters} 
-                className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition-all shadow-sm border flex items-center gap-1 ${
-                  !isReset 
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200' 
-                    : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
-                }`}
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition-all shadow-sm border flex items-center gap-1 ${!isReset
+                  ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
+                  : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
+                  }`}
                 title="Reset all filters to defaults"
               >
                 <RotateCcw size={11} /> Reset
               </button>
-              <button 
-                type="button" 
-                onClick={() => toggleAllGroups(true)} 
+              <button
+                type="button"
+                onClick={() => toggleAllGroups(true)}
                 className="px-2 py-0.5 bg-white hover:bg-gray-100 border border-[#CBD5E1] rounded text-[10.5px] font-bold text-black shadow-sm flex items-center gap-1"
               >
                 <ChevronDown size={12} /> Expand All
               </button>
-              <button 
-                type="button" 
-                onClick={() => toggleAllGroups(false)} 
+              <button
+                type="button"
+                onClick={() => toggleAllGroups(false)}
                 className="px-2 py-0.5 bg-white hover:bg-gray-100 border border-[#CBD5E1] rounded text-[10.5px] font-bold text-black shadow-sm flex items-center gap-1"
               >
                 <ChevronUp size={12} /> Collapse All
@@ -715,11 +700,10 @@ const ProductWiseSalesReport = () => {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold flex items-center gap-1 transition-all shadow-sm border shrink-0 h-[28px] ${
-                    !isReset
-                      ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
-                      : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
-                  }`}
+                  className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold flex items-center gap-1 transition-all shadow-sm border shrink-0 h-[28px] ${!isReset
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
+                    : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
+                    }`}
                   title="Reset all filters"
                 >
                   <RotateCcw size={12} /> Reset
@@ -768,7 +752,7 @@ const ProductWiseSalesReport = () => {
                     return (
                       <React.Fragment key={idx}>
                         {/* Group Header Row */}
-                        <tr 
+                        <tr
                           onClick={() => toggleGroup(groupKey)}
                           className="bg-[#F1F5F9] border-y border-[#CBD5E1] cursor-pointer hover:bg-[#E2E8F0] transition-colors select-none"
                         >
@@ -801,14 +785,13 @@ const ProductWiseSalesReport = () => {
 
                         {/* Child Rows (Invoices) */}
                         {isOpen && group.items?.map((item: any, i: number) => (
-                          <tr 
+                          <tr
                             key={i}
-                            className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors ${
-                              i % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'
-                            }`}
+                            className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'
+                              }`}
                           >
                             <td className="px-2 py-1 text-center text-gray-400 font-bold">{i + 1}</td>
-                            <td 
+                            <td
                               onClick={() => {
                                 if (item.invoiceNo && item.invoiceNo !== '-') {
                                   navigate(`/reports/sales?invoiceNo=${item.invoiceNo}`);
@@ -919,7 +902,7 @@ const ProductWiseSalesReport = () => {
                     return (
                       <React.Fragment key={idx}>
                         {/* Supplier Group Header */}
-                        <tr 
+                        <tr
                           onClick={() => toggleGroup(groupKey)}
                           className="bg-[#FFF1F2] border-y border-[#FECDD3] cursor-pointer hover:bg-[#FFE4E6] transition-colors select-none"
                         >
@@ -957,11 +940,10 @@ const ProductWiseSalesReport = () => {
 
                         {/* Child Products Supplied */}
                         {isOpen && group.products?.map((prod: any, pIdx: number) => (
-                          <tr 
+                          <tr
                             key={pIdx}
-                            className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors ${
-                              pIdx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'
-                            }`}
+                            className={`border-b border-[#F1F5F9] hover:bg-[#F8FAFC] transition-colors ${pIdx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'
+                              }`}
                           >
                             <td className="px-2 py-1 text-center text-gray-400 font-bold">{pIdx + 1}</td>
                             <td className="px-3 py-1 border-r border-[#E2E8F0] font-bold text-black pl-6">
