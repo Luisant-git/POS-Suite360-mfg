@@ -27,7 +27,7 @@ const indianStates = [
   "35 - Andaman & Nicobar Islands", "36 - Telangana", "37 - Andhra Pradesh", "38 - Ladakh"
 ];
 
-const WhatsAppIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
+const _WhatsAppIcon = ({ size = 16, className = "" }: { size?: number, className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size}
@@ -36,7 +36,7 @@ const WhatsAppIcon = ({ size = 16, className = "" }: { size?: number, className?
     fill="currentColor"
     className={className}
   >
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" />
   </svg>
 );
 
@@ -55,7 +55,7 @@ const numberToWords = (num: number): string => {
 
   const wholePart = Math.floor(Number(num));
   const cents = Math.round((Number(num) - wholePart) * 100);
-  
+
   let res = convertWhole(wholePart) || "";
   if (cents > 0) {
     res += `AND CENTS ${convertWhole(cents) || ""}`;
@@ -104,7 +104,7 @@ const estimationSchema = z.object({
   date: z.string(),
   rateType: z.string(),
   paymentModeId: z.coerce.number().min(1, 'Payment Mode is required').or(z.literal(0)),
-  
+
   grossAmount: z.coerce.number(),
   totalDiscount: z.coerce.number(),
   totalDiscountPercent: z.coerce.number().optional(),
@@ -122,14 +122,14 @@ const Estimation = () => {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('editId');
   const queryClient = useQueryClient();
-  
+
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', address: '', state: '' });
   const activeTab = 'Amount Details';
-  
+
   const [showLossWarning, setShowLossWarning] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<any>(null);
-  
+
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [pendingSavePayload, setPendingSavePayload] = useState<any>(null);
@@ -228,7 +228,7 @@ const Estimation = () => {
       setValue('grossAmount', Number(editEstimationData.subtotal));
       setValue('totalDiscount', Number(editEstimationData.discount));
       setValue('netAmount', Number(editEstimationData.grandTotal));
-      
+
       const posItems = editEstimationData.items.map((item: any) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -274,19 +274,19 @@ const Estimation = () => {
   useEffect(() => {
     let grossAmount = 0;
     let totalTax = 0;
-    
+
     items.forEach((item, index) => {
       const q = Number(item.quantity) || 0;
       const rate = Number(item.rate) || 0;
-      
+
       let discAmt = Number(item.discAmt) || 0;
 
       let subtotal = (q * rate) - discAmt;
-      
+
       let itemTax = 0;
 
       const total = subtotal + itemTax;
-      
+
       if (item.total !== total) {
         setValue(`items.${index}.total`, Number(total.toFixed(2)), { shouldValidate: false });
       }
@@ -299,7 +299,7 @@ const Estimation = () => {
     const netAmount = grossAmount + totalTax - d + r;
 
     setValue('grossAmount', Number(grossAmount.toFixed(2)));
-    
+
     setValue('netAmount', Number(netAmount.toFixed(2)));
 
   }, [JSON.stringify(items), watchTotalDiscount, watchRoundOff, setValue, settings?.enableTax, products]);
@@ -310,12 +310,12 @@ const Estimation = () => {
     if (product) {
       setValue(`items.${index}.stock`, product.currentStock || 0);
       setValue(`items.${index}.unit`, product.unit?.shortCode || product.unit?.name || 'Nos');
-      
+
       const rateType = getValues('rateType');
       let rate = Number(product.sellingRate) || 0;
       if (rateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
       else if (rateType === 'MRP') rate = Number(product.mrp) || 0;
-      
+
       // Override with custom customer rate if enabled
       if (settings?.enableCustomerWiseRate && selectedCustomer?.productRates) {
         const customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
@@ -338,7 +338,7 @@ const Estimation = () => {
         let rate = Number(product.sellingRate) || 0;
         if (watchRateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
         else if (watchRateType === 'MRP') rate = Number(product.mrp) || 0;
-        
+
         if (settings?.enableCustomerWiseRate && selectedCustomer?.productRates) {
           const customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
           if (customRate && customRate.rate > 0) {
@@ -357,20 +357,20 @@ const Estimation = () => {
     mutationFn: (data: any) => editId ? api.put(`/estimations/${editId}`, data) : api.post('/estimations', data),
     onSuccess: () => {
       toast.success(editId ? 'Estimation updated successfully!' : 'Estimation recorded successfully!');
-      
+
       // Conditionally print the bill
       setTimeout(async () => {
         if (printAfterSaveRef.current) {
           window.print();
         }
         reset();
-        
+
         // Manually fetch and inject the new invoice number for the next estimation
         const res = await api.get('/estimations/next-estimation-no');
         if (res.data?.estimationNo) {
-           setValue('estimationNo', res.data.estimationNo);
+          setValue('estimationNo', res.data.estimationNo);
         }
-        
+
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['nextEstimationNo'] });
       }, 100);
@@ -392,7 +392,7 @@ const Estimation = () => {
       toast.error('Please select a Payment Mode before saving.');
       return;
     }
-    
+
     const validItems = data.items.filter((item: any) => item.productId > 0);
     if (validItems.length === 0) {
       toast.error('Please add at least one product before saving.');
@@ -450,7 +450,7 @@ const Estimation = () => {
 
   const onError = (errors: any) => {
     let errorMessage = 'Validation failed. Please ensure all items have a Rate and Quantity > 0.';
-    
+
     if (errors.customerId) {
       errorMessage = 'Please select a Customer before saving.';
     } else if (errors.paymentModeId) {
@@ -473,7 +473,7 @@ const Estimation = () => {
     } else if (errors.items) {
       errorMessage = 'Please add at least one product before saving.';
     }
-    
+
     toast.error(errorMessage);
     console.error(errors);
   };
@@ -502,7 +502,7 @@ const Estimation = () => {
     addCustomerMutation.mutate(newCustomer);
   };
 
-  const handleWhatsApp = async () => {
+  const _handleWhatsApp = async () => {
     if (!selectedCustomerId) {
       toast.error('Please select a customer first.');
       return;
@@ -518,14 +518,14 @@ const Estimation = () => {
     if (!element) return;
 
     toast.loading('Sending invoice directly to WhatsApp...', { id: 'whatsapp-toast' });
-    
+
     const opt = {
-      margin:       0.5,
-      filename:     `Estimation_${watch('estimationNo')}.pdf`,
-      image:        { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' as const },
-      enableLinks:  true
+      margin: 0.5,
+      filename: `Estimation_${watch('estimationNo')}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' as const },
+      enableLinks: true
     };
 
     let originalParent: ParentNode | null = null;
@@ -542,20 +542,20 @@ const Estimation = () => {
       element.style.display = 'flex';
       element.style.minHeight = '250mm';
       element.style.width = '210mm'; // Force A4 width
-      
+
       // Position fixed behind everything so it renders in viewport but isn't visible to user
       element.style.position = 'fixed';
       element.style.left = '0';
       element.style.top = '0';
       element.style.zIndex = '-9999';
-      
+
       // Manually hide all toaster notifications so they don't get captured in the PDF
       const toasters = document.querySelectorAll('div[id^="hot-toast-"], [role="status"], .go3958317564');
       toasters.forEach(t => { (t as HTMLElement).style.opacity = '0'; });
 
       // Generate base64 PDF
       const pdfBase64 = await html2pdf().set(opt).from(element).output('datauristring');
-      
+
       const message = `Hello ${customer.name},\n\nHere is your invoice ${watch('estimationNo')}.\nTotal Amount: ${formatCurrency(watch('netAmount'))}\n\nThank you for your business!`;
 
       // Send to backend WhatsApp integration
@@ -568,9 +568,9 @@ const Estimation = () => {
 
       // Restore toasters
       toasters.forEach(t => { (t as HTMLElement).style.opacity = '1'; });
-      
+
       toast.success('Invoice sent successfully to WhatsApp!', { id: 'whatsapp-toast' });
-      
+
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Failed to send WhatsApp message. Is the backend authenticated?', { id: 'whatsapp-toast' });
@@ -584,7 +584,7 @@ const Estimation = () => {
       element.style.left = '';
       element.style.top = '';
       element.style.zIndex = '';
-      
+
       // Move back to original parent
       if (originalParent && element.parentNode === document.body) {
         originalParent.insertBefore(element, nextSibling);
@@ -596,7 +596,7 @@ const Estimation = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input/textarea unless it's a function key or escape
-      
+
       if (e.key === 'F10') {
         e.preventDefault();
         handleSubmit(onSubmit as any, onError)();
@@ -623,11 +623,11 @@ const Estimation = () => {
 
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col font-sans overflow-hidden z-10 print:static print:block print:overflow-visible print:h-auto print:bg-white">
-      
+
       {/* Top Bar */}
       <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-2 sm:px-4 py-2 flex flex-wrap gap-2 justify-between items-center shrink-0 print:hidden">
         <div className="flex flex-wrap gap-2">
-          <button 
+          <button
             type="button"
             onClick={handleSubmit(onSubmit as any, onError)}
             className="bg-[#10B981] hover:bg-[#059669] text-white px-4 py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
@@ -635,7 +635,7 @@ const Estimation = () => {
             <Printer size={16} /> SAVE & PRINT (F10)
           </button>
         </div>
-        <button 
+        <button
           type="button"
           onClick={() => setIsLeaveModalOpen(true)}
           className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-4 py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
@@ -645,11 +645,11 @@ const Estimation = () => {
       </div>
 
       <form className="flex flex-col flex-1 min-h-0 overflow-hidden print:hidden" onSubmit={handleSubmit(onSubmit as any, onError)}>
-        
+
         {/* Header Section */}
         <div className="bg-white p-3 sm:p-4 border-b border-[#E5E7EB] shrink-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-row gap-3 sm:gap-4">
-            
+
             <div className="w-full lg:flex-1 lg:max-w-[200px]">
               <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Entry No</label>
               <input
@@ -716,13 +716,13 @@ const Estimation = () => {
                         let rate = Number(p.sellingRate) || 0;
                         if (newRateType === 'Wholesale Rate') rate = Number(p.wholesaleRate) || 0;
                         else if (newRateType === 'MRP') rate = Number(p.mrp) || 0;
-                        
+
                         const q = Number(item.quantity) || 0;
                         const total = rate * q;
-                        
+
                         setValue(`items.${index}.rate`, rate > 0 ? rate : ('' as any));
                         if (total > 0) {
-                           setValue(`items.${index}.total`, total);
+                          setValue(`items.${index}.total`, total);
                         }
                       }
                     }
@@ -751,11 +751,10 @@ const Estimation = () => {
                           setValue('paymentModeId', pm.id);
                           if (pm.name?.toLowerCase() === 'cash') setValue('customerId', 0);
                         }}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
-                          isCredit
-                            ? isSelected ? 'bg-rose-500 text-white shadow-sm' : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
-                            : isSelected ? 'bg-[#22C55E] text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
-                        }`}
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${isCredit
+                          ? isSelected ? 'bg-rose-500 text-white shadow-sm' : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
+                          : isSelected ? 'bg-[#22C55E] text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
+                          }`}
                       >
                         {pm.name}
                       </button>
@@ -772,14 +771,13 @@ const Estimation = () => {
                     setValue('customerId', 0);
                   }
                 }}
-                className={`w-full px-2 py-1.5 border rounded text-[13px] outline-none font-bold transition-colors ${
-                  (() => {
-                    const pm = paymentModes.find((p: any) => p.id === Number(watch('paymentModeId')));
-                    if (pm?.name?.toLowerCase() === 'credit') return 'border-rose-400 bg-rose-50 text-rose-700';
-                    if (pm?.name?.toLowerCase() === 'cash') return 'border-emerald-400 bg-emerald-50 text-emerald-700';
-                    return 'border-[#D1D5DB] bg-white';
-                  })()
-                }`}
+                className={`w-full px-2 py-1.5 border rounded text-[13px] outline-none font-bold transition-colors ${(() => {
+                  const pm = paymentModes.find((p: any) => p.id === Number(watch('paymentModeId')));
+                  if (pm?.name?.toLowerCase() === 'credit') return 'border-rose-400 bg-rose-50 text-rose-700';
+                  if (pm?.name?.toLowerCase() === 'cash') return 'border-emerald-400 bg-emerald-50 text-emerald-700';
+                  return 'border-[#D1D5DB] bg-white';
+                })()
+                  }`}
               >
                 <option value="0">Select Payment Mode...</option>
                 {paymentModes.map((pm: any) => (
@@ -793,28 +791,28 @@ const Estimation = () => {
 
         {/* Action Buttons */}
         <div className="shrink-0 flex flex-wrap justify-end gap-2 p-2 bg-white border-b border-[#E5E7EB]">
-          <button 
+          <button
             type="button"
             onClick={() => append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 })}
             className="border border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <Plus size={14} /> Add Row (F2)
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => reset()}
             className="border border-[#713F12] text-[#713F12] hover:bg-[#713F12] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <RefreshCw size={14} /> Clear (F4)
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => navigate('/sales')}
             className="border border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <List size={14} /> Sales List
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => navigate('/reports/sales')}
             className="border border-[#1E3A8A] text-[#1E3A8A] hover:bg-[#1E3A8A] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
@@ -838,7 +836,7 @@ const Estimation = () => {
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-28">Rate</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-20">Disc %</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Disc Amt</th>
-                
+
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-32">Total</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-16">Act</th>
               </tr>
@@ -874,20 +872,20 @@ const Estimation = () => {
                   </td>
 
                   <td data-label="Qty" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.quantity`)}
                       data-row={index} data-col={1}
-                      type="number" min="1" placeholder="0" 
+                      type="number" min="1" placeholder="0"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 1, 5)}
-                      className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-center transition-colors ${watch(`items.${index}.quantity`) > watch(`items.${index}.stock`) ? 'border-red-500 focus:border-red-500 bg-red-100 text-red-700 font-bold' : 'border-[#D1D5DB] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50'}`} 
+                      className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-center transition-colors ${watch(`items.${index}.quantity`) > watch(`items.${index}.stock`) ? 'border-red-500 focus:border-red-500 bg-red-100 text-red-700 font-bold' : 'border-[#D1D5DB] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50'}`}
                     />
                   </td>
                   <td data-label="Rate" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.rate`)}
                       data-row={index} data-col={2}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 2, 5)}
                       className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors ${(() => {
@@ -911,10 +909,10 @@ const Estimation = () => {
                     />
                   </td>
                   <td data-label="Disc %" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.discPercent`)}
                       data-row={index} data-col={3}
-                      type="number" step="0.01" placeholder="0" 
+                      type="number" step="0.01" placeholder="0"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 3, 5)}
                       onChange={(e) => {
@@ -925,14 +923,14 @@ const Estimation = () => {
                         const amt = (rate * q * pct) / 100;
                         setValue(`items.${index}.discAmt`, Number(amt.toFixed(2)));
                       }}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-right"
                     />
                   </td>
                   <td data-label="Disc Amt" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.discAmt`)}
                       data-row={index} data-col={4}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 4, 5)}
                       onChange={(e) => {
@@ -948,27 +946,27 @@ const Estimation = () => {
                           setValue(`items.${index}.discPercent`, 0);
                         }
                       }}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-right"
                     />
                   </td>
-                  
+
                   <td data-label="Total" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input {...register(`items.${index}.total`)} type="number" readOnly tabIndex={-1} className="w-full px-2 py-1 bg-transparent text-[13px] outline-none text-right font-bold" />
                   </td>
                   <td data-label="Action" className="px-2 py-1 text-center">
                     <div className="flex justify-center gap-2">
-                      <button 
-                        type="button" 
-                        onClick={() => append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 })} 
+                      <button
+                        type="button"
+                        onClick={() => append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 })}
                         className="bg-[#10B981] text-white p-1.5 rounded hover:bg-[#059669] transition-colors shadow-sm"
                         title="Add Row"
                       >
                         <Plus size={14} strokeWidth={3} />
                       </button>
-                      <button 
-                        type="button" 
-                        onClick={() => remove(index)} 
-                        disabled={fields.length === 1} 
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
                         className="bg-red-50 text-red-500 p-1.5 rounded hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-red-50 disabled:hover:text-red-500"
                         title="Remove Row"
                       >
@@ -984,11 +982,11 @@ const Estimation = () => {
 
         {/* Tabs & Footer Calculation Area */}
         <div className="bg-[#F9FAFB] shrink-0">
-          
+
           <div className="p-3 sm:p-4 bg-white border-b border-[#E5E7EB]">
             {activeTab === 'Amount Details' && (
               <div className="flex flex-col md:flex-row items-stretch md:items-center md:justify-start gap-4 md:gap-6">
-                
+
                 <div className="w-full md:w-56 flex flex-col gap-1">
                   <label className="text-[13px] font-extrabold text-[#1F2937] uppercase">Total Quantity:</label>
                   <input
@@ -1017,7 +1015,7 @@ const Estimation = () => {
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-[14px] pointer-events-none">%</span>
                     </div>
-                    
+
                     <div className="relative w-1/2">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-[15px] pointer-events-none">{settings?.currencySymbol || 'RM'}</span>
                       <input
@@ -1051,7 +1049,7 @@ const Estimation = () => {
                   />
                 </div>
 
-                
+
 
                 <div className="w-full md:w-72 flex flex-col gap-1 ml-auto">
                   <label className="text-[14px] font-black text-[#1E3A8A] uppercase">NET AMOUNT:</label>
@@ -1075,31 +1073,31 @@ const Estimation = () => {
           {/* Bottom Black Bar */}
           <div className="bg-[#020617] text-white px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0">
             <div className="flex flex-nowrap justify-between sm:justify-center gap-1 sm:gap-2 w-full md:w-auto">
-              <button 
+              <button
                 type="button"
                 onClick={() => append({ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, total: 0 })}
                 className="bg-[#2563EB] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#1D4ED8] whitespace-nowrap"
               >
                 <span className="opacity-70 border-r border-[#60A5FA] pr-1 mr-1">F2</span> Add Row
               </button>
-              <button 
+              <button
                 type="button"
                 disabled={createMutation.isPending}
-                className="bg-[#059669] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#047857] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" 
+                className="bg-[#059669] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#047857] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 onClick={handleSubmit(onSubmit as any, onError)}
               >
-                <span className="opacity-70 border-r border-[#34D399] pr-1 mr-1">F10</span> 
+                <span className="opacity-70 border-r border-[#34D399] pr-1 mr-1">F10</span>
                 {createMutation.isPending ? 'Saving...' : 'Save & Print'}
               </button>
-              <button 
+              <button
                 type="button"
-                className="bg-[#0891B2] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#0E7490] whitespace-nowrap" 
+                className="bg-[#0891B2] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#0E7490] whitespace-nowrap"
                 onClick={() => setIsLeaveModalOpen(true)}
               >
                 <span className="opacity-70 border-r border-[#67E8F9] pr-1 mr-1">Esc</span> Dashboard
               </button>
             </div>
-            
+
             <div className="flex items-center gap-2 sm:gap-4 w-full md:w-auto justify-between md:justify-end border-t md:border-none border-gray-700 pt-3 md:pt-0">
               <span className="text-[16px] sm:text-[20px] font-black text-white uppercase tracking-wider">TOTAL NET AMOUNT:</span>
               <span className="text-[28px] sm:text-[36px] font-black text-[#38BDF8] drop-shadow-md">
@@ -1127,27 +1125,27 @@ const Estimation = () => {
             <div className="p-4 flex flex-col gap-4">
               <div>
                 <label className="block text-[13px] font-bold text-[#1F2937] mb-1">Customer Name *</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newCustomer.name}
-                  onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]" 
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]"
                 />
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">Mobile Number</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newCustomer.phone}
-                  onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]" 
+                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]"
                 />
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">State {settings?.enableTax && <span className="text-red-500">*</span>}</label>
-                <Select 
+                <Select
                   value={newCustomer.state ? { value: newCustomer.state, label: newCustomer.state } : null}
-                  onChange={(val: any) => setNewCustomer({...newCustomer, state: val?.value || ''})}
+                  onChange={(val: any) => setNewCustomer({ ...newCustomer, state: val?.value || '' })}
                   options={[
                     { value: '', label: '-- Select State --' },
                     ...indianStates.map(s => ({ value: s, label: s }))
@@ -1168,15 +1166,15 @@ const Estimation = () => {
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">Billing Address</label>
-                <textarea 
+                <textarea
                   value={newCustomer.address}
-                  onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] min-h-[80px]" 
+                  onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] min-h-[80px]"
                 />
               </div>
             </div>
             <div className="p-4 bg-white pt-2 border-none pb-5">
-              <button 
+              <button
                 type="button"
                 onClick={handleQuickAddCustomer}
                 disabled={!newCustomer.name || addCustomerMutation.isPending}
@@ -1191,223 +1189,223 @@ const Estimation = () => {
 
       {/* Printable Receipt */}
       <div id="printable-receipt" className={`hidden bg-white text-black font-sans ${settings?.printFormat === 'Thermal' ? 'print:block w-[80mm] text-[11px] p-2' : settings?.printFormat === 'A5' ? 'print:flex flex-col text-[11px] w-full max-w-[560px] mx-auto p-5 print:h-[205mm] box-border' : 'print:flex flex-col text-[12px] w-full max-w-[800px] mx-auto p-8 print:h-[257mm] box-border'}`}>
-    {settings?.printFormat === 'Thermal' ? (
-      /* ── THERMAL LAYOUT ── */
-      <div style={{ fontFamily: "'Inter', sans-serif", width: '80mm' }}>
-        <style>{`@media print { @page { size: 80mm auto; margin: 4mm; } }`}</style>
-        <div className="text-center mb-2">
-          {settings?.logoImage && <img src={settings.logoImage} alt="Logo" className="h-12 mx-auto mb-1 object-contain" />}
-          <div className="font-bold text-[13px] uppercase">{settings?.shopName || 'POS Suite 360'}</div>
-          {settings?.shopAddress && <div className="text-[10px]">{settings.shopAddress}</div>}
-          {settings?.phone && <div className="text-[10px]">Tel: {settings.phone}</div>}
-          {settings?.gstin && <div className="text-[10px]">GSTIN: {settings.gstin}</div>}
-          <div className="font-bold text-[12px] mt-1">ESTIMATION</div>
-          <div className="text-[10px]">Est No: #{watch('estimationNo')}</div>
-          <div className="text-[10px]">Date: {watch('date')}</div>
-        </div>
-        <div className="border-t border-dashed border-black my-1" />
-        {selectedCustomer && selectedCustomer.name !== 'Cash Customer' && (
-          <div className="text-[10px] mb-1">
-            <div className="font-bold">{selectedCustomer.name}</div>
-            {selectedCustomer.phone && <div>Ph: {selectedCustomer.phone}</div>}
-          </div>
-        )}
-        <div className="border-t border-dashed border-black my-1" />
-        <table className="w-full text-[10px]">
-          <thead>
-            <tr className="border-b border-black">
-              <th className="text-left py-0.5">Item</th>
-              <th className="text-center py-0.5">Qty</th>
-              <th className="text-right py-0.5">Rate</th>
-              <th className="text-right py-0.5">Amt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {watch('items').filter((i: any) => Number(i.productId) > 0).map((item: any, idx: number) => {
-              const product = products.find((p: any) => p.id === Number(item.productId));
-              return (
-                <tr key={idx}>
-                  <td className="py-0.5 pr-1">{product?.name || ''}</td>
-                  <td className="text-center py-0.5">{item.quantity}</td>
-                  <td className="text-right py-0.5">{Number(item.rate || 0).toFixed(2)}</td>
-                  <td className="text-right py-0.5">{Number(item.total || 0).toFixed(2)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        <div className="border-t border-dashed border-black my-1" />
-        <div className="text-[10px] flex justify-between"><span>Subtotal:</span><span>{Number(watch('grossAmount') || 0).toFixed(2)}</span></div>
-        {Number(watch('totalDiscount')) > 0 && (
-          <div className="text-[10px] flex justify-between"><span>Discount:</span><span>-{Number(watch('totalDiscount') || 0).toFixed(2)}</span></div>
-        )}
-        <div className="border-t border-black my-1" />
-        <div className="text-[12px] font-bold flex justify-between"><span>TOTAL:</span><span>{settings?.currencySymbol || 'RM'} {Number(watch('netAmount') || 0).toFixed(2)}</span></div>
-        <div className="text-[9px] text-center mt-1">{numberToWords(watch('netAmount'))} ONLY</div>
-        <div className="border-t border-dashed border-black my-1" />
-        {settings?.estimationNotes && (
-          <div className="text-[9px] mt-1" dangerouslySetInnerHTML={{ __html: settings.estimationNotes }} />
-        )}
-        <div className="text-[10px] text-center mt-2">Thank you!</div>
-      </div>
-    ) : (
-    <div 
-      className="flex flex-col flex-1 bg-white text-slate-800 overflow-hidden h-full"
-      style={{ fontFamily: "'Inter', sans-serif" }}
-    >
-      {/* Header */}
-      <div className="flex justify-between items-start mb-8">
-        <div className="flex flex-col gap-3">
-          {settings?.logoImage && (
-            <img src={settings.logoImage} alt="Logo" className="max-h-20 max-w-[200px] w-auto h-auto object-contain object-left" />
-          )}
-          <div>
-            <h1 className={`${settings?.logoImage ? 'text-xl' : 'text-2xl'} font-bold text-[#04325E] uppercase tracking-tight`}>{settings?.shopName || 'POS Suite 360'}</h1>
-          {settings?.invoiceTitle && <p className="text-[#1A63A8] font-bold text-sm mt-1">{settings.invoiceTitle}</p>}
-          <div className="mt-2 text-slate-800 text-xs leading-relaxed">
-            {settings?.shopAddress && <p>{settings.shopAddress}</p>}
-            <p className="font-bold text-slate-700">
-              {[settings?.city, settings?.state, settings?.country].filter(Boolean).join(', ')}
-            </p>
-            {settings?.phone && <p>Tel: {settings.phone}</p>}
-            {settings?.gstin && <p>GSTIN: {settings.gstin}</p>}
-          </div>
-          </div>
-        </div>
-        <div className="text-right">
-          <h2 className="text-4xl font-black text-[#1A63A8] tracking-wider mb-2">ESTIMATION</h2>
-          <p className="font-bold text-slate-700 text-sm">Est No: #{watch('estimationNo')}</p>
-        </div>
-      </div>
-
-      {/* Info Cards */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-slate-50 border border-slate-100 rounded-lg p-4">
-          <h3 className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-3">Billed To / Customer Details</h3>
-          <p className="font-bold text-slate-800 text-sm mb-1">{selectedCustomer?.name !== 'Cash Customer' ? (selectedCustomer?.name || 'Counter Sale') : 'Counter Sale'}</p>
-          <div className="text-slate-800 text-xs space-y-1">
-            {selectedCustomer?.name !== 'Cash Customer' && selectedCustomer?.address && <p>{selectedCustomer.address}</p>}
-            {selectedCustomer?.name !== 'Cash Customer' && selectedCustomer?.state && <p>{selectedCustomer.state}</p>}
-            {selectedCustomer?.name !== 'Cash Customer' && selectedCustomer?.phone && <p>Phone: {selectedCustomer.phone}</p>}
-            {selectedCustomer?.gstNumber && <p>GSTIN: {selectedCustomer.gstNumber}</p>}
-          </div>
-        </div>
-        <div className="bg-slate-50 border border-slate-100 rounded-lg p-4">
-          <h3 className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-3">Estimation Details</h3>
-          <div className="grid grid-cols-[120px_1fr] gap-y-2 text-xs">
-            <span className="font-bold text-slate-600">Date:</span>
-            <span className="text-slate-800">{watch('date')}</span>
-            <span className="font-bold text-slate-600">Payment Mode:</span>
-            <span className="text-slate-800">{paymentModes.find((p: any) => p.id === Number(watch('paymentModeId')))?.name || 'Cash'}</span>
-            {Number(selectedCustomer?.openingBalance) > 0 && (
-              <>
-                <span className="font-bold text-slate-600">Pending Amount:</span>
-                <span className="text-slate-800">{settings?.currencySymbol || 'RM'} {Number(selectedCustomer?.openingBalance).toFixed(2)}</span>
-              </>
+        {settings?.printFormat === 'Thermal' ? (
+          /* ── THERMAL LAYOUT ── */
+          <div style={{ fontFamily: "'Inter', sans-serif", width: '80mm' }}>
+            <style>{`@media print { @page { size: 80mm auto; margin: 4mm; } }`}</style>
+            <div className="text-center mb-2">
+              {settings?.logoImage && <img src={settings.logoImage} alt="Logo" className="h-12 mx-auto mb-1 object-contain" />}
+              <div className="font-bold text-[13px] uppercase">{settings?.shopName || 'POS Suite 360'}</div>
+              {settings?.shopAddress && <div className="text-[10px]">{settings.shopAddress}</div>}
+              {settings?.phone && <div className="text-[10px]">Tel: {settings.phone}</div>}
+              {settings?.gstin && <div className="text-[10px]">GSTIN: {settings.gstin}</div>}
+              <div className="font-bold text-[12px] mt-1">ESTIMATION</div>
+              <div className="text-[10px]">Est No: #{watch('estimationNo')}</div>
+              <div className="text-[10px]">Date: {watch('date')}</div>
+            </div>
+            <div className="border-t border-dashed border-black my-1" />
+            {selectedCustomer && selectedCustomer.name !== 'Cash Customer' && (
+              <div className="text-[10px] mb-1">
+                <div className="font-bold">{selectedCustomer.name}</div>
+                {selectedCustomer.phone && <div>Ph: {selectedCustomer.phone}</div>}
+              </div>
             )}
+            <div className="border-t border-dashed border-black my-1" />
+            <table className="w-full text-[10px]">
+              <thead>
+                <tr className="border-b border-black">
+                  <th className="text-left py-0.5">Item</th>
+                  <th className="text-center py-0.5">Qty</th>
+                  <th className="text-right py-0.5">Rate</th>
+                  <th className="text-right py-0.5">Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {watch('items').filter((i: any) => Number(i.productId) > 0).map((item: any, idx: number) => {
+                  const product = products.find((p: any) => p.id === Number(item.productId));
+                  return (
+                    <tr key={idx}>
+                      <td className="py-0.5 pr-1">{product?.name || ''}</td>
+                      <td className="text-center py-0.5">{item.quantity}</td>
+                      <td className="text-right py-0.5">{Number(item.rate || 0).toFixed(2)}</td>
+                      <td className="text-right py-0.5">{Number(item.total || 0).toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="border-t border-dashed border-black my-1" />
+            <div className="text-[10px] flex justify-between"><span>Subtotal:</span><span>{Number(watch('grossAmount') || 0).toFixed(2)}</span></div>
+            {Number(watch('totalDiscount')) > 0 && (
+              <div className="text-[10px] flex justify-between"><span>Discount:</span><span>-{Number(watch('totalDiscount') || 0).toFixed(2)}</span></div>
+            )}
+            <div className="border-t border-black my-1" />
+            <div className="text-[12px] font-bold flex justify-between"><span>TOTAL:</span><span>{settings?.currencySymbol || 'RM'} {Number(watch('netAmount') || 0).toFixed(2)}</span></div>
+            <div className="text-[9px] text-center mt-1">{numberToWords(watch('netAmount'))} ONLY</div>
+            <div className="border-t border-dashed border-black my-1" />
+            {settings?.estimationNotes && (
+              <div className="text-[9px] mt-1" dangerouslySetInnerHTML={{ __html: settings.estimationNotes }} />
+            )}
+            <div className="text-[10px] text-center mt-2">Thank you!</div>
           </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="border border-slate-200 mb-6 flex-1 flex flex-col overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-[#2D6AA1] text-white text-[10px] uppercase tracking-wider">
-            <tr>
-              <th className="py-3 px-4 font-bold w-[5%]">#</th>
-              <th className="py-3 px-4 font-bold w-[45%]">Item Description</th>
-              <th className="py-3 px-4 font-bold w-[15%] text-center">Quantity</th>
-              <th className="py-3 px-4 font-bold w-[15%] text-right whitespace-nowrap">Unit Rate ({settings?.currencySymbol || 'RM'})</th>
-              <th className="py-3 px-4 font-bold w-[20%] text-right whitespace-nowrap">Amount ({settings?.currencySymbol || 'RM'})</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-xs">
-            {watch('items').filter((i: any) => Number(i.productId) > 0).map((item: any, idx: number) => {
-              const product = products.find((p: any) => p.id === Number(item.productId));
-              return (
-              <tr key={idx} className="bg-white">
-                <td className="py-3 px-4 text-slate-500">{idx + 1}</td>
-                <td className="py-3 px-4">
-                  <span className="font-bold text-slate-800">{product?.name || ''}</span>
-                  {product?.code && <span className="text-slate-500 ml-2">({product.code})</span>}
-                </td>
-                <td className="py-3 px-4 text-center text-slate-600 font-medium">{item.quantity} {item.unit || 'Nos'}</td>
-                <td className="py-3 px-4 text-right text-slate-600">{Number(item.rate || 0).toFixed(2)}</td>
-                <td className="py-3 px-4 text-right font-bold text-slate-800">{Number(item.total || 0).toFixed(2)}</td>
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Footer Area */}
-      <div className="mt-auto grid grid-cols-[1fr_350px] gap-8">
-        <div className="flex flex-col gap-4 h-full">
-          <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex-1 flex flex-col">
-            <h3 className="text-[10px] font-bold text-[#1A63A8] uppercase tracking-widest mb-2">Terms & Conditions</h3>
-            <div 
-              className="text-[11px] text-slate-600 prose prose-sm max-w-none html-content flex-1"
-              dangerouslySetInnerHTML={{ __html: (settings?.estimationNotes !== undefined && settings?.estimationNotes !== null) ? settings.estimationNotes : '1. Goods once sold cannot be taken back or exchanged.<br/>2. Subject to Salem jurisdiction.' }}
-            />
-          </div>
-          
-          {(editId && editEstimationData ? editEstimationData.stockMaintained : settings?.estimationStockMaintain) && settings?.upiId && Number(watch('netAmount')) > 0 && (
-            <a 
-              href={`${window.location.origin}/?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(settings?.shopName || 'Shop')}&tr=${encodeURIComponent(watch('estimationNo'))}&am=${Number(watch('netAmount')).toFixed(2)}&cu=INR`}
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex items-center gap-4 hover:bg-slate-100 transition-colors cursor-pointer"
-              style={{ textDecoration: 'none' }}
-            >
-              <div className="bg-white p-1.5 rounded border border-slate-200 shadow-sm shrink-0">
-                <QRCodeSVG 
-                  value={`upi://pay?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(settings?.shopName || 'Shop')}&tr=${encodeURIComponent(watch('estimationNo'))}&am=${Number(watch('netAmount')).toFixed(2)}&cu=INR`}
-                  size={64}
-                  level="M"
-                />
-              </div>
-              <div className="flex flex-col">
-                <h3 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest mb-1">Scan or Click to Pay</h3>
-                <p className="text-[10px] text-slate-600 font-medium">UPI ID: {settings.upiId}</p>
-                <p className="text-[9px] text-slate-500 mt-1">Scan or tap to open UPI app</p>
-              </div>
-            </a>
-          )}
-        </div>
-        
-        <div className="flex flex-col justify-end">
-          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg pt-4 pb-2 flex flex-col mb-6">
-            <div className="space-y-3 text-[13px] px-4 mb-4">
-              <div className="flex justify-between text-[#334155]">
-                <span>Subtotal:</span>
-                <span className="font-semibold tracking-wide">{Number(watch('grossAmount') || 0).toFixed(2)}</span>
-              </div>
-              
-              {Number(watch('totalDiscount')) > 0 && (
-                <div className="flex justify-between text-[#334155]">
-                  <span>Discount:</span>
-                  <span className="font-semibold tracking-wide">{Number(watch('totalDiscount') || 0).toFixed(2)}</span>
+        ) : (
+          <div
+            className="flex flex-col flex-1 bg-white text-slate-800 overflow-hidden h-full"
+            style={{ fontFamily: "'Inter', sans-serif" }}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-start mb-8">
+              <div className="flex flex-col gap-3">
+                {settings?.logoImage && (
+                  <img src={settings.logoImage} alt="Logo" className="max-h-20 max-w-[200px] w-auto h-auto object-contain object-left" />
+                )}
+                <div>
+                  <h1 className={`${settings?.logoImage ? 'text-xl' : 'text-2xl'} font-bold text-[#04325E] uppercase tracking-tight`}>{settings?.shopName || 'POS Suite 360'}</h1>
+                  {settings?.invoiceTitle && <p className="text-[#1A63A8] font-bold text-sm mt-1">{settings.invoiceTitle}</p>}
+                  <div className="mt-2 text-slate-800 text-xs leading-relaxed">
+                    {settings?.shopAddress && <p>{settings.shopAddress}</p>}
+                    <p className="font-bold text-slate-700">
+                      {[settings?.city, settings?.state, settings?.country].filter(Boolean).join(', ')}
+                    </p>
+                    {settings?.phone && <p>Tel: {settings.phone}</p>}
+                    {settings?.gstin && <p>GSTIN: {settings.gstin}</p>}
+                  </div>
                 </div>
-              )}
+              </div>
+              <div className="text-right">
+                <h2 className="text-4xl font-black text-[#1A63A8] tracking-wider mb-2">ESTIMATION</h2>
+                <p className="font-bold text-slate-700 text-sm">Est No: #{watch('estimationNo')}</p>
+              </div>
             </div>
-            
-            <div className="bg-[#F0F5FA] border-y-2 border-[#1A63A8] px-4 py-3 flex justify-between items-center text-[#04325E] mt-1 mb-1">
-              <span className="font-bold text-[14px]">Total Due:</span>
-              <span className="text-[15px] font-black tracking-tight">{settings?.currencySymbol || 'RM'} {Number(watch('netAmount') || 0).toFixed(2)}</span>
+
+            {/* Info Cards */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-4">
+                <h3 className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-3">Billed To / Customer Details</h3>
+                <p className="font-bold text-slate-800 text-sm mb-1">{selectedCustomer?.name !== 'Cash Customer' ? (selectedCustomer?.name || 'Counter Sale') : 'Counter Sale'}</p>
+                <div className="text-slate-800 text-xs space-y-1">
+                  {selectedCustomer?.name !== 'Cash Customer' && selectedCustomer?.address && <p>{selectedCustomer.address}</p>}
+                  {selectedCustomer?.name !== 'Cash Customer' && selectedCustomer?.state && <p>{selectedCustomer.state}</p>}
+                  {selectedCustomer?.name !== 'Cash Customer' && selectedCustomer?.phone && <p>Phone: {selectedCustomer.phone}</p>}
+                  {selectedCustomer?.gstNumber && <p>GSTIN: {selectedCustomer.gstNumber}</p>}
+                </div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-lg p-4">
+                <h3 className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-3">Estimation Details</h3>
+                <div className="grid grid-cols-[120px_1fr] gap-y-2 text-xs">
+                  <span className="font-bold text-slate-600">Date:</span>
+                  <span className="text-slate-800">{watch('date')}</span>
+                  <span className="font-bold text-slate-600">Payment Mode:</span>
+                  <span className="text-slate-800">{paymentModes.find((p: any) => p.id === Number(watch('paymentModeId')))?.name || 'Cash'}</span>
+                  {Number(selectedCustomer?.openingBalance) > 0 && (
+                    <>
+                      <span className="font-bold text-slate-600">Pending Amount:</span>
+                      <span className="text-slate-800">{settings?.currencySymbol || 'RM'} {Number(selectedCustomer?.openingBalance).toFixed(2)}</span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="text-right px-4 pb-2 text-[9px] text-[#1A63A8] font-bold uppercase tracking-wider">
-              {numberToWords(watch('netAmount'))} ONLY
+
+            {/* Table */}
+            <div className="border border-slate-200 mb-6 flex-1 flex flex-col overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-[#2D6AA1] text-white text-[10px] uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4 font-bold w-[5%]">#</th>
+                    <th className="py-3 px-4 font-bold w-[45%]">Item Description</th>
+                    <th className="py-3 px-4 font-bold w-[15%] text-center">Quantity</th>
+                    <th className="py-3 px-4 font-bold w-[15%] text-right whitespace-nowrap">Unit Rate ({settings?.currencySymbol || 'RM'})</th>
+                    <th className="py-3 px-4 font-bold w-[20%] text-right whitespace-nowrap">Amount ({settings?.currencySymbol || 'RM'})</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs">
+                  {watch('items').filter((i: any) => Number(i.productId) > 0).map((item: any, idx: number) => {
+                    const product = products.find((p: any) => p.id === Number(item.productId));
+                    return (
+                      <tr key={idx} className="bg-white">
+                        <td className="py-3 px-4 text-slate-500">{idx + 1}</td>
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-slate-800">{product?.name || ''}</span>
+                          {product?.code && <span className="text-slate-500 ml-2">({product.code})</span>}
+                        </td>
+                        <td className="py-3 px-4 text-center text-slate-600 font-medium">{item.quantity} {item.unit || 'Nos'}</td>
+                        <td className="py-3 px-4 text-right text-slate-600">{Number(item.rate || 0).toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right font-bold text-slate-800">{Number(item.total || 0).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer Area */}
+            <div className="mt-auto grid grid-cols-[1fr_350px] gap-8">
+              <div className="flex flex-col gap-4 h-full">
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex-1 flex flex-col">
+                  <h3 className="text-[10px] font-bold text-[#1A63A8] uppercase tracking-widest mb-2">Terms & Conditions</h3>
+                  <div
+                    className="text-[11px] text-slate-600 prose prose-sm max-w-none html-content flex-1"
+                    dangerouslySetInnerHTML={{ __html: (settings?.estimationNotes !== undefined && settings?.estimationNotes !== null) ? settings.estimationNotes : '1. Goods once sold cannot be taken back or exchanged.<br/>2. Subject to Salem jurisdiction.' }}
+                  />
+                </div>
+
+                {(editId && editEstimationData ? editEstimationData.stockMaintained : settings?.estimationStockMaintain) && settings?.upiId && Number(watch('netAmount')) > 0 && (
+                  <a
+                    href={`${window.location.origin}/?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(settings?.shopName || 'Shop')}&tr=${encodeURIComponent(watch('estimationNo'))}&am=${Number(watch('netAmount')).toFixed(2)}&cu=INR`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-slate-50 border border-slate-100 rounded-lg p-4 flex items-center gap-4 hover:bg-slate-100 transition-colors cursor-pointer"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <div className="bg-white p-1.5 rounded border border-slate-200 shadow-sm shrink-0">
+                      <QRCodeSVG
+                        value={`upi://pay?pa=${settings.upiId.trim()}&pn=${encodeURIComponent(settings?.shopName || 'Shop')}&tr=${encodeURIComponent(watch('estimationNo'))}&am=${Number(watch('netAmount')).toFixed(2)}&cu=INR`}
+                        size={64}
+                        level="M"
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <h3 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest mb-1">Scan or Click to Pay</h3>
+                      <p className="text-[10px] text-slate-600 font-medium">UPI ID: {settings.upiId}</p>
+                      <p className="text-[9px] text-slate-500 mt-1">Scan or tap to open UPI app</p>
+                    </div>
+                  </a>
+                )}
+              </div>
+
+              <div className="flex flex-col justify-end">
+                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg pt-4 pb-2 flex flex-col mb-6">
+                  <div className="space-y-3 text-[13px] px-4 mb-4">
+                    <div className="flex justify-between text-[#334155]">
+                      <span>Subtotal:</span>
+                      <span className="font-semibold tracking-wide">{Number(watch('grossAmount') || 0).toFixed(2)}</span>
+                    </div>
+
+                    {Number(watch('totalDiscount')) > 0 && (
+                      <div className="flex justify-between text-[#334155]">
+                        <span>Discount:</span>
+                        <span className="font-semibold tracking-wide">{Number(watch('totalDiscount') || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-[#F0F5FA] border-y-2 border-[#1A63A8] px-4 py-3 flex justify-between items-center text-[#04325E] mt-1 mb-1">
+                    <span className="font-bold text-[14px]">Total Due:</span>
+                    <span className="text-[15px] font-black tracking-tight">{settings?.currencySymbol || 'RM'} {Number(watch('netAmount') || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="text-right px-4 pb-2 text-[9px] text-[#1A63A8] font-bold uppercase tracking-wider">
+                    {numberToWords(watch('netAmount'))} ONLY
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 text-center text-[11px] font-medium text-slate-600 border-t border-slate-200 pt-3">
+              <p>Thank you for partnering with {settings?.shopName || 'POS Suite 360'}! | Page 1 of 1</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="mt-8 text-center text-[11px] font-medium text-slate-600 border-t border-slate-200 pt-3">
-        <p>Thank you for partnering with {settings?.shopName || 'POS Suite 360'}! | Page 1 of 1</p>
-      </div>
-    </div>
-    )}
+        )}
       </div>
 
       {/* Loss Warning Modal */}
@@ -1423,14 +1421,14 @@ const Estimation = () => {
               <p className="text-gray-500 text-sm font-medium">Are you absolutely sure you want to proceed with this sale and take a loss?</p>
             </div>
             <div className="bg-gray-50 p-4 flex justify-end gap-3 border-t border-gray-200">
-              <button 
+              <button
                 type="button"
                 onClick={() => { setShowLossWarning(false); setPendingPayload(null); }}
                 className="px-4 py-2 border border-gray-300 bg-white rounded font-bold text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 No, Cancel
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={confirmLossWarning}
                 className="px-4 py-2 bg-red-600 rounded font-bold text-white hover:bg-red-700 transition-colors flex items-center gap-2"
@@ -1454,7 +1452,7 @@ const Estimation = () => {
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="p-6 text-center">
               <div className="bg-blue-50 text-blue-800 p-4 rounded-lg mb-6 shadow-sm border border-blue-100">
                 <p className="font-bold text-[15px]">Net Amount: {formatCurrency(pendingSavePayload?.grandTotal || 0)}</p>
@@ -1464,14 +1462,14 @@ const Estimation = () => {
             </div>
 
             <div className="px-6 pb-6 flex flex-col sm:flex-row gap-3">
-              <button 
+              <button
                 type="button"
                 onClick={() => handleConfirmSave(false)}
                 className="flex-1 bg-white border-2 border-[#E2E8F0] hover:border-[#94A3B8] hover:bg-[#F8FAFC] text-[#334155] py-2.5 rounded-lg font-bold text-[14px] transition-all flex items-center justify-center gap-2"
               >
                 <Save size={16} /> Save Only
               </button>
-              <button 
+              <button
                 type="button"
                 onClick={() => handleConfirmSave(true)}
                 className="flex-1 bg-gradient-to-r from-[#10B981] to-[#059669] hover:from-[#059669] hover:to-[#047857] text-white py-2.5 rounded-lg font-bold text-[14px] transition-all shadow-md flex items-center justify-center gap-2"
@@ -1483,10 +1481,10 @@ const Estimation = () => {
         </div>
       )}
 
-      <LeaveConfirmModal 
-        isOpen={isLeaveModalOpen} 
-        onClose={() => setIsLeaveModalOpen(false)} 
-        onConfirm={() => navigate('/dashboard')} 
+      <LeaveConfirmModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        onConfirm={() => navigate('/dashboard')}
       />
 
     </div>
