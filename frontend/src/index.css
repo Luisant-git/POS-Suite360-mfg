@@ -6,18 +6,23 @@
   --color-primary-focus: #2563EB; 
   --color-sidebar: #2A3F54; /* Dark Charcoal */
   --color-sidebar-hover: #172D44;
-  --color-secondary: #73879C; /* Sidebar text */
+  --color-secondary: #000000; /* Sidebar text */
   --color-background: #F7F7F7; /* Light grey canvas */
   --color-surface: #ffffff; /* White */
   --color-surface-hover: #f9f9f9; 
   --color-border: #E6E9ED; /* Subtle borders */
-  --color-text: #73879C; /* Classic grey text */
-  --color-text-dark: #2A3F54; /* Headings */
+  --color-text: #000000; /* Dark Black text */
+  --color-text-dark: #000000; /* Headings */
   
   --font-sans: "Inter", Roboto, Arial, sans-serif;
 }
 
 @layer base {
+  *, ::before, ::after {
+    border-color: #E5E7EB;
+    outline-color: transparent;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-text);
@@ -26,8 +31,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  label {
+    color: #000000;
+  }
+
   input, textarea, select {
-    color: var(--color-text-dark);
+    color: #000000;
     font-weight: bold;
   }
 
@@ -45,6 +54,57 @@
   input[type="number"] {
     -moz-appearance: textfield;
   }
+}
+
+/* Nasa Fresh Mart Theme Pattern: Convert grey/slate text classes to crisp black font */
+.text-gray-500,
+.text-gray-600,
+.text-gray-700,
+.text-gray-800,
+.text-gray-900,
+.text-slate-500,
+.text-slate-600,
+.text-slate-700,
+.text-slate-800,
+.text-slate-900,
+.text-\[\#111827\],
+.text-\[\#1F2937\],
+.text-\[\#334155\],
+.text-\[\#374151\],
+.text-\[\#475569\],
+.text-\[\#4B5563\],
+.text-\[\#64748B\],
+.text-\[\#6B7280\],
+.text-\[\#73879C\] {
+  color: #000000 !important;
+}
+
+label,
+.form-label {
+  color: #000000 !important;
+  font-weight: 700;
+}
+
+table tbody td {
+  color: #000000;
+}
+
+table tfoot td,
+table tfoot th,
+.table-footer-white,
+.table-footer-white td,
+.table-footer-white th,
+.table-footer-white span {
+  color: #ffffff !important;
+}
+
+
+/* React-Select black font styling matching Nasa Fresh Mart */
+[class*="-singleValue"],
+[class*="-Input"] input,
+.select__single-value {
+  color: #000000 !important;
+  font-weight: 700 !important;
 }
 
 

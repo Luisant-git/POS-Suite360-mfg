@@ -21,6 +21,7 @@ interface Settings {
   enableTax: boolean;
   taxType: string;
   enableCustomerWiseRate: boolean;
+  enableCustomerRates?: boolean;
   city?: string;
   state?: string;
   country?: string;
@@ -45,7 +46,7 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType>({
   settings: null,
   isLoading: true,
-  formatCurrency: (amount: number | string) => `RM ${Number(amount).toFixed(2)}`,
+  formatCurrency: (amount: number | string) => `₹ ${Number(amount).toFixed(2)}`,
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -67,7 +68,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const formatCurrency = useCallback((amount: number | string) => {
     const num = Number(amount) || 0;
     const formatted = num.toFixed(2);
-    const symbol = settings?.currencySymbol || 'RM';
+    const symbol = settings?.currencySymbol || '₹';
     const position = settings?.currencyPosition || 'before';
     
     if (position === 'after') {

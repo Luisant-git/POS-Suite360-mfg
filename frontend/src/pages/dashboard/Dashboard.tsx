@@ -8,7 +8,9 @@ import {
   CreditCard,
   Wallet,
   Landmark,
-  Users
+  Users,
+  Search,
+  Clock
 } from 'lucide-react';
 import api from '../../services/api';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -56,6 +58,16 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [filterStartDate, setFilterStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [filterEndDate, setFilterEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedDateTime = `${currentDateTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${currentDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -144,40 +156,52 @@ const Dashboard = () => {
       </div>
       */}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-[20px] font-semibold text-gray-800">Financial Overview</h1>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white px-4 py-3 sm:py-2 border border-gray-200 rounded-xl shadow-sm w-full sm:w-auto">
-          <div className="flex items-center justify-between sm:justify-start gap-2 sm:border-r border-gray-200 sm:pr-4">
-            <label className="text-[13px] font-semibold text-gray-500 w-10 sm:w-auto">From:</label>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-[18px] sm:text-[20px] font-bold text-gray-800">Financial Overview</h1>
+          <p className="text-[11px] sm:text-[12px] text-gray-500 font-medium">Daily business performance & ledger dues</p>
+          <p className="text-[12px] sm:text-[13px] font-bold text-blue-600 mt-1 flex items-center gap-1.5">
+            <Clock size={13} className="text-blue-600" /> {formattedDateTime}
+          </p>
+        </div>
+
+        {/* Date Filter Bar - Same Row on Mobile with Icon-Only Reset like NASA */}
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-white px-2 sm:px-2.5 py-1.5 sm:py-2 border border-gray-200 rounded-xl shadow-sm w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 bg-gray-50/80 border border-gray-100 px-2 py-1.5 rounded-lg flex-1 sm:flex-none overflow-hidden">
+            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider hidden sm:inline">From</span>
             <input 
               type="date" 
               value={filterStartDate} 
               onChange={(e) => setFilterStartDate(e.target.value)}
-              className="text-[14px] font-semibold text-gray-800 outline-none bg-transparent cursor-pointer flex-1 text-right sm:text-left"
+              className="text-[12px] sm:text-[13px] font-bold text-black bg-transparent outline-none cursor-pointer w-full sm:w-auto"
             />
           </div>
-          <div className="flex items-center justify-between sm:justify-start gap-2 sm:pl-2 sm:border-r border-gray-200 sm:pr-4">
-            <label className="text-[13px] font-semibold text-gray-500 w-10 sm:w-auto">To:</label>
+          <span className="text-gray-300 font-bold">-</span>
+          <div className="flex items-center gap-1.5 bg-gray-50/80 border border-gray-100 px-2 py-1.5 rounded-lg flex-1 sm:flex-none overflow-hidden">
+            <span className="text-[11px] text-gray-500 font-bold uppercase tracking-wider hidden sm:inline">To</span>
             <input 
               type="date" 
               value={filterEndDate} 
               onChange={(e) => setFilterEndDate(e.target.value)}
-              className="text-[14px] font-semibold text-gray-800 outline-none bg-transparent cursor-pointer flex-1 text-right sm:text-left"
+              className="text-[12px] sm:text-[13px] font-bold text-black bg-transparent outline-none cursor-pointer w-full sm:w-auto"
             />
           </div>
-          <div className="flex justify-end w-full sm:w-auto sm:block mt-1 sm:mt-0 border-t border-gray-100 pt-2 sm:border-t-0 sm:pt-0">
-            <button 
-              onClick={() => {
-                const today = new Date().toISOString().split('T')[0];
-                setFilterStartDate(today);
-                setFilterEndDate(today);
-              }}
-              className="flex items-center gap-1.5 text-[13px] font-semibold text-gray-500 hover:text-blue-600 transition-colors sm:pl-2"
-              title="Reset to Today"
-            >
-              <RotateCcw size={16} /> Reset
-            </button>
-          </div>
+          <button 
+            onClick={() => {
+              const today = new Date().toISOString().split('T')[0];
+              setFilterStartDate(today);
+              setFilterEndDate(today);
+            }}
+            className={`flex items-center justify-center p-1.5 sm:px-3 sm:py-1.5 rounded-lg transition-all duration-300 shrink-0 ${
+              (filterStartDate !== todayStr || filterEndDate !== todayStr)
+                ? 'bg-rose-100 text-rose-600 hover:bg-rose-200 shadow-sm'
+                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Reset to Today"
+          >
+            <RotateCcw size={16} strokeWidth={2.5} className={`transition-transform duration-300 ${(filterStartDate !== todayStr || filterEndDate !== todayStr) ? '-rotate-180' : ''}`} />
+            <span className="hidden sm:inline ml-1.5 text-[13px] font-bold">Reset</span>
+          </button>
         </div>
       </div>
       
@@ -282,42 +306,76 @@ const Dashboard = () => {
 
         {/* Supplier Payments Due */}
         <div className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden lg:col-span-1 flex flex-col">
-          <div className="border-b border-gray-100 px-5 py-4 flex justify-between items-center bg-gray-50/50">
-            <h2 className="text-[16px] font-semibold text-gray-800 flex items-center gap-2">
-              <Landmark size={18} className="text-rose-500" /> Supplier Payments Due
+          <div className="border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-3.5 flex flex-wrap justify-between items-center bg-gray-50/50 gap-2">
+            <h2 className="text-[14px] sm:text-[15px] font-bold text-gray-800 flex items-center gap-2 whitespace-nowrap">
+              <Landmark size={18} className="text-rose-500 shrink-0" /> Supplier Payments Due
             </h2>
-            <Link to="/purchase/payments" className="px-3 py-1 bg-rose-50 text-rose-600 font-semibold rounded hover:bg-rose-100 transition-colors text-[12px]">
-              Settle
-            </Link>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Link 
+                to="/reports/supplier-payments" 
+                className="flex-1 sm:flex-none text-center px-3 py-1 bg-white border border-gray-200 text-gray-700 font-bold rounded-md hover:bg-gray-50 transition-colors text-[12px] shadow-sm"
+              >
+                View All
+              </Link>
+              <Link 
+                to="/purchase/payments" 
+                className="flex-1 sm:flex-none text-center px-3 py-1 bg-rose-50 text-rose-600 font-bold rounded-md hover:bg-rose-100 transition-colors text-[12px] border border-rose-100"
+              >
+                Settle
+              </Link>
+            </div>
+          </div>
+          {/* Supplier Search Bar */}
+          <div className="px-3.5 py-2 border-b border-gray-100 bg-white">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+              <input
+                type="text"
+                placeholder="Search supplier or bill..."
+                value={supplierSearch}
+                onChange={e => setSupplierSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1 text-[12px] border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-rose-300 bg-gray-50 font-bold text-black"
+              />
+            </div>
           </div>
           <div className="flex-1 p-0 h-[350px] overflow-y-auto custom-scrollbar bg-white">
             <table className="w-full text-left text-[12px] whitespace-nowrap">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] sticky top-0">
+              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 font-bold text-[#334155]">Supplier / Bill</th>
-                  <th className="px-4 py-3 font-bold text-[#059669] text-right">Pending</th>
+                  <th className="px-4 py-2.5 font-bold text-[#334155]">Supplier / Bill</th>
+                  <th className="px-4 py-2.5 font-bold text-[#059669] text-right">Pending</th>
                 </tr>
               </thead>
               <tbody>
-                {data.unpaidSupplierBills?.length > 0 ? data.unpaidSupplierBills.map((bill: any, idx: number) => (
-                  <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-[#1E293B]">{bill.entityName}</div>
-                      <div className="text-[#64748B] text-[11px] mt-0.5">
-                        {bill.entryNo} • {new Date(bill.date).toLocaleDateString('en-GB')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="font-bold text-[#059669]">{formatCurrency(bill.pending)}</div>
-                      <div className="text-[#64748B] text-[11px] mt-0.5">
-                        Total: {formatCurrency(bill.total)}
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
+                {data.unpaidSupplierBills?.filter((bill: any) =>
+                  !supplierSearch ||
+                  bill.entityName?.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                  bill.entryNo?.toLowerCase().includes(supplierSearch.toLowerCase())
+                ).length > 0 ? (
+                  data.unpaidSupplierBills.filter((bill: any) =>
+                    !supplierSearch ||
+                    bill.entityName?.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+                    bill.entryNo?.toLowerCase().includes(supplierSearch.toLowerCase())
+                  ).map((bill: any, idx: number) => (
+                    <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
+                      <td className="px-4 py-2.5">
+                        <div className="font-bold text-[#1E293B]">{bill.entityName}</div>
+                        <div className="text-[#64748B] text-[11px] font-semibold mt-0.5">
+                          {bill.entryNo} • {new Date(bill.date).toLocaleDateString('en-IN')}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="font-bold text-[#059669]">{formatCurrency(bill.pending)}</div>
+                        <div className="text-[#64748B] text-[11px] font-semibold mt-0.5">
+                          Total: {formatCurrency(bill.total)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan={2} className="px-4 py-8 text-center text-gray-500">
-                      No pending supplier bills
+                    <td colSpan={2} className="px-4 py-10 text-center text-gray-500 font-bold">
+                      {supplierSearch ? 'No matching supplier bills found' : 'No pending supplier bills'}
                     </td>
                   </tr>
                 )}
@@ -328,42 +386,76 @@ const Dashboard = () => {
 
         {/* Customer Payments Expected */}
         <div className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden lg:col-span-1 flex flex-col">
-          <div className="border-b border-gray-100 px-5 py-4 flex justify-between items-center bg-gray-50/50">
-            <h2 className="text-[16px] font-semibold text-gray-800 flex items-center gap-2">
-              <Users size={18} className="text-amber-500" /> Customer Payments Due
+          <div className="border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-3.5 flex flex-wrap justify-between items-center bg-gray-50/50 gap-2">
+            <h2 className="text-[14px] sm:text-[15px] font-bold text-gray-800 flex items-center gap-2 whitespace-nowrap">
+              <Users size={18} className="text-amber-500 shrink-0" /> Customer Payments Due
             </h2>
-            <Link to="/sales/receipts" className="px-3 py-1 bg-amber-50 text-amber-600 font-semibold rounded hover:bg-amber-100 transition-colors text-[12px]">
-              Collect
-            </Link>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Link 
+                to="/reports/customer-receipts" 
+                className="flex-1 sm:flex-none text-center px-3 py-1 bg-white border border-gray-200 text-gray-700 font-bold rounded-md hover:bg-gray-50 transition-colors text-[12px] shadow-sm"
+              >
+                View All
+              </Link>
+              <Link 
+                to="/sales/receipts" 
+                className="flex-1 sm:flex-none text-center px-3 py-1 bg-amber-50 text-amber-600 font-bold rounded-md hover:bg-amber-100 transition-colors text-[12px] border border-amber-100"
+              >
+                Collect
+              </Link>
+            </div>
+          </div>
+          {/* Customer Search Bar */}
+          <div className="px-3.5 py-2 border-b border-gray-100 bg-white">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+              <input
+                type="text"
+                placeholder="Search customer or bill..."
+                value={customerSearch}
+                onChange={e => setCustomerSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1 text-[12px] border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-300 bg-gray-50 font-bold text-black"
+              />
+            </div>
           </div>
           <div className="flex-1 p-0 h-[350px] overflow-y-auto custom-scrollbar bg-white">
             <table className="w-full text-left text-[12px] whitespace-nowrap">
-              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] sticky top-0">
+              <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0] sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 font-bold text-[#334155]">Customer / Bill</th>
-                  <th className="px-4 py-3 font-bold text-[#059669] text-right">Pending</th>
+                  <th className="px-4 py-2.5 font-bold text-[#334155]">Customer / Bill</th>
+                  <th className="px-4 py-2.5 font-bold text-[#059669] text-right">Pending</th>
                 </tr>
               </thead>
               <tbody>
-                {data.unpaidCustomerBills?.length > 0 ? data.unpaidCustomerBills.map((bill: any, idx: number) => (
-                  <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-[#1E293B]">{bill.entityName}</div>
-                      <div className="text-[#64748B] text-[11px] mt-0.5">
-                        {bill.entryNo} • {new Date(bill.date).toLocaleDateString('en-GB')}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="font-bold text-[#059669]">{formatCurrency(bill.pending)}</div>
-                      <div className="text-[#64748B] text-[11px] mt-0.5">
-                        Total: {formatCurrency(bill.total)}
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
+                {data.unpaidCustomerBills?.filter((bill: any) =>
+                  !customerSearch ||
+                  bill.entityName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                  bill.entryNo?.toLowerCase().includes(customerSearch.toLowerCase())
+                ).length > 0 ? (
+                  data.unpaidCustomerBills.filter((bill: any) =>
+                    !customerSearch ||
+                    bill.entityName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                    bill.entryNo?.toLowerCase().includes(customerSearch.toLowerCase())
+                  ).map((bill: any, idx: number) => (
+                    <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC]">
+                      <td className="px-4 py-2.5">
+                        <div className="font-bold text-[#1E293B]">{bill.entityName}</div>
+                        <div className="text-[#64748B] text-[11px] font-semibold mt-0.5">
+                          {bill.entryNo} • {new Date(bill.date).toLocaleDateString('en-IN')}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="font-bold text-[#059669]">{formatCurrency(bill.pending)}</div>
+                        <div className="text-[#64748B] text-[11px] font-semibold mt-0.5">
+                          Total: {formatCurrency(bill.total)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
-                    <td colSpan={2} className="px-4 py-8 text-center text-gray-500">
-                      No pending customer bills
+                    <td colSpan={2} className="px-4 py-10 text-center text-gray-500 font-bold">
+                      {customerSearch ? 'No matching customer bills found' : 'No pending customer bills'}
                     </td>
                   </tr>
                 )}

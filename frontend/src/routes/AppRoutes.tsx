@@ -68,6 +68,9 @@ import RawMaterialPurchaseReport from '../pages/reports/RawMaterialPurchaseRepor
 import ProductionReport from '../pages/reports/ProductionReport';
 import BatchPnlReport from '../pages/reports/BatchPnlReport';
 import ServiceSalesReport from '../pages/reports/ServiceSalesReport';
+import CustomerReceiptsReport from '../pages/reports/CustomerReceiptsReport';
+import SupplierPaymentsReport from '../pages/reports/SupplierPaymentsReport';
+import ProductWiseSalesReport from '../pages/reports/ProductWiseSalesReport';
 
 // Services
 import ServiceItems from '../pages/services/ServiceItems';
@@ -112,7 +115,7 @@ const AppRoutes = () => {
         <Route path="/master/taxes" element={<Taxes />} /> {/* Tax GST doesn't seem to have a specific perm in MainLayout, just settings.enableTax */}
 
         {/* Purchase Routes */}
-        <Route element={<ProtectedRoute requiredPerms={['purchase_entry', 'purchase_return', 'purchase_payments']} />}><Route path="/purchase" element={<PurchaseList />} /></Route>
+        <Route element={<ProtectedRoute requiredPerms={['purchase_entry', 'purchase_list', 'purchase_return', 'purchase_payments']} />}><Route path="/purchase" element={<PurchaseList />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="purchase_entry" />}><Route path="/purchase/new" element={<PurchaseEntry />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="purchase_payments" />}><Route path="/purchase/payments" element={<SupplierPayments />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="purchase_return" />}><Route path="/purchase/return" element={<PurchaseReturn />} /></Route>
@@ -151,6 +154,9 @@ const AppRoutes = () => {
         <Route element={<ProtectedRoute requiredPerms="reports_rm_purchase" />}><Route path="/reports/raw-material-purchase" element={<RawMaterialPurchaseReport />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="reports_production" />}><Route path="/reports/production" element={<ProductionReport />} /></Route>
         <Route element={<ProtectedRoute requiredPerms="reports_batch_pnl" />}><Route path="/reports/batch-pnl" element={<BatchPnlReport />} /></Route>
+        <Route element={<ProtectedRoute requiredPerms={['reports_sales', 'reports_product_wise_sales']} />}><Route path="/reports/product-wise-sales" element={<ProductWiseSalesReport />} /></Route>
+        <Route element={<ProtectedRoute requiredPerms="reports_customer_receipts" />}><Route path="/reports/customer-receipts" element={<CustomerReceiptsReport />} /></Route>
+        <Route element={<ProtectedRoute requiredPerms="reports_supplier_payments" />}><Route path="/reports/supplier-payments" element={<SupplierPaymentsReport />} /></Route>
         <Route path="/reports/service-sales" element={<ServiceSalesReport />} />
 
         {/* Service Module Routes */}

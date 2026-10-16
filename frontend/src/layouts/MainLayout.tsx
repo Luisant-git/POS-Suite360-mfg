@@ -20,10 +20,30 @@ const NavItem = ({ title, icon, to, onClick, compact, isCrowded }: { title: stri
   );
 };
 
-const NavDropdown = ({ title, icon, children, isActive, rightAligned, compact, isCrowded }: { title: string, icon: string, children: React.ReactNode, isActive?: boolean, rightAligned?: boolean, compact?: boolean, isCrowded?: boolean }) => {
+const NavDropdown = ({ 
+  title, 
+  icon, 
+  children, 
+  isActive, 
+  rightAligned, 
+  compact, 
+  isCrowded,
+  widthClass
+}: { 
+  title: string, 
+  icon: string, 
+  children: React.ReactNode, 
+  isActive?: boolean, 
+  rightAligned?: boolean, 
+  compact?: boolean, 
+  isCrowded?: boolean,
+  widthClass?: string
+}) => {
   const sizeClass = isCrowded 
     ? (compact ? 'gap-1 lg:gap-1.5 px-1.5 lg:px-2 xl:px-2.5 text-[12px] lg:text-[12.5px] xl:text-[13px]' : 'gap-1.5 lg:gap-2 px-2 lg:px-2.5 xl:px-3 text-[12.5px] lg:text-[13px] xl:text-[14px]')
     : (compact ? 'gap-1.5 px-2.5 lg:px-3 xl:px-4 text-[13px] lg:text-sm' : 'gap-2 px-3 lg:px-4 xl:px-5 text-[14px] lg:text-[15px]');
+
+  const dropdownWidth = widthClass || 'w-max min-w-[280px]';
 
   return (
     <div className="relative group h-full flex items-center">
@@ -32,7 +52,7 @@ const NavDropdown = ({ title, icon, children, isActive, rightAligned, compact, i
         <span className="whitespace-nowrap">{title}</span>
         <ChevronDown size={14} className="ml-0.5 opacity-70" />
       </button>
-      <div className={`absolute ${rightAligned ? 'right-0' : 'left-0'} top-full mt-0 w-64 bg-white border border-gray-200 shadow-2xl rounded-b-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden transform origin-top group-hover:scale-100 scale-95`}>
+      <div className={`absolute ${rightAligned ? 'right-0' : 'left-0'} top-full mt-0 ${dropdownWidth} max-w-[calc(100vw-24px)] bg-white border border-gray-200 shadow-2xl rounded-b-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 transform origin-top group-hover:scale-100 scale-95 max-h-[calc(100vh-65px)] overflow-y-auto custom-scrollbar`}>
         <div className="py-2">
           {children}
         </div>
@@ -46,12 +66,12 @@ const DropdownItem = ({ to, icon, title, isDanger = false, isWarning = false, on
     to={to}
     end={end}
     onClick={onClick}
-    className={({ isActive }) => `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600 border-l-4 border-transparent'}`}
+    className={({ isActive }) => `flex items-center gap-3 px-4 py-2 text-sm font-bold transition-colors ${isActive ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600' : 'text-black font-bold hover:bg-gray-50 hover:text-blue-600 border-l-4 border-transparent'}`}
   >
-    <div className={`w-6 flex justify-center ${isDanger ? 'text-red-500' : isWarning ? 'text-amber-500' : 'text-gray-400'}`}>
-      <i className={`fa ${icon} text-base`}></i>
+    <div className={`w-5 shrink-0 flex justify-center ${isDanger ? 'text-red-500' : isWarning ? 'text-amber-500' : 'text-black font-bold'}`}>
+      <i className={`fa ${icon} text-[14px]`}></i>
     </div>
-    <span className="whitespace-nowrap">{title}</span>
+    <span className="whitespace-nowrap flex-1">{title}</span>
   </NavLink>
 );
 
@@ -86,10 +106,10 @@ const MobileDropdownItem = ({ to, icon, title, onClick, isDanger = false, isWarn
     onClick={onClick}
     className={({ isActive }) => `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${isActive ? 'text-white font-bold bg-[#1E3A8A]/30 border-l-2 border-blue-400' : 'text-blue-200 hover:text-white hover:bg-[#1E40AF]/50 border-l-2 border-transparent'}`}
   >
-    <div className={`w-5 flex justify-center ${isDanger ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-blue-300'}`}>
+    <div className={`w-5 shrink-0 flex justify-center ${isDanger ? 'text-red-400' : isWarning ? 'text-amber-400' : 'text-blue-300'}`}>
       <i className={`fa ${icon} text-[13px]`}></i>
     </div>
-    <span className="whitespace-nowrap">{title}</span>
+    <span className="flex-1 leading-snug">{title}</span>
   </NavLink>
 );
 
@@ -206,13 +226,13 @@ const MainLayout = () => {
   const visibleMenusCount = [
     true, // Dashboard
     hasAnyPerm(['master_products', 'mfg_product_master', 'master_brands', 'master_categories', 'master_units', 'master_suppliers', 'master_customers', 'master_payment_modes', 'master_payment_types', 'master_expense_categories']),
-    hasAnyPerm(['purchase_entry', 'purchase_return', 'purchase_payments']),
+    hasAnyPerm(['purchase_entry', 'purchase_list', 'purchase_return', 'purchase_payments']),
     hasAnyPerm(['mfg_rm_master', 'mfg_rm_purchase', 'mfg_production']),
     hasAnyPerm(['sales_pos', 'sales_return', 'sales_receipts']),
     hasPerm('sales_estimation'),
     hasPerm('expenses_entry'),
     settings?.enableService && hasAnyPerm(['services_items', 'services_sales', 'services_sales_list']),
-    hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales'])
+    hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments'])
   ].filter(Boolean).length;
 
   const isCrowded = visibleMenusCount >= 8;
@@ -253,9 +273,10 @@ const MainLayout = () => {
             </MobileNavDropdown>
 
             <MobileNavDropdown title="Purchases" icon="fa-truck" isActive={isPurchaseActive}>
-              <MobileDropdownItem to="/purchase/new" icon="fa-shopping-basket" title="Purchase Entry" />
-              <MobileDropdownItem to="/purchase/return" icon="fa-undo" title="Purchase Return" isWarning />
-              <MobileDropdownItem to="/purchase/payments" icon="fa-credit-card" title="Supplier Payments" />
+              {hasPerm('purchase_entry') && <MobileDropdownItem to="/purchase/new" icon="fa-shopping-basket" title="Purchase Entry" />}
+              {(hasPerm('purchase_list') || hasPerm('purchase_entry')) && <MobileDropdownItem to="/purchase" icon="fa-list-alt" title="Purchase List" />}
+              {hasPerm('purchase_return') && <MobileDropdownItem to="/purchase/return" icon="fa-undo" title="Purchase Return" isWarning />}
+              {hasPerm('purchase_payments') && <MobileDropdownItem to="/purchase/payments" icon="fa-credit-card" title="Supplier Payments" />}
             </MobileNavDropdown>
 
             <MobileNavDropdown title="Manufacturing" icon="fa-industry" isActive={isManufacturingActive}>
@@ -295,6 +316,9 @@ const MainLayout = () => {
               <MobileDropdownItem to="/reports/estimations" icon="fa-file-text-o" title="Estimation Report" />
               <MobileDropdownItem to="/reports/purchase" icon="fa-file-text-o" title="Purchase Report" />
               <MobileDropdownItem to="/reports/purchase-return" icon="fa-mail-reply" title="Purchase Return Report" isWarning />
+              <div className="my-1 border-t border-[#2A3F54]/30"></div>
+              {hasPerm('reports_customer_receipts') && <MobileDropdownItem to="/reports/customer-receipts" icon="fa-users" title="Customer Receipts & Dues Report" />}
+              {hasPerm('reports_supplier_payments') && <MobileDropdownItem to="/reports/supplier-payments" icon="fa-credit-card" title="Supplier Payments & Payables Report" />}
               <div className="my-1 border-t border-[#2A3F54]/30"></div>
               <MobileDropdownItem to="/reports/raw-material-purchase" icon="fa-truck" title="RM Purchase Report" />
               <MobileDropdownItem to="/reports/production" icon="fa-industry" title="Production Report" />
@@ -383,9 +407,10 @@ const MainLayout = () => {
               </NavDropdown>
               )}
 
-              {hasAnyPerm(['purchase_entry', 'purchase_return', 'purchase_payments']) && (
+              {hasAnyPerm(['purchase_entry', 'purchase_list', 'purchase_return', 'purchase_payments']) && (
               <NavDropdown title="Purchases" icon="fa-truck" isActive={isPurchaseActive} compact={showBackButton} isCrowded={isCrowded}>
                 {hasPerm('purchase_entry') && <DropdownItem to="/purchase/new" icon="fa-shopping-basket" title="Purchase Entry" />}
+                {(hasPerm('purchase_list') || hasPerm('purchase_entry')) && <DropdownItem to="/purchase" icon="fa-list-alt" title="Purchase List" />}
                 {hasPerm('purchase_return') && <DropdownItem to="/purchase/return" icon="fa-undo" title="Purchase Return" isWarning />}
                 <div className="h-px bg-gray-100 my-1 mx-4"></div>
                 {hasPerm('purchase_payments') && <DropdownItem to="/purchase/payments" icon="fa-credit-card" title="Supplier Payments" />}
@@ -428,16 +453,19 @@ const MainLayout = () => {
               </NavDropdown>
               )}
 
-              {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales']) && (
-              <NavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive} rightAligned compact={showBackButton} isCrowded={isCrowded}>
-                {(hasPerm('reports_purchase') || hasPerm('reports_purchase_return') || hasPerm('reports_sales') || hasPerm('reports_sales_return') || hasPerm('reports_estimations')) && (
+              {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments']) && (
+              <NavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive} rightAligned compact={showBackButton} isCrowded={isCrowded} widthClass="w-max min-w-[340px]">
+                {(hasPerm('reports_purchase') || hasPerm('reports_purchase_return') || hasPerm('reports_sales') || hasPerm('reports_sales_return') || hasPerm('reports_estimations') || hasPerm('reports_customer_receipts') || hasPerm('reports_supplier_payments')) && (
                   <div className="px-4 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Purchase & Sales</div>
                 )}
                 {hasPerm('reports_purchase') && <DropdownItem to="/reports/purchase" icon="fa-file-text-o" title="Purchase Report" />}
                 {hasPerm('reports_purchase_return') && <DropdownItem to="/reports/purchase-return" icon="fa-mail-reply" title="Purchase Return Report" isWarning />}
                 {hasPerm('reports_sales') && <DropdownItem to="/reports/sales" icon="fa-line-chart" title="Sales Report" />}
                 {hasPerm('reports_sales_return') && <DropdownItem to="/reports/sales-return" icon="fa-mail-reply" title="Sales Return Report" isDanger />}
+                {(hasPerm('reports_sales') || hasPerm('reports_product_wise_sales')) && <DropdownItem to="/reports/product-wise-sales" icon="fa-cubes" title="Product & Supplier Wise Sales" />}
                 {hasPerm('reports_estimations') && <DropdownItem to="/reports/estimations" icon="fa-file-text-o" title="Estimation Report" />}
+                {hasPerm('reports_customer_receipts') && <DropdownItem to="/reports/customer-receipts" icon="fa-users" title="Customer Receipts & Overdue" />}
+                {hasPerm('reports_supplier_payments') && <DropdownItem to="/reports/supplier-payments" icon="fa-credit-card" title="Supplier Payments & Payables" />}
                 
                 {(hasPerm('reports_rm_purchase') || hasPerm('reports_production') || hasPerm('reports_batch_pnl')) && (
                   <>
@@ -600,9 +628,10 @@ const MainLayout = () => {
               </MobileNavDropdown>
               )}
 
-              {hasAnyPerm(['purchase_entry', 'purchase_return', 'purchase_payments']) && (
+              {hasAnyPerm(['purchase_entry', 'purchase_list', 'purchase_return', 'purchase_payments']) && (
               <MobileNavDropdown title="Purchases" icon="fa-truck" isActive={isPurchaseActive}>
                 {hasPerm('purchase_entry') && <MobileDropdownItem to="/purchase/new" icon="fa-shopping-basket" title="Purchase Entry" onClick={closeMobileMenu} />}
+                {(hasPerm('purchase_list') || hasPerm('purchase_entry')) && <MobileDropdownItem to="/purchase" icon="fa-list-alt" title="Purchase List" onClick={closeMobileMenu} />}
                 {hasPerm('purchase_return') && <MobileDropdownItem to="/purchase/return" icon="fa-undo" title="Purchase Return" isWarning onClick={closeMobileMenu} />}
                 {hasPerm('purchase_payments') && <MobileDropdownItem to="/purchase/payments" icon="fa-credit-card" title="Supplier Payments" onClick={closeMobileMenu} />}
               </MobileNavDropdown>
@@ -636,13 +665,16 @@ const MainLayout = () => {
               </MobileNavDropdown>
               )}
 
-              {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger']) && (
+              {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_customer_receipts', 'reports_supplier_payments']) && (
               <MobileNavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive}>
-                {hasPerm('reports_sales') && <MobileDropdownItem to="/reports/sales" icon="fa-line-chart" title="Sales Report" />}
-                {hasPerm('reports_sales_return') && <MobileDropdownItem to="/reports/sales-return" icon="fa-mail-reply" title="Sales Return Report" isDanger />}
-                {hasPerm('reports_estimations') && <MobileDropdownItem to="/reports/estimations" icon="fa-file-text-o" title="Estimation Report" />}
-                {hasPerm('reports_purchase') && <MobileDropdownItem to="/reports/purchase" icon="fa-file-text-o" title="Purchase Report" />}
-                {hasPerm('reports_purchase_return') && <MobileDropdownItem to="/reports/purchase-return" icon="fa-mail-reply" title="Purchase Return Report" isWarning />}
+                {hasPerm('reports_sales') && <MobileDropdownItem to="/reports/sales" icon="fa-line-chart" title="Sales Report" onClick={closeMobileMenu} />}
+                {hasPerm('reports_sales_return') && <MobileDropdownItem to="/reports/sales-return" icon="fa-mail-reply" title="Sales Return Report" isDanger onClick={closeMobileMenu} />}
+                {(hasPerm('reports_sales') || hasPerm('reports_product_wise_sales')) && <MobileDropdownItem to="/reports/product-wise-sales" icon="fa-cubes" title="Product & Supplier Wise Sales" onClick={closeMobileMenu} />}
+                {hasPerm('reports_estimations') && <MobileDropdownItem to="/reports/estimations" icon="fa-file-text-o" title="Estimation Report" onClick={closeMobileMenu} />}
+                {hasPerm('reports_purchase') && <MobileDropdownItem to="/reports/purchase" icon="fa-file-text-o" title="Purchase Report" onClick={closeMobileMenu} />}
+                {hasPerm('reports_purchase_return') && <MobileDropdownItem to="/reports/purchase-return" icon="fa-mail-reply" title="Purchase Return Report" isWarning onClick={closeMobileMenu} />}
+                {hasPerm('reports_customer_receipts') && <MobileDropdownItem to="/reports/customer-receipts" icon="fa-users" title="Customer Receipts & Overdue" onClick={closeMobileMenu} />}
+                {hasPerm('reports_supplier_payments') && <MobileDropdownItem to="/reports/supplier-payments" icon="fa-credit-card" title="Supplier Payments & Payables" onClick={closeMobileMenu} />}
                 
                 {hasPerm('reports_rm_purchase') && <MobileDropdownItem to="/reports/raw-material-purchase" icon="fa-truck" title="RM Purchase Report" />}
                 {hasPerm('reports_production') && <MobileDropdownItem to="/reports/production" icon="fa-industry" title="Production Report" />}
