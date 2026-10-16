@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, UseGuards, Request, Param, Query } from '@nestjs/common';
 import { CustomerReceiptsService } from './customer-receipts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -12,20 +12,37 @@ export class CustomerReceiptsController {
     return { receiptNo: await this.customerReceiptsService.generateReceiptNo() };
   }
 
+  @Get('consolidation-report')
+  async getConsolidationReport(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.customerReceiptsService.getConsolidationReport(startDate, endDate);
+  }
+
   @Get('balance/:id')
   async getBalance(@Param('id') id: string) {
     return this.customerReceiptsService.getBalance(Number(id));
   }
 
   @Get('unpaid-bills/:id')
-  async getUnpaidBills(@Param('id') id: string) {
-    return this.customerReceiptsService.getUnpaidBills(Number(id));
+  async getUnpaidBills(
+    @Param('id') id: string,
+    @Query('excludeReceiptId') excludeReceiptId?: string
+  ) {
+    return this.customerReceiptsService.getUnpaidBills(Number(id), excludeReceiptId ? Number(excludeReceiptId) : undefined);
   }
 
   @Post()
   async create(@Body() createCustomerReceiptDto: any, @Request() req: any) {
     const userId = (req.user?.userId && req.user.userId > 0) ? req.user.userId : 1;
     return this.customerReceiptsService.create(createCustomerReceiptDto, userId);
+  }
+
+  @Put(':id')
+  async update(@Param('id') id: string, @Body() updateData: any, @Request() req: any) {
+    const userId = (req.user?.userId && req.user.userId > 0) ? req.user.userId : 1;
+    return this.customerReceiptsService.update(Number(id), updateData, userId);
   }
 
   @Get()
