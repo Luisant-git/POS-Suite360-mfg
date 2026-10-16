@@ -209,25 +209,29 @@ const ServiceSalesEntry = () => {
 
   const onFormError = (errors: any) => {
     console.error('Form Validation Errors:', errors);
-    let errorMessage = 'Please fill all mandatory fields correctly.';
+    let errorMessage = 'Validation failed. Please ensure all items have a Rate and Quantity > 0.';
 
-    if (errors.paymentModeId) {
-      errorMessage = 'Payment mode is required.';
+    if (errors.customerId) {
+      errorMessage = 'Please select a Customer before saving.';
+    } else if (errors.paymentModeId) {
+      errorMessage = 'Please select a Payment Mode before saving.';
     } else if (errors.items && Array.isArray(errors.items)) {
       for (const item of errors.items) {
         if (item?.serviceName) {
-           errorMessage = 'Service Name is required for all rows.';
+           errorMessage = 'Validation failed: Service Name is required for all rows.';
            break;
         }
         if (item?.quantity) {
-           errorMessage = 'Quantity must be greater than 0.';
+           errorMessage = 'Validation failed: Quantity must be greater than 0.';
            break;
         }
         if (item?.rate) {
-           errorMessage = 'Rate must be valid.';
+           errorMessage = 'Validation failed: Rate is required for all items.';
            break;
         }
       }
+    } else if (errors.items) {
+      errorMessage = 'Please add at least one service before saving.';
     }
     
     toast.error(errorMessage);
