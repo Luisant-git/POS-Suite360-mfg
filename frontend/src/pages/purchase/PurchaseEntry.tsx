@@ -62,7 +62,7 @@ const purchaseSchema = z.object({
   entryNo: z.string(),
   date: z.string(),
   paymentModeId: z.coerce.number().min(1, 'Payment Mode is required').or(z.literal(0)),
-  
+
   totalAmount: z.coerce.number(),
   totalDiscount: z.coerce.number(),
   totalDiscountPercent: z.coerce.number().optional(),
@@ -212,20 +212,20 @@ const PurchaseEntry = () => {
   const watchTransportCharge = watch('transportCharge');
   const watchwages = watch('wages');
   const watchRoundOff = watch('roundOff');
-  
+
   // Calculations
   useEffect(() => {
     let totalAmount = 0;
     let totalTax = 0;
-    
+
     items.forEach((item, index) => {
       const q = Number(item.quantity) || 0;
       const pRate = Number(item.pRate) || 0;
-      
+
       let discAmt = Number(item.discAmt) || 0;
 
       let subtotal = (q * pRate) - discAmt;
-      
+
       let itemTax = 0;
       if (settings?.enableTax && item.productId > 0) {
         const product = products.find((p: any) => p.id === Number(item.productId));
@@ -242,11 +242,11 @@ const PurchaseEntry = () => {
       }
 
       const total = subtotal + itemTax;
-      
+
       if (item.tax !== itemTax) {
         setValue(`items.${index}.tax`, Number(itemTax.toFixed(2)), { shouldValidate: false });
       }
-      
+
       if (item.total !== total) {
         setValue(`items.${index}.total`, Number(total.toFixed(2)), { shouldValidate: false });
       }
@@ -270,7 +270,7 @@ const PurchaseEntry = () => {
     const product = products.find((p: any) => p.id === Number(productId));
     if (product) {
       setValue(`items.${index}.unit`, product.unit?.shortCode || product.unit?.name || 'Nos');
-      
+
       try {
         const response = await api.get(`/purchases/latest-rate/${productId}`);
         const latest = response.data;
@@ -298,7 +298,7 @@ const PurchaseEntry = () => {
     mutationFn: (data: PurchaseFormValues) => api.post('/purchases', data),
     onSuccess: () => {
       toast.success('Purchase recorded successfully!');
-      
+
       setTimeout(() => {
         if (printAfterSaveRef.current) {
           window.print();
@@ -325,7 +325,7 @@ const PurchaseEntry = () => {
       toast.error('Please select a Payment Mode before saving.');
       return;
     }
-    
+
     const validItems = data.items.filter(item => item.productId > 0);
     if (validItems.length === 0) {
       toast.error('Please add at least one product before saving.');
@@ -370,7 +370,7 @@ const PurchaseEntry = () => {
 
   const onError = (errors: any) => {
     let errorMessage = 'Validation failed. Please ensure all items have a Rate and Quantity > 0.';
-    
+
     if (errors.supplierId) {
       errorMessage = 'Please select a Supplier before saving.';
     } else if (errors.paymentModeId) {
@@ -389,7 +389,7 @@ const PurchaseEntry = () => {
     } else if (errors.items) {
       errorMessage = 'Please add at least one product before saving.';
     }
-    
+
     toast.error(errorMessage);
     console.error(errors);
   };
@@ -416,7 +416,7 @@ const PurchaseEntry = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input/textarea unless it's a function key or escape
-      
+
       if (e.key === 'F10') {
         e.preventDefault();
         handleSubmit(onSubmit as any, onError)();
@@ -500,32 +500,32 @@ const PurchaseEntry = () => {
 
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col font-sans overflow-hidden z-10">
-      
+
       {/* Top Bar */}
       <div className="bg-[#0B355B] text-white px-2 sm:px-4 py-2 flex flex-wrap gap-2 justify-between items-center shrink-0">
         <div className="flex flex-wrap gap-2">
-          <button 
+          <button
             type="button"
             onClick={handleSubmit(onSubmit as any, onError)}
-            className="bg-[#059669] hover:bg-[#047857] text-white px-4 py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
+            className="bg-[#059669] hover:bg-[#047857] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
           >
-            <CheckCircle size={16} /> SAVE PURCHASE (F10)
+            <CheckCircle size={16} /> <span className="hidden sm:inline">SAVE PURCHASE (F10)</span><span className="sm:hidden">Save</span>
           </button>
         </div>
-        <button 
+        <button
           onClick={() => setIsLeaveModalOpen(true)}
           className="text-white hover:text-white/80 transition-colors flex items-center gap-1.5"
         >
-          <ArrowLeft size={16} /> Back (Esc)
+          <ArrowLeft size={16} /> <span className="hidden sm:inline">Back (Esc)</span>
         </button>
       </div>
 
       <form className="flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit(onSubmit as any, onError)}>
-        
+
         {/* Header Section */}
         <div className="bg-white p-3 sm:p-4 border-b border-[#E5E7EB] shrink-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:flex lg:flex-row gap-3 sm:gap-4">
-            
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:flex lg:flex-row gap-2 sm:gap-4">
+
             <div className="w-full lg:flex-1 lg:max-w-[200px]">
               <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Entry No *</label>
               <input
@@ -535,7 +535,7 @@ const PurchaseEntry = () => {
                 className="w-full px-2 py-1.5 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[13px] font-bold outline-none"
               />
             </div>
-            
+
             <div className="w-full lg:flex-1 lg:max-w-[250px]">
               <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Supplier Invoice number</label>
               <input
@@ -546,18 +546,18 @@ const PurchaseEntry = () => {
               />
             </div>
 
-            <div className="w-full lg:flex-[2]">
+            <div className="w-full col-span-2 lg:col-span-1 lg:flex-[2]">
               <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Supplier Name (Searchable Dropdown) *</label>
               <div className="flex flex-col gap-1">
                 <div className="flex-1 w-full">
-                <SearchableSelect
-                  value={watch('supplierId')}
-                  onChange={(val) => setValue('supplierId', Number(val))}
-                  options={[
-                    { label: 'Click or type supplier name / phone...', value: 0 },
-                    ...suppliers.map((s: any) => ({ label: `${s.name} - ${s.phone || ''}`, value: s.id }))
-                  ]}
-                />
+                  <SearchableSelect
+                    value={watch('supplierId')}
+                    onChange={(val) => setValue('supplierId', Number(val))}
+                    options={[
+                      { label: 'Click or type supplier name / phone...', value: 0 },
+                      ...suppliers.map((s: any) => ({ label: `${s.name} - ${s.phone || ''}`, value: s.id }))
+                    ]}
+                  />
                 </div>
                 <div className="flex justify-between items-center mt-1">
                   <button type="button" onClick={() => setIsSupplierModalOpen(true)} className="bg-[#059669] hover:bg-[#047857] text-white px-2 py-1 rounded transition-colors flex items-center gap-1 text-[11px] font-bold">
@@ -606,8 +606,8 @@ const PurchaseEntry = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="shrink-0 flex flex-wrap justify-end gap-2 p-2 bg-white border-b border-[#E5E7EB]">
-          <button 
+        <div className="entry-action-bar shrink-0 flex flex-wrap justify-end gap-2 p-2 bg-white border-b border-[#E5E7EB]">
+          <button
             type="button"
             onClick={() => {
               append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 });
@@ -620,21 +620,21 @@ const PurchaseEntry = () => {
           >
             <PlusCircle size={14} /> Add Row (F2)
           </button>
-          <button 
+          <button
             type="button"
             onClick={handleClear}
             className="border border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <RotateCcw size={14} /> Clear (F4)
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => navigate('/purchase')}
             className="border border-[#0B355B] text-[#0B355B] hover:bg-[#0B355B] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <List size={14} /> Purchase List
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => navigate('/reports/purchase')}
             className="border border-[#0B355B] text-[#0B355B] hover:bg-[#0B355B] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
@@ -645,8 +645,8 @@ const PurchaseEntry = () => {
         </div>
 
         {/* Items Grid */}
-        <div className="flex-1 min-h-0 overflow-auto custom-scrollbar bg-white border-b border-[#E5E7EB]">
-          <table className="w-full border-collapse border border-[#E5E7EB] md:min-w-[1200px] whitespace-nowrap responsive-table">
+        <div className="entry-table-wrapper flex-1 min-h-0 overflow-auto custom-scrollbar bg-white border-b border-[#E5E7EB]">
+          <table className="w-full border-collapse border border-[#E5E7EB] whitespace-nowrap md:min-w-[1200px] responsive-table">
             <thead>
               <tr className="bg-[#0F172A] text-white">
                 <th className="px-2 py-2 text-center text-[12px] font-bold border border-[#334155] w-10">#</th>
@@ -716,63 +716,63 @@ const PurchaseEntry = () => {
                     </div>
                   </td>
                   <td data-label="Qty" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.quantity`)}
                       data-row={index} data-col={1}
-                      type="number" min="1" placeholder="0" 
+                      type="number" min="1" placeholder="0"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 1, 7)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-center" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-center"
                     />
                   </td>
                   <td data-label="Unit" className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input {...register(`items.${index}.unit`)} type="text" readOnly tabIndex={-1} className="w-full px-1 py-1 bg-transparent text-[13px] outline-none text-center" />
                   </td>
                   <td data-label="PRate" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.pRate`)}
                       data-row={index} data-col={2}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 2, 7)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td data-label="WRate" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.wRate`)}
                       data-row={index} data-col={3}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 3, 7)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td data-label="SRate" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.sRate`)}
                       data-row={index} data-col={4}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 4, 7)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td data-label="MRP" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.mrp`)}
                       data-row={index} data-col={5}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 5, 7)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td data-label="Disc %" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.discPercent`)}
                       data-row={index} data-col={6}
-                      type="number" step="0.01" placeholder="0" 
+                      type="number" step="0.01" placeholder="0"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 6, 7)}
                       onChange={(e) => {
@@ -783,14 +783,14 @@ const PurchaseEntry = () => {
                         const amt = (rate * q * pct) / 100;
                         setValue(`items.${index}.discAmt`, Number(amt.toFixed(2)));
                       }}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td data-label="Disc Amt" className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       {...register(`items.${index}.discAmt`)}
                       data-row={index} data-col={7}
-                      type="number" step="0.01" placeholder="0.00" 
+                      type="number" step="0.01" placeholder="0.00"
                       onFocus={(e) => e.target.select()}
                       onKeyDown={(e) => handleCellKey(e, index, 7, 7)}
                       onChange={(e) => {
@@ -806,7 +806,7 @@ const PurchaseEntry = () => {
                           setValue(`items.${index}.discPercent`, 0);
                         }
                       }}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   {settings?.enableTax && (
@@ -817,10 +817,10 @@ const PurchaseEntry = () => {
                         </div>
                       </td>
                       <td data-label="Tax Amt" className="px-2 py-1 border-r border-[#E5E7EB]">
-                        <input 
-                          {...register(`items.${index}.tax`)} 
+                        <input
+                          {...register(`items.${index}.tax`)}
                           type="number" step="0.01" readOnly tabIndex={-1}
-                          className="w-full px-2 py-1 bg-transparent border-none text-[13px] text-right text-gray-500 outline-none" 
+                          className="w-full px-2 py-1 bg-transparent border-none text-[13px] text-right text-gray-500 outline-none"
                         />
                       </td>
                     </>
@@ -830,18 +830,18 @@ const PurchaseEntry = () => {
                   </td>
                   <td data-label="Action" className="px-2 py-1 text-center">
                     <div className="flex justify-center gap-2">
-                      <button 
-                        type="button" 
-                        onClick={() => append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 })} 
+                      <button
+                        type="button"
+                        onClick={() => append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 })}
                         className="bg-[#10B981] text-white p-1.5 rounded hover:bg-[#059669] transition-colors shadow-sm"
                         title="Add Row"
                       >
                         <Plus size={14} strokeWidth={3} />
                       </button>
-                      <button 
-                        type="button" 
-                        onClick={() => remove(index)} 
-                        disabled={fields.length === 1} 
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        disabled={fields.length === 1}
                         className="bg-red-50 text-red-500 p-1.5 rounded hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-red-50 disabled:hover:text-red-500"
                         title="Remove Row"
                       >
@@ -857,8 +857,8 @@ const PurchaseEntry = () => {
 
         {/* Footer Calculation Area */}
         <div className="bg-white border-t border-[#E5E7EB] p-3 sm:p-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-6">
-            
+          <div className="entry-footer-totals flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-6">
+
             <div className="w-full md:flex-1 flex flex-col gap-1">
               <label className="text-[14px] font-extrabold text-[#1F2937] uppercase">Total Quantity:</label>
               <input
@@ -950,7 +950,7 @@ const PurchaseEntry = () => {
         {/* Bottom Actions Bar */}
         <div className="bg-white border-t border-gray-200 px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 mt-auto shrink-0">
           <div className="flex flex-nowrap justify-between sm:justify-center gap-1 sm:gap-2 w-full md:w-auto">
-            <button 
+            <button
               type="button"
               onClick={() => append({ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, total: 0 })}
               className="bg-[#2563EB] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#1D4ED8] whitespace-nowrap"
@@ -958,27 +958,27 @@ const PurchaseEntry = () => {
               <span className="opacity-70 border-r border-[#60A5FA] pr-1 mr-1">F2</span> Add Row
             </button>
 
-            <button 
+            <button
               type="button"
               disabled={createMutation.isPending}
-              className="bg-[#059669] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#047857] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" 
+              className="bg-[#059669] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#047857] disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               onClick={handleSubmit(onSubmit as any, onError)}
             >
-              <span className="opacity-70 border-r border-[#34D399] pr-1 mr-1">F10</span> 
+              <span className="opacity-70 border-r border-[#34D399] pr-1 mr-1">F10</span>
               {createMutation.isPending ? 'Saving...' : 'Save Purchase'}
             </button>
-            <button 
+            <button
               type="button"
-              className="bg-[#0891B2] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#0E7490] whitespace-nowrap" 
+              className="bg-[#0891B2] text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-3 py-1.5 rounded-sm flex items-center gap-1 cursor-pointer hover:bg-[#0E7490] whitespace-nowrap"
               onClick={() => setIsLeaveModalOpen(true)}
             >
               <span className="opacity-70 border-r border-[#67E8F9] pr-1 mr-1">Esc</span> Dashboard
             </button>
           </div>
-          
+
           <div className="flex items-center gap-2 sm:gap-4 w-full md:w-auto justify-between md:justify-end border-t border-gray-200 md:border-none pt-3 md:pt-0">
             <span className="text-[16px] sm:text-[20px] font-extrabold text-[#1F2937] uppercase tracking-wider">NET PURCHASE AMOUNT:</span>
-            <span className="text-[28px] sm:text-[36px] font-black text-[#059669]">
+            <span className="entry-net-amount text-[28px] sm:text-[36px] font-black text-[#059669]">
               {formatCurrency(watch('netAmount') || 0)}
             </span>
           </div>
@@ -1001,27 +1001,27 @@ const PurchaseEntry = () => {
             <div className="p-4 flex flex-col gap-4">
               <div>
                 <label className="block text-[13px] font-bold text-[#1F2937] mb-1">Supplier Name *</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newSupplier.name}
-                  onChange={(e) => setNewSupplier({...newSupplier, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]" 
+                  onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]"
                 />
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">Mobile Number</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newSupplier.phone}
-                  onChange={(e) => setNewSupplier({...newSupplier, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]" 
+                  onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]"
                 />
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">State {settings?.enableTax && <span className="text-red-500">*</span>}</label>
-                <Select 
+                <Select
                   value={newSupplier.state ? { value: newSupplier.state, label: newSupplier.state } : null}
-                  onChange={(val: any) => setNewSupplier({...newSupplier, state: val?.value || ''})}
+                  onChange={(val: any) => setNewSupplier({ ...newSupplier, state: val?.value || '' })}
                   options={[
                     { value: '', label: '-- Select State --' },
                     ...indianStates.map(s => ({ value: s, label: s }))
@@ -1042,15 +1042,15 @@ const PurchaseEntry = () => {
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">Address</label>
-                <textarea 
+                <textarea
                   value={newSupplier.address}
-                  onChange={(e) => setNewSupplier({...newSupplier, address: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] min-h-[80px]" 
+                  onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] min-h-[80px]"
                 />
               </div>
             </div>
             <div className="p-4 bg-white pt-2 border-none pb-5">
-              <button 
+              <button
                 type="button"
                 onClick={handleQuickAddSupplier}
                 disabled={!newSupplier.name || addSupplierMutation.isPending}
@@ -1075,7 +1075,7 @@ const PurchaseEntry = () => {
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="p-6 text-center">
               <div className="bg-blue-50 text-blue-800 p-4 rounded-lg mb-6 shadow-sm border border-blue-100">
                 <p className="font-bold text-[15px]">Net Amount: {formatCurrency(pendingSavePayload?.grandTotal || 0)}</p>
@@ -1085,7 +1085,7 @@ const PurchaseEntry = () => {
             </div>
 
             <div className="px-6 pb-6 flex gap-3">
-              <button 
+              <button
                 type="button"
                 onClick={() => handleConfirmSave(false)}
                 className="w-full bg-[#10B981] hover:bg-[#059669] text-white py-2.5 rounded-lg font-bold text-[14px] transition-all shadow-md flex items-center justify-center gap-2"
@@ -1097,10 +1097,10 @@ const PurchaseEntry = () => {
         </div>
       )}
 
-      <LeaveConfirmModal 
-        isOpen={isLeaveModalOpen} 
-        onClose={() => setIsLeaveModalOpen(false)} 
-        onConfirm={() => navigate('/purchase')} 
+      <LeaveConfirmModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        onConfirm={() => navigate('/purchase')}
       />
 
     </div>

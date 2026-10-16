@@ -124,46 +124,152 @@ table tfoot th,
 }
 
 @media (max-width: 768px) {
+  /* ── Entry form tables: stacked card layout ── */
   .responsive-table {
     display: block;
     width: 100%;
+    overflow-x: hidden !important;
+    min-width: unset !important;
   }
   .responsive-table thead {
     display: none;
   }
-  .responsive-table tbody, .responsive-table tr, .responsive-table td {
+  .responsive-table tbody {
     display: block;
     width: 100%;
+    padding: 0.5rem;
+    gap: 0.75rem;
   }
   .responsive-table tr {
-    margin-bottom: 15px;
-    border: 1px solid #E5E7EB;
-    border-radius: 0.5rem;
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 12px;
     background-color: #fff;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    overflow: hidden;
   }
   .responsive-table td {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #F3F4F6;
+    padding: 0.6rem 0.875rem;
+    border-bottom: 1px solid #F1F5F9;
     text-align: right;
+    min-height: 44px; /* touch target */
   }
   .responsive-table td:last-child {
     border-bottom: none;
+    background-color: #F8FAFC;
+    border-radius: 0 0 12px 12px;
   }
+  /* Label before each value */
   .responsive-table td::before {
     content: attr(data-label);
     font-weight: 700;
-    color: #4B5563;
-    font-size: 0.75rem;
+    color: #64748B;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    margin-right: 1rem;
+    letter-spacing: 0.05em;
+    margin-right: 0.75rem;
     white-space: nowrap;
+    flex-shrink: 0;
   }
-  .responsive-table td > input, .responsive-table td > select, .responsive-table td > div {
+  /* Inputs / selects / divs inside td */
+  .responsive-table td > input,
+  .responsive-table td > select,
+  .responsive-table td > div {
     flex-grow: 1;
-    max-width: 60%;
+    max-width: 65%;
+  }
+  /* Make all entry inputs taller for touch */
+  .responsive-table td input[type="number"],
+  .responsive-table td input[type="text"] {
+    min-height: 36px;
+    font-size: 14px !important;
+    padding: 0.4rem 0.6rem !important;
+    border-radius: 6px;
+  }
+  /* Row number cell — make it a header strip */
+  .responsive-table td:first-child {
+    background: linear-gradient(to right, #0F172A, #1E3A8A);
+    color: white;
+    font-weight: 800;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    min-height: 36px;
+    border-radius: 10px 10px 0 0;
+    border-bottom: none;
+  }
+  .responsive-table td:first-child::before {
+    color: rgba(255,255,255,0.7);
+  }
+  /* Action buttons row */
+  .responsive-table td[data-label="Action"],
+  .responsive-table td[data-label="Act"] {
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 0.875rem;
+    background-color: #F8FAFC;
+  }
+  .responsive-table td[data-label="Action"]::before,
+  .responsive-table td[data-label="Act"]::before {
+    display: none;
+  }
+  /* Total cell highlight */
+  .responsive-table td[data-label="Total"] {
+    background-color: #F0FDF4;
+    font-weight: 900;
+    font-size: 1rem;
+  }
+  /* Stock badge */
+  .responsive-table td[data-label="Stock"] span {
+    font-size: 13px;
+    padding: 0.2rem 0.6rem;
+  }
+
+  /* ── Entry form: make the overflow container not clip the cards ── */
+  .entry-table-wrapper {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 0.5rem !important;
+    background: #F3F5F8 !important;
+  }
+
+  /* ── Top bar: compact on mobile ── */
+  .entry-topbar-label {
+    display: none;
+  }
+
+  /* ── Action buttons bar: scrollable row on mobile ── */
+  .entry-action-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    padding-bottom: 4px;
+  }
+  .entry-action-bar::-webkit-scrollbar {
+    height: 3px;
+  }
+  .entry-action-bar::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 3px;
+  }
+
+  /* ── Footer totals: stack nicely ── */
+  .entry-footer-totals {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* ── Bottom bar net amount: large and readable ── */
+  .entry-net-amount {
+    font-size: 2rem !important;
   }
 }
