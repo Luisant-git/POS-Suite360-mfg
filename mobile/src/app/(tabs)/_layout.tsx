@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs as ExpoTabs, useRouter } from 'expo-router';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ShoppingCart, FileText, LogOut, Truck } from 'lucide-react-native';
+import { ShoppingCart, FileText, LogOut, Truck, Layers } from 'lucide-react-native';
 
 export default function TabLayout() {
   const router = useRouter();
@@ -20,18 +20,26 @@ export default function TabLayout() {
       headerTitleStyle: { fontWeight: 'bold' },
       headerRight: () => (
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <LogOut color="#EF4444" size={18} />
-          <Text style={styles.logoutText}>Close</Text>
+          <LogOut color="#EF4444" size={16} />
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       ),
       tabBarActiveTintColor: '#1E3A8A',
       tabBarInactiveTintColor: '#6B7280',
-      tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#E5E7EB' },
+      tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#E5E7EB', height: 60, paddingBottom: 8, paddingTop: 6 },
+      tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
     }}>
+      <ExpoTabs.Screen
+        name="entries"
+        options={{
+          title: 'All Entries',
+          tabBarIcon: ({ color, size }) => <Layers color={color} size={size} />,
+        }}
+      />
       <ExpoTabs.Screen
         name="sales-entry"
         options={{
-          title: 'Sales Entry',
+          title: 'Sales POS',
           tabBarIcon: ({ color, size }) => <ShoppingCart color={color} size={size} />,
         }}
       />
@@ -43,17 +51,16 @@ export default function TabLayout() {
         }}
       />
       <ExpoTabs.Screen
-        name="sales"
+        name="reports"
         options={{
-          title: 'POS',
-          tabBarIcon: ({ color, size }) => <ShoppingCart color={color} size={size} />,
+          title: 'All Reports',
+          tabBarIcon: ({ color, size }) => <FileText color={color} size={size} />,
         }}
       />
       <ExpoTabs.Screen
-        name="reports"
+        name="sales"
         options={{
-          title: 'Reports',
-          tabBarIcon: ({ color, size }) => <FileText color={color} size={size} />,
+          href: null,
         }}
       />
     </ExpoTabs>
@@ -66,7 +73,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: '#1E293B',
-    borderRadius: 6,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -74,6 +81,6 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#EF4444',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 12,
   },
 });

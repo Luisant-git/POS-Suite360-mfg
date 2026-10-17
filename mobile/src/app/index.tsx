@@ -12,9 +12,9 @@ export default function Index() {
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
-          router.replace('/(tabs)/sales-entry');
+          router.replace('/(tabs)/entries' as any);
         } else {
-          router.replace('/login');
+          router.replace('/login' as any);
         }
       } catch (error) {
         router.replace('/login');
