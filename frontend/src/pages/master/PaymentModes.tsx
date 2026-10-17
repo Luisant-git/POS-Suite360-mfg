@@ -32,9 +32,9 @@ const PaymentModes = () => {
     defaultValues: { name: '', description: '' }
   });
 
-  const { data: paymentModes = [], isLoading } = useQuery({ 
-    queryKey: ['paymentModes'], 
-    queryFn: async () => (await api.get('/payment-modes')).data 
+  const { data: paymentModes = [], isLoading } = useQuery({
+    queryKey: ['paymentModes'],
+    queryFn: async () => (await api.get('/payment-modes')).data
   });
 
   const filteredModes = paymentModes.filter((p: any) => {
@@ -109,93 +109,101 @@ const PaymentModes = () => {
 
   return (
     <div className="bg-[#F7F7F7] min-h-[calc(100vh-100px)] grid grid-cols-1 lg:grid-cols-3 gap-4">
-      
+
       {/* Left Column: Form */}
       {!isFullTable && (
-      <div className="lg:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm">
-        <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex items-center gap-2 rounded-t-sm">
-          <CreditCard size={16} className="text-[#1E3A8A]" />
-          <h2 className="font-bold text-[14px] text-[#1E3A8A]">PAYMENT MODE FORM</h2>
-        </div>
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="p-5 flex flex-col gap-4">
-          <div>
-            <label className="block text-[13px] font-bold text-[#1F2937] mb-1">Payment Mode Name *</label>
-            <input 
-              {...register('name')}
-              type="text" 
-              placeholder="e.g. Cash, Card, UPI, Credit, Bank Transfer"
-              className="w-full px-3 py-2 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
-            />
-            {errors.name && <span className="text-red-500 text-xs mt-1 block">{errors.name.message}</span>}
+        <div className="lg:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm">
+          <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex items-center gap-2 rounded-t-sm">
+            <CreditCard size={16} className="text-[#1E3A8A]" />
+            <h2 className="font-bold text-[14px] text-[#1E3A8A]">PAYMENT MODE FORM</h2>
           </div>
 
-          <div>
-            <label className="block text-[13px] text-[#1F2937] mb-1">Description / Notes</label>
-            <input 
-              {...register('description')}
-              type="text" 
-              placeholder="e.g. Direct cash, POS terminal, QR Code scan"
-              className="w-full px-3 py-2 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
-            />
-          </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="p-5 flex flex-col gap-4">
+            <div>
+              <label className="block text-[13px] font-bold text-[#1F2937] mb-1">Payment Mode Name *</label>
+              <input
+                {...register('name')}
+                type="text"
+                placeholder="e.g. Cash, Card, UPI, Credit, Bank Transfer"
+                className="w-full px-3 py-2 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
+              />
+              {errors.name && <span className="text-red-500 text-xs mt-1 block">{errors.name.message}</span>}
+            </div>
 
-          <button 
-            type="submit" 
-            disabled={mutation.isPending}
-            className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 mt-4 transition-colors"
-          >
-            <CheckCircle size={16} />
-            {editingId ? 'UPDATE PAYMENT MODE' : 'SAVE PAYMENT MODE (F10)'}
-          </button>
-          
-          {editingId && (
-            <button 
-              type="button" 
-              onClick={() => { reset(); setEditingId(null); }}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
+            <div>
+              <label className="block text-[13px] text-[#1F2937] mb-1">Description / Notes</label>
+              <input
+                {...register('description')}
+                type="text"
+                placeholder="e.g. Direct cash, POS terminal, QR Code scan"
+                className="w-full px-3 py-2 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 mt-4 transition-colors"
             >
-              CANCEL EDIT
+              <CheckCircle size={16} />
+              {editingId ? 'UPDATE PAYMENT MODE' : 'SAVE PAYMENT MODE (F10)'}
             </button>
-          )}
-        </form>
-      </div>
+
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => { reset(); setEditingId(null); }}
+                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
+              >
+                CANCEL EDIT
+              </button>
+            )}
+          </form>
+        </div>
       )}
 
       {/* Right Column: List */}
       <div className={`${isFullTable ? 'lg:col-span-3' : 'lg:col-span-2'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col`}>
-        <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-[#1E3A8A]">
-            <Grid size={16} className="text-[#1E3A8A]" />
-            <h2 className="font-bold text-[14px]">PAYMENT MODES LIST</h2>
+        <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0">
+          <div className="flex items-center justify-between w-full md:w-auto">
+            <div className="flex items-center gap-2 text-[#1E3A8A]">
+              <Grid size={16} className="text-[#1E3A8A]" />
+              <h2 className="font-bold text-[14px]">PAYMENT MODES LIST</h2>
+            </div>
+            <div className="md:hidden bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+              {filteredModes.length} Modes
+            </div>
           </div>
-          <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
-            {filteredModes.length} Modes
+
+          <div className="flex items-center justify-between w-full md:w-auto gap-3">
+            <div className="hidden md:block bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+              {filteredModes.length} Modes
+            </div>
+            <div className="flex flex-row items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:flex-none">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <Search size={14} className="text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search modes..."
+                  className="pl-7 pr-3 py-1 border border-[#ccc] rounded text-[12px] w-full md:w-48 outline-none focus:border-[#3B82F6]"
+                />
+              </div>
+              <button type="button"
+                onClick={() => setIsFullTable(!isFullTable)}
+                className="whitespace-nowrap text-[#3B82F6] hover:bg-white px-2 py-1 rounded text-[12px] font-bold flex items-center justify-center gap-1 transition-colors border border-[#3B82F6]"
+              >
+                {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
+                <span className="hidden sm:inline">{isFullTable ? 'Show Form' : 'View Full Table'}</span>
+                <span className="sm:hidden">{isFullTable ? 'Form' : 'Full Table'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="p-3 border-b border-[#E6E9ED] bg-white flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="relative w-full sm:w-auto">
-            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-              <Search size={14} className="text-gray-400" />
-            </div>
-            <input 
-              type="text" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search modes..."
-              className="w-full sm:w-64 pl-7 pr-3 py-1.5 border border-[#ccc] rounded text-[13px] outline-none focus:border-[#3B82F6]"
-            />
-          </div>
-          <button type="button" 
-            onClick={() => setIsFullTable(!isFullTable)}
-            className="w-full sm:w-auto justify-center text-[#3B82F6] hover:bg-[#EFF6FF] px-3 py-1.5 rounded text-[12px] font-bold flex items-center gap-2 transition-colors border border-[#3B82F6]"
-          >
-            {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
-            {isFullTable ? 'Show Form' : 'View Full Table'}
-          </button>
-        </div>
-        
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 overflow-x-auto">
           <table className="w-full text-left text-[13px] whitespace-nowrap min-w-[800px]">
             <thead>
@@ -221,13 +229,13 @@ const PaymentModes = () => {
                     <td data-label="Description" className="px-3 py-2.5 border-r border-[#E5E7EB] text-gray-600">{mode.description || '-'}</td>
                     <td data-label="Actions" className="px-3 py-2.5 text-center">
                       <div className="flex justify-center gap-2">
-                        <button type="button" 
+                        <button type="button"
                           onClick={() => handleEdit(mode)}
                           className="text-[#3B82F6] border border-[#3B82F6] rounded p-1 hover:bg-[#3B82F6] hover:text-white transition-colors"
                         >
                           <Edit size={14} />
                         </button>
-                        <button type="button" 
+                        <button type="button"
                           onClick={() => {
                             setItemToDelete(mode);
                           }}
@@ -245,7 +253,7 @@ const PaymentModes = () => {
         </div>
       </div>
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal 
+      <DeleteConfirmationModal
         isOpen={!!itemToDelete}
         itemName={itemToDelete?.name}
         isDeleting={deleteMutation.isPending}
@@ -256,13 +264,13 @@ const PaymentModes = () => {
         }}
         onCancel={() => setItemToDelete(null)}
       />
-    
-      <LeaveConfirmModal 
-        isOpen={isLeaveModalOpen} 
-        onClose={() => setIsLeaveModalOpen(false)} 
-        onConfirm={() => navigate('/dashboard')} 
+
+      <LeaveConfirmModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        onConfirm={() => navigate('/dashboard')}
       />
-</div>
+    </div>
   );
 };
 export default PaymentModes;

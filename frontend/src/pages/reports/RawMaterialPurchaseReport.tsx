@@ -9,34 +9,35 @@ import { exportToExcel } from '../../utils/exportExcel';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import PaginationControls from '../../components/PaginationControls';
 import RawMaterialPurchaseModal from '../raw-materials/RawMaterialPurchaseModal';
+import TableLoader from '../../components/TableLoader';
 
 const RawMaterialPurchaseReport = () => {
   const navigate = useNavigate();
   const { formatCurrency, settings } = useSettings();
   const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState(''); 
+  const [toDate, setToDate] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [quickSearch, setQuickSearch] = useState('');
   const [viewId, setViewId] = useState<number | null>(null);
 
   // Fetch Master Data for filters
-  const { data: suppliers = [] } = useQuery({ 
-    queryKey: ['suppliers'], 
-    queryFn: async () => (await api.get('/suppliers')).data 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => (await api.get('/suppliers')).data
   });
 
   // Fetch Report Data
   const { data: purchases = [], isLoading, refetch } = useQuery({
     queryKey: ['rawMaterialPurchaseReport', fromDate, toDate, supplierId, invoiceNo],
     queryFn: async () => {
-      const { data } = await api.get(`/raw-material-purchases`, { 
-        params: { 
-          fromDate, 
-          toDate, 
+      const { data } = await api.get(`/raw-material-purchases`, {
+        params: {
+          fromDate,
+          toDate,
           supplierId: supplierId || undefined,
           invoiceNo: invoiceNo || undefined,
-        } 
+        }
       });
       return data.map((p: any) => ({
         id: p.id,
@@ -75,14 +76,14 @@ const RawMaterialPurchaseReport = () => {
   const paginatedPurchases = filteredPurchases.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
 
   return (
-    <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-hidden z-10 p-4">
-      
+    <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-y-auto lg:overflow-hidden z-10 p-2 sm:p-4">
+
       <ReportTabs />
 
       {/* Filter Section */}
       <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md mb-4 p-4 shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
-          
+
           <div>
             <label className="flex items-center gap-1 text-[12px] text-[#64748B] mb-1 font-bold"><Calendar size={12} /> From Date</label>
             <input
@@ -107,8 +108,8 @@ const RawMaterialPurchaseReport = () => {
             <label className="flex items-center gap-1 text-[12px] text-[#3B82F6] mb-1 font-bold"><FileDigit size={12} /> Invoice No</label>
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
                 placeholder="Search invoice..."
@@ -181,15 +182,15 @@ const RawMaterialPurchaseReport = () => {
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={quickSearch}
                 onChange={(e) => setQuickSearch(e.target.value)}
                 placeholder="Quick search table..."
                 className="pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] w-64 focus:border-[#3B82F6]"
               />
             </div>
-            <button type="button" 
+            <button type="button"
               onClick={() => {
                 const exportData = filteredPurchases.map((p: any) => ({
                   'Entry No': p.entryNo,
@@ -221,7 +222,7 @@ const RawMaterialPurchaseReport = () => {
             >
               <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
             </button>
-            <button type="button" 
+            <button type="button"
               onClick={() => {
                 const cols: PdfColumn[] = [
                   { header: 'Entry No', dataKey: 'entryNo' },
@@ -249,7 +250,7 @@ const RawMaterialPurchaseReport = () => {
             >
               <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
-            <button type="button" 
+            <button type="button"
               onClick={() => navigate('/raw-materials/purchase')}
               className="bg-[#1E3A8A] hover:bg-[#172554] text-white px-3 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
             >
@@ -262,6 +263,7 @@ const RawMaterialPurchaseReport = () => {
           <table className="w-full text-left text-[12px] whitespace-nowrap">
             <thead>
               <tr className="bg-[#0F172A] text-white font-bold">
+                <th className="px-4 py-3 border-r border-[#1E293B] text-center">S.No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Entry No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Invoice No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
@@ -276,12 +278,13 @@ const RawMaterialPurchaseReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={5} className="text-center p-6 text-gray-500">Loading report data...</td></tr>
+                <tr><td colSpan={11} className="p-0"><TableLoader /></td></tr>
               ) : filteredPurchases.length === 0 ? (
-                <tr><td colSpan={10} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
+                <tr><td colSpan={11} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
               ) : (
                 paginatedPurchases.map((p: any, index: number) => (
                   <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-black">{p.entryNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.invoiceNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.date}</td>
@@ -296,7 +299,7 @@ const RawMaterialPurchaseReport = () => {
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.wages}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-black">{p.netAmount}</td>
                     <td className="px-4 py-3 text-center">
-                      <button 
+                      <button
                         onClick={() => setViewId(p.id)}
                         className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
                         title="View Details"

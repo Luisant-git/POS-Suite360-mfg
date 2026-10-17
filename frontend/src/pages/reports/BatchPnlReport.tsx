@@ -7,6 +7,7 @@ import ReportTabs from '../../components/ReportTabs';
 import { exportToExcel } from '../../utils/exportExcel';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import Select from 'react-select';
+import TableLoader from '../../components/TableLoader';
 
 const BatchPnlReport = () => {
   const { formatCurrency, settings } = useSettings();
@@ -14,9 +15,9 @@ const BatchPnlReport = () => {
   const [productId, setProductId] = useState('');
 
   // Fetch Master Data for filters
-  const { data: products = [] } = useQuery({ 
-    queryKey: ['products'], 
-    queryFn: async () => (await api.get('/products')).data 
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => (await api.get('/products')).data
   });
 
   const { data: productions = [] } = useQuery({
@@ -31,7 +32,7 @@ const BatchPnlReport = () => {
   // Filter products based on selected batch
   const batchProductions = productions.filter((p: any) => p.workName === workName);
   const batchProductIds = Array.from(new Set(batchProductions.map((p: any) => p.finishedProductId)));
-  const availableProducts = workName 
+  const availableProducts = workName
     ? products.filter((p: any) => batchProductIds.includes(p.id))
     : products.filter((p: any) => p.isManufacturingProduct);
 
@@ -46,11 +47,11 @@ const BatchPnlReport = () => {
     queryKey: ['batchPnlReport', workName, productId],
     queryFn: async () => {
       if (!workName && !productId) return null;
-      const { data } = await api.get(`/reports/batch-pnl`, { 
-        params: { 
-          workName: workName || undefined, 
+      const { data } = await api.get(`/reports/batch-pnl`, {
+        params: {
+          workName: workName || undefined,
           productId: productId || undefined,
-        } 
+        }
       });
       return data;
     },
@@ -58,14 +59,14 @@ const BatchPnlReport = () => {
   });
 
   return (
-    <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-hidden z-10 p-4">
-      
+    <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-y-auto lg:overflow-hidden z-10 p-2 sm:p-4">
+
       <ReportTabs />
 
       {/* Filter Section */}
       <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md mb-4 p-4 shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
-          
+
           <div>
             <label className="flex items-center gap-1 text-[12px] text-[#3B82F6] mb-1 font-bold"><Box size={12} /> Batch / Work Name</label>
             <div className="relative">
@@ -152,7 +153,7 @@ const BatchPnlReport = () => {
             <p className={`text-[12px] font-bold mb-1 uppercase ${reportData.profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>Profit / Loss</p>
             <p className={`text-[20px] font-bold ${reportData.profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(Math.abs(reportData.profit))} {reportData.profit < 0 ? '(Loss)' : ''}</p>
           </div>
-          
+
           {/* Row 1/Col 4 */}
           <div className="bg-white p-4 rounded-md border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
             <p className="text-[#64748B] text-[12px] font-bold mb-1 uppercase">Cost Per Unit</p>
@@ -164,7 +165,7 @@ const BatchPnlReport = () => {
             <p className="text-[#64748B] text-[12px] font-bold mb-1 uppercase">Produced Qty</p>
             <p className="text-[20px] font-bold text-[#1A63A8]">{reportData.totalProducedQty}</p>
           </div>
-          
+
           {/* Row 1/Col 6 */}
           <div className="bg-white p-4 rounded-md border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
             <p className="text-[#64748B] text-[12px] font-bold mb-1 uppercase">Wastage Qty</p>
@@ -190,73 +191,73 @@ const BatchPnlReport = () => {
           </div>
           {reportData && (
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" 
+              <button type="button"
                 onClick={() => window.print()}
                 className="bg-white border border-[#CBD5E1] text-[#334155] hover:bg-gray-50 px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
               >
                 <FileText size={14} /> <span className="hidden sm:inline">Print Report</span>
               </button>
-              <button type="button" 
+              <button type="button"
                 onClick={() => {
-                const exportData = reportData.materialsUsed.map((m: any) => ({
-                  'Material Name': m.name,
-                  'Quantity Consumed': m.quantity,
-                  'Total Cost': m.cost,
-                }));
-                exportData.push({
-                  'Material Name': 'TOTAL COST',
-                  'Quantity Consumed': '',
-                  'Total Cost': reportData.totalCost
-                });
-                exportData.push({
-                  'Material Name': 'POTENTIAL REVENUE',
-                  'Quantity Consumed': '',
-                  'Total Cost': reportData.totalRevenue
-                });
-                exportData.push({
-                  'Material Name': 'NET PROFIT',
-                  'Quantity Consumed': '',
-                  'Total Cost': reportData.profit
-                });
-                exportToExcel(exportData, `Batch_PnL_${workName || 'Report'}`, {
-                  shopName: settings?.shopName || 'MY SHOP',
-                  title: `Batch P&L Report - ${workName}`,
-                  totalCount: reportData.materialsUsed.length
-                });
-              }}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
-            >
-              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
-            </button>
-            <button type="button" 
-              onClick={() => {
-                const cols: PdfColumn[] = [
-                  { header: 'Raw Material Name', dataKey: 'name' },
-                  { header: 'Quantity Consumed', dataKey: 'quantity' },
-                  { header: 'Total Cost', dataKey: 'cost' },
-                ];
-                const pdfData = [...reportData.materialsUsed.map((m: any) => ({
-                  ...m,
-                  cost: formatCurrency(m.cost)
-                })), {
-                  name: 'TOTAL COST',
-                  quantity: '',
-                  cost: formatCurrency(reportData.totalCost)
-                }, {
-                  name: 'POTENTIAL REVENUE',
-                  quantity: '',
-                  cost: formatCurrency(reportData.totalRevenue)
-                }, {
-                  name: 'NET PROFIT',
-                  quantity: '',
-                  cost: formatCurrency(reportData.profit)
-                }];
-                exportTableToPdf(cols, pdfData, `Batch_PnL_${workName || 'Report'}`, `Batch P&L Report - ${workName}`, settings?.shopName, reportData.materialsUsed.length);
-              }}
-              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
-            >
-              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
-            </button>
+                  const exportData = reportData.materialsUsed.map((m: any) => ({
+                    'Material Name': m.name,
+                    'Quantity Consumed': m.quantity,
+                    'Total Cost': m.cost,
+                  }));
+                  exportData.push({
+                    'Material Name': 'TOTAL COST',
+                    'Quantity Consumed': '',
+                    'Total Cost': reportData.totalCost
+                  });
+                  exportData.push({
+                    'Material Name': 'POTENTIAL REVENUE',
+                    'Quantity Consumed': '',
+                    'Total Cost': reportData.totalRevenue
+                  });
+                  exportData.push({
+                    'Material Name': 'NET PROFIT',
+                    'Quantity Consumed': '',
+                    'Total Cost': reportData.profit
+                  });
+                  exportToExcel(exportData, `Batch_PnL_${workName || 'Report'}`, {
+                    shopName: settings?.shopName || 'MY SHOP',
+                    title: `Batch P&L Report - ${workName}`,
+                    totalCount: reportData.materialsUsed.length
+                  });
+                }}
+                className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              >
+                <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+              </button>
+              <button type="button"
+                onClick={() => {
+                  const cols: PdfColumn[] = [
+                    { header: 'Raw Material Name', dataKey: 'name' },
+                    { header: 'Quantity Consumed', dataKey: 'quantity' },
+                    { header: 'Total Cost', dataKey: 'cost' },
+                  ];
+                  const pdfData = [...reportData.materialsUsed.map((m: any) => ({
+                    ...m,
+                    cost: formatCurrency(m.cost)
+                  })), {
+                    name: 'TOTAL COST',
+                    quantity: '',
+                    cost: formatCurrency(reportData.totalCost)
+                  }, {
+                    name: 'POTENTIAL REVENUE',
+                    quantity: '',
+                    cost: formatCurrency(reportData.totalRevenue)
+                  }, {
+                    name: 'NET PROFIT',
+                    quantity: '',
+                    cost: formatCurrency(reportData.profit)
+                  }];
+                  exportTableToPdf(cols, pdfData, `Batch_PnL_${workName || 'Report'}`, `Batch P&L Report - ${workName}`, settings?.shopName, reportData.materialsUsed.length);
+                }}
+                className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
+              >
+                <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
+              </button>
             </div>
           )}
         </div>
@@ -272,7 +273,7 @@ const BatchPnlReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={3} className="text-center p-6 text-gray-500">Loading data...</td></tr>
+                <tr><td colSpan={3} className="p-0"><TableLoader /></td></tr>
               ) : !reportData ? (
                 <tr><td colSpan={3} className="text-center p-6 text-gray-500">Select a batch or product and click Calculate P&L</td></tr>
               ) : reportData.materialsUsed.length === 0 ? (

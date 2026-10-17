@@ -8,6 +8,7 @@ import ServiceReceiptPrintModal from '../../components/ServiceReceiptPrintModal'
 import PaginationControls from '../../components/PaginationControls';
 import { exportToExcel } from '../../utils/exportExcel';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
+import TableLoader from '../../components/TableLoader';
 
 const ServiceSalesReport = () => {
   const navigate = useNavigate();
@@ -54,10 +55,10 @@ const ServiceSalesReport = () => {
 
   const filteredSales = quickSearch
     ? sales.filter((s: any) =>
-        s.invoiceNo?.toLowerCase().includes(quickSearch.toLowerCase()) ||
-        s.customer?.name?.toLowerCase().includes(quickSearch.toLowerCase()) ||
-        s.items?.some((i: any) => i.serviceName?.toLowerCase().includes(quickSearch.toLowerCase()))
-      )
+      s.invoiceNo?.toLowerCase().includes(quickSearch.toLowerCase()) ||
+      s.customer?.name?.toLowerCase().includes(quickSearch.toLowerCase()) ||
+      s.items?.some((i: any) => i.serviceName?.toLowerCase().includes(quickSearch.toLowerCase()))
+    )
     : sales;
 
   const totalPages = Math.ceil(filteredSales.length / entriesPerPage);
@@ -191,8 +192,8 @@ ${totalTax > 0 ? `<div style="display:flex;justify-content:space-between;font-si
   };
 
   return (
-    <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-hidden z-10">
-      <div className="print:hidden flex flex-col flex-1 overflow-hidden p-2">
+    <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-y-auto lg:overflow-hidden z-10 p-2 sm:p-4">
+      <div className="print:hidden flex flex-col flex-1 overflow-hidden">
 
         {/* Filter Section */}
         <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md mb-2 p-3">
@@ -322,6 +323,7 @@ ${totalTax > 0 ? `<div style="display:flex;justify-content:space-between;font-si
             <table className="w-full text-left text-[12px] whitespace-nowrap">
               <thead>
                 <tr className="bg-[#0F172A] text-white font-bold">
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-center">S.No</th>
                   <th className="px-4 py-3 border-r border-[#1E293B]">Invoice No</th>
                   <th className="px-4 py-3 border-r border-[#1E293B] text-center">Date</th>
                   <th className="px-4 py-3 border-r border-[#1E293B]">Customer</th>
@@ -335,11 +337,12 @@ ${totalTax > 0 ? `<div style="display:flex;justify-content:space-between;font-si
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={9} className="text-center p-6 text-gray-500">Loading report data...</td></tr>
+                  <tr><td colSpan={10} className="p-0"><TableLoader /></td></tr>
                 ) : filteredSales.length === 0 ? (
-                  <tr><td colSpan={9} className="text-center p-6 text-gray-500">No service billing records found.</td></tr>
+                  <tr><td colSpan={10} className="text-center p-6 text-gray-500">No service billing records found.</td></tr>
                 ) : paginatedSales.map((s: any, index: number) => (
                   <tr key={s.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#ECFDF5]`}>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-[#059669] font-mono">{s.invoiceNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#475569]">
                       {new Date(s.date).toISOString().split('T')[0]}
