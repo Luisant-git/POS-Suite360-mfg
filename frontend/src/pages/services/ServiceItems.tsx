@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Scissors, Grid, Maximize, Minimize, Search } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Scissors, Grid, Maximize, Minimize, Search, Plus, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,6 +27,7 @@ const ServiceItems = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullTable, setIsFullTable] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ServiceItemValues>({
@@ -81,6 +82,7 @@ const ServiceItems = () => {
       toast.success(editingId ? 'Service updated successfully!' : 'Service added successfully!');
       reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true });
       setEditingId(null);
+      setIsMobileDrawerOpen(false);
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to save service.');
@@ -119,6 +121,30 @@ const ServiceItems = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSubmit, onSubmit]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
+      if (e.key === 'Escape' && !isInput) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+          setEditingId(null);
+          reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true });
+        } else if (itemToDelete) {
+          setItemToDelete(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [itemToDelete, isMobileDrawerOpen, nextCodeData, reset]);
+
+  const handleAddNew = () => {
+    setIsFullTable(false);
+    setEditingId(null);
+    reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true });
+    setIsMobileDrawerOpen(true);
+  };
+
   const handleEdit = (item: any) => {
     setIsFullTable(false);
     setEditingId(item.id);
@@ -128,18 +154,43 @@ const ServiceItems = () => {
     setValue('rate', Number(item.rate));
     setValue('taxPercent', Number(item.taxPercent || 0));
     setValue('isActive', item.isActive);
+    setIsMobileDrawerOpen(true);
   };
 
   return (
     <div className="bg-transparent h-[calc(100vh-6rem)] grid grid-cols-1 xl:grid-cols-3 gap-4">
 
-      {/* Left Column: Form */}
+      {/* Mobile Drawer Backdrop */}
+      {isMobileDrawerOpen && (
+        <div 
+          className="xl:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true }); }}
+        />
+      )}
+
+      {/* Left Column: Form (Desktop: Inline Column, Mobile: Slide-over Right Drawer) */}
       {!isFullTable && (
-        <div className="xl:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col h-full overflow-hidden">
+        <div className={`
+          bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col h-full overflow-hidden
+          xl:col-span-1 xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex xl:flex-col
+          ${isMobileDrawerOpen 
+            ? 'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200' 
+            : 'hidden xl:flex'
+          }
+        `}>
           {/* Form Header */}
-          <div className="bg-[#ECFDF5] border-b border-[#059669] px-4 py-2 flex items-center gap-2 rounded-t-sm shrink-0">
-            <Scissors size={16} className="text-[#065F46]" />
-            <h2 className="font-bold text-[14px] text-[#065F46]">SERVICE MASTER FORM</h2>
+          <div className="bg-[#ECFDF5] border-b border-[#059669] px-4 py-2 flex items-center justify-between rounded-t-sm shrink-0">
+            <div className="flex items-center gap-2">
+              <Scissors size={16} className="text-[#065F46]" />
+              <h2 className="font-bold text-[14px] text-[#065F46] uppercase">{editingId ? 'EDIT SERVICE' : 'SERVICE MASTER FORM'}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true }); }}
+              className="xl:hidden p-1 rounded hover:bg-emerald-100 text-[#065F46]"
+            >
+              <X size={18} />
+            </button>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit as any, onFormError)} className="p-3 flex flex-col gap-2 overflow-y-auto custom-scrollbar flex-1">
@@ -229,7 +280,7 @@ const ServiceItems = () => {
             {editingId && (
               <button
                 type="button"
-                onClick={() => { reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true }); setEditingId(null); }}
+                onClick={() => { reset({ name: '', code: nextCodeData?.code || '', description: '', rate: '' as any, taxPercent: '' as any, isActive: true }); setEditingId(null); setIsMobileDrawerOpen(false); }}
                 className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
               >
                 CANCEL EDIT
@@ -247,8 +298,18 @@ const ServiceItems = () => {
             <Grid size={16} className="text-[#065F46]" />
             <h2 className="font-bold text-[14px]">SERVICE ITEMS LIST</h2>
           </div>
-          <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
-            {filteredItems.length} Services
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAddNew}
+              className="xl:hidden whitespace-nowrap bg-[#059669] hover:bg-[#047857] text-white px-2.5 py-1 rounded text-[12px] font-bold flex items-center gap-1 shadow-sm transition-colors"
+            >
+              <Plus size={14} />
+              <span>Add</span>
+            </button>
+            <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+              {filteredItems.length} Services
+            </div>
           </div>
         </div>
 
@@ -268,10 +329,10 @@ const ServiceItems = () => {
           <button
             type="button"
             onClick={() => setIsFullTable(!isFullTable)}
-            className="w-full sm:w-auto justify-center text-[#059669] hover:bg-[#ECFDF5] px-3 py-1.5 rounded text-[12px] font-bold flex items-center gap-2 transition-colors border border-[#059669]"
+            className="hidden xl:flex w-full sm:w-auto justify-center text-[#059669] hover:bg-[#ECFDF5] px-3 py-1.5 rounded text-[12px] font-bold items-center gap-2 transition-colors border border-[#059669]"
           >
             {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
-            {isFullTable ? 'Show Form' : 'View Full Table'}
+            <span>{isFullTable ? 'Show Form' : 'View Full Table'}</span>
           </button>
         </div>
 

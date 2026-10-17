@@ -1,6 +1,6 @@
 import { getMalaysiaDateStr, formatMalaysiaDate } from '../../utils/date';
 import { useState, useEffect } from 'react';
-import { X, Briefcase, PlusSquare, Download, Filter, RefreshCw, Edit, XCircle, Trash2 } from 'lucide-react';
+import { X, Briefcase, PlusSquare, Download, Filter, RefreshCw, Edit, XCircle, Trash2, Plus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -15,6 +15,10 @@ const ExpenseEntry = () => {
   const { formatCurrency, settings } = useSettings();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  // Mobile Drawers
+  const [isFormDrawerOpen, setIsFormDrawerOpen] = useState(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
 
   // New Expense Form State
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -118,6 +122,7 @@ const ExpenseEntry = () => {
     setCategoryId('');
     setPaymentModeId('');
     setExpenseDate(getMalaysiaDateStr());
+    setIsFormDrawerOpen(false);
   };
 
   const handleEdit = (exp: any) => {
@@ -127,6 +132,7 @@ const ExpenseEntry = () => {
     setAmount(exp.amount?.toString() || '');
     setPaymentModeId(exp.paymentModeId?.toString() || '');
     setNotes(exp.notes || '');
+    setIsFormDrawerOpen(true);
   };
 
   const handleDelete = (id: number) => {
@@ -208,7 +214,12 @@ const ExpenseEntry = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
       if (e.key === 'Escape') {
-        if (editingId) {
+        if (isFormDrawerOpen) {
+          setIsFormDrawerOpen(false);
+          setEditingId(null);
+        } else if (isFilterDrawerOpen) {
+          setIsFilterDrawerOpen(false);
+        } else if (editingId) {
           resetForm();
         } else if (!isInput) {
           navigate('/dashboard');
@@ -217,7 +228,7 @@ const ExpenseEntry = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editingId, navigate]);
+  }, [editingId, isFormDrawerOpen, isFilterDrawerOpen, navigate]);
 
   return (
     <div className="flex flex-col h-full bg-[#F3F4F6] font-sans">
@@ -250,19 +261,55 @@ const ExpenseEntry = () => {
         </div>
       </div>
 
+      {/* Mobile Form Drawer Backdrop */}
+      {isFormDrawerOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => {
+            resetForm();
+            setIsFormDrawerOpen(false);
+          }}
+        />
+      )}
+
+      {/* Mobile Filter Drawer Backdrop */}
+      {isFilterDrawerOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => setIsFilterDrawerOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
       <div className="flex-1 p-3 sm:p-4 overflow-auto overflow-x-auto">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full">
 
-          {/* Left Panel - Log New Expense */}
-          <div className="w-full lg:w-1/3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col self-start">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+          {/* Left Panel - Log New Expense (Desktop: Inline Column, Mobile: Slide-over Right Drawer) */}
+          <div className={`
+            bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col
+            lg:w-1/3 lg:static lg:z-auto lg:h-auto lg:max-w-none lg:shadow-sm lg:rounded-lg lg:flex lg:flex-col lg:self-start
+            ${isFormDrawerOpen
+              ? 'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200'
+              : 'hidden lg:flex'
+            }
+          `}>
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg flex items-center justify-between shrink-0">
               <h3 className="font-bold text-[#0f172a] text-sm flex items-center gap-2 uppercase">
                 {editingId ? 'EDIT EXPENSE' : 'LOG NEW EXPENSE'}
               </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  setIsFormDrawerOpen(false);
+                }}
+                className="lg:hidden p-1 rounded hover:bg-gray-200 text-gray-700"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="p-4 flex-1 flex flex-col gap-3.5">
+            <div className="p-4 flex-1 flex flex-col gap-3.5 overflow-y-auto custom-scrollbar">
               <div>
                 <label className="block text-[12px] font-bold text-black mb-1">Expense Date</label>
                 <input
@@ -338,16 +385,63 @@ const ExpenseEntry = () => {
           </div>
 
           {/* Right Panel - Expense Log History with Date Wise Filter */}
-          <div className="w-full lg:w-2/3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="w-full lg:w-2/3 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col flex-1">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg flex justify-between items-center gap-2 shrink-0">
               <h3 className="font-bold text-[#0f172a] text-sm uppercase">
-                EXPENSE LOG HISTORY & DATE WISE FILTER
+                EXPENSE LOG HISTORY
               </h3>
-              <span className="text-xs font-bold text-black">{expenses.length} Records</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetForm();
+                    setIsFormDrawerOpen(true);
+                  }}
+                  className="lg:hidden flex items-center gap-1 bg-[#16A34A] hover:bg-[#15803D] text-white px-2.5 py-1 rounded text-xs font-bold shadow-sm transition-colors whitespace-nowrap"
+                >
+                  <Plus size={14} />
+                  <span>Add Expense</span>
+                </button>
+                <span className="text-xs font-bold text-black">{expenses.length} Records</span>
+              </div>
             </div>
 
-            {/* Date Wise Filter Controls Bar */}
-            <div className="p-3 sm:p-4 border-b border-gray-200 bg-[#F8FAFC]">
+            {/* Mobile Quick Bar: Important fields in front (From Date, To Date) + Filter Button */}
+            <div className="lg:hidden flex items-center justify-between gap-2 p-2.5 sm:p-3 bg-[#F8FAFC] border-b border-gray-200 shrink-0">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <input
+                  type="date"
+                  value={filterStartDate}
+                  onChange={(e) => setFilterStartDate(e.target.value)}
+                  className="w-1/2 px-2 py-1.5 border border-gray-300 rounded text-xs font-bold text-black bg-white focus:outline-none focus:border-blue-500"
+                />
+                <span className="text-gray-400 font-bold text-xs">-</span>
+                <input
+                  type="date"
+                  value={filterEndDate}
+                  onChange={(e) => setFilterEndDate(e.target.value)}
+                  className="w-1/2 px-2 py-1.5 border border-gray-300 rounded text-xs font-bold text-black bg-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterDrawerOpen(true)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold transition-colors border shadow-sm shrink-0 ${
+                  filterCategoryId || searchQuery
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-[#0f172a] border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                <Filter size={14} />
+                <span>Filter</span>
+                {(filterCategoryId || searchQuery) && (
+                  <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                )}
+              </button>
+            </div>
+
+            {/* Desktop Date Wise Filter Controls Bar */}
+            <div className="hidden lg:block p-3 sm:p-4 border-b border-gray-200 bg-[#F8FAFC]">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 items-end mb-2">
                 <div>
                   <label className="block text-[11px] font-bold text-black mb-1">From Date</label>
@@ -472,6 +566,124 @@ const ExpenseEntry = () => {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* Mobile Filter Drawer (Slide-over from Right) */}
+      <div
+        className={`
+          bg-white border-l border-gray-200 shadow-2xl flex flex-col h-full overflow-hidden
+          lg:hidden
+          ${isFilterDrawerOpen
+            ? 'fixed inset-y-0 right-0 z-50 w-full max-w-sm animate-in slide-in-from-right duration-200'
+            : 'hidden'
+          }
+        `}
+      >
+        <div className="px-4 py-3 bg-[#0f172a] text-white flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-blue-400" />
+            <h3 className="font-bold text-sm tracking-wide uppercase">EXPENSE FILTERS</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsFilterDrawerOpen(false)}
+            className="p-1 rounded hover:bg-white/20 text-white transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-3.5">
+          <div>
+            <label className="block text-[12px] font-bold text-black mb-1">From Date</label>
+            <input
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white"
+            />
+          </div>
+          <div>
+            <label className="block text-[12px] font-bold text-black mb-1">To Date</label>
+            <input
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white"
+            />
+          </div>
+          <div>
+            <label className="block text-[12px] font-bold text-black mb-1">Category</label>
+            <SearchableSelect
+              options={[{ value: '', label: 'All Categories' }, ...categories.map((c: any) => ({ value: c.id, label: c.name }))]}
+              value={filterCategoryId}
+              onChange={(val) => setFilterCategoryId(val || '')}
+              placeholder="All Categories"
+            />
+          </div>
+          <div>
+            <label className="block text-[12px] font-bold text-black mb-1">Search Description</label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search notes or category..."
+              className="w-full border border-gray-300 rounded px-2.5 py-1.5 text-xs font-bold text-black focus:outline-none focus:border-blue-500 bg-white"
+            />
+          </div>
+
+          <div className="pt-2 flex flex-col gap-2">
+            <span className="text-[11px] font-bold text-gray-500 uppercase">Quick Date Presets</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setQuickDate('today')}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold py-1.5 rounded transition-colors text-center"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickDate('thisMonth')}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold py-1.5 rounded transition-colors text-center"
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickDate('all')}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-black text-xs font-bold py-1.5 rounded transition-colors text-center"
+              >
+                All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-gray-200 bg-gray-50 flex gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              refetch();
+              setIsFilterDrawerOpen(false);
+            }}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3 rounded flex justify-center items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <Filter size={14} /> Apply Filter
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterStartDate('');
+              setFilterEndDate('');
+              setFilterCategoryId('');
+              setSearchQuery('');
+            }}
+            className="bg-white border border-gray-300 hover:bg-gray-100 text-black text-xs font-bold py-2 px-3 rounded flex items-center gap-1 transition-colors shadow-sm"
+          >
+            <RefreshCw size={13} /> Reset
+          </button>
         </div>
       </div>
     </div>

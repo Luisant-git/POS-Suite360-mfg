@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle, ArrowLeft, PlusCircle, RotateCcw, List, FileText, Plus, Trash2, Package, X, Save, UserPlus } from 'lucide-react';
+import { CheckCircle, ArrowLeft, PlusCircle, RotateCcw, List, FileText, Plus, Trash2, Package, X, Save, UserPlus, Search, ShoppingCart, User, ChevronRight, Edit3, Truck } from 'lucide-react';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
@@ -38,6 +38,20 @@ const RawMaterialPurchaseEntry = () => {
   const [wages, setwages] = useState<number | ''>('');
   
   const [items, setItems] = useState<any[]>([{ rawMaterialId: 0, widthMm: '', lengthM: '', sqM: 0, quantity: '', price: '', amount: 0 }]);
+
+  // Mobile-specific state
+  const [mobileSearch, setMobileSearch] = useState('');
+  const [isMobileCheckoutOpen, setIsMobileCheckoutOpen] = useState(false);
+  const [isMobileSupplierPickerOpen, setIsMobileSupplierPickerOpen] = useState(false);
+  const [isMobileEditItemOpen, setIsMobileEditItemOpen] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    widthMm: '',
+    lengthM: '',
+    sqM: 0,
+    quantity: '1',
+    price: ''
+  });
 
   const { data: suppliers = [] } = useQuery({ 
     queryKey: ['suppliers'], 
@@ -285,11 +299,87 @@ const RawMaterialPurchaseEntry = () => {
 
   const selectedSupplier = suppliers.find((s: any) => s.id === Number(supplierId));
 
+  const validItems = items.filter(i => Number(i.rawMaterialId) > 0);
+
+  const handleMobileOpenEdit = (material: any) => {
+    setEditingMaterial(material);
+    const existingIndex = items.findIndex(i => Number(i.rawMaterialId) === Number(material.id));
+    if (existingIndex >= 0) {
+      const item = items[existingIndex];
+      setEditForm({
+        widthMm: item.widthMm ? String(item.widthMm) : '',
+        lengthM: item.lengthM ? String(item.lengthM) : '',
+        sqM: item.sqM || 0,
+        quantity: item.quantity ? String(item.quantity) : '1',
+        price: item.price ? String(item.price) : (material.purchaseRate ? String(material.purchaseRate) : '')
+      });
+    } else {
+      setEditForm({
+        widthMm: '',
+        lengthM: '',
+        sqM: 0,
+        quantity: '1',
+        price: material.purchaseRate ? String(material.purchaseRate) : ''
+      });
+    }
+    setIsMobileEditItemOpen(true);
+  };
+
+  const handleMobileSaveEdit = () => {
+    if (!editingMaterial) return;
+    const width = parseFloat(editForm.widthMm || '0');
+    const length = parseFloat(editForm.lengthM || '0');
+    const sqM = (width / 1000) * length;
+    const qty = parseFloat(editForm.quantity || '0');
+    const price = parseFloat(editForm.price || '0');
+    const amount = sqM * qty * price;
+
+    const existingIndex = items.findIndex(i => Number(i.rawMaterialId) === Number(editingMaterial.id));
+    const newItem = {
+      rawMaterialId: editingMaterial.id,
+      widthMm: editForm.widthMm,
+      lengthM: editForm.lengthM,
+      sqM: parseFloat(sqM.toFixed(4)),
+      quantity: editForm.quantity,
+      price: editForm.price,
+      amount: parseFloat(amount.toFixed(2))
+    };
+
+    if (existingIndex >= 0) {
+      const newItems = [...items];
+      newItems[existingIndex] = newItem;
+      setItems(newItems);
+    } else {
+      if (items.length === 1 && items[0].rawMaterialId === 0) {
+        setItems([newItem]);
+      } else {
+        setItems([...items, newItem]);
+      }
+    }
+    setIsMobileEditItemOpen(false);
+    toast.success(`${editingMaterial.name} updated!`);
+  };
+
+  const handleMobileRemoveItem = (materialId: number) => {
+    const updated = items.filter(i => Number(i.rawMaterialId) !== Number(materialId));
+    if (updated.length === 0) {
+      setItems([{ rawMaterialId: 0, widthMm: '', lengthM: '', sqM: 0, quantity: '', price: '', amount: 0 }]);
+    } else {
+      setItems(updated);
+    }
+  };
+
+  const filteredMaterials = rawMaterials.filter((m: any) => {
+    if (!mobileSearch) return true;
+    const q = mobileSearch.toLowerCase();
+    return m.name?.toLowerCase().includes(q) || m.code?.toLowerCase().includes(q);
+  });
+
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col font-sans overflow-hidden z-10">
       
-      {/* Top Bar - Differentiated color for Manufacturing */}
-      <div className="bg-[#475569] text-white px-2 sm:px-4 py-2 flex flex-wrap gap-2 justify-between items-center shrink-0">
+      {/* Top Bar - Differentiated color for Manufacturing - Desktop only */}
+      <div className="hidden md:flex bg-[#475569] text-white px-2 sm:px-4 py-2 flex-wrap gap-2 justify-between items-center shrink-0">
         <div className="flex flex-wrap items-center gap-4">
           <h1 className="font-bold text-[14px] uppercase tracking-wider flex items-center gap-2">
             <span className="bg-[#334155] p-1 rounded"><Package size={16} /></span>
@@ -311,7 +401,7 @@ const RawMaterialPurchaseEntry = () => {
         </button>
       </div>
 
-      <form className="flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit}>
+      <form className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit}>
         
         {/* Header Section */}
         <div className="bg-white p-4 sm:p-5 border-b border-[#E5E7EB] shrink-0 shadow-sm">
@@ -592,6 +682,646 @@ const RawMaterialPurchaseEntry = () => {
         </div>
 
       </form>
+
+      {/* ========================================================= */}
+      {/* MOBILE-ONLY VIEW (md:hidden)                             */}
+      {/* ========================================================= */}
+
+      {/* Mobile Top Header Bar */}
+      <div className="md:hidden bg-[#475569] text-white px-3 py-2.5 flex items-center justify-between shrink-0 shadow-sm z-20">
+        <div className="flex items-center gap-2">
+          <button 
+            type="button" 
+            onClick={() => setIsLeaveModalOpen(true)}
+            className="p-1 rounded hover:bg-white/10 active:scale-95 transition-all text-white/90"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="font-bold text-[13px] tracking-wide flex items-center gap-1.5">
+              <Package size={15} className="text-emerald-400" />
+              Raw Material Purchase
+            </h1>
+            <p className="text-[10px] text-slate-300">
+              {validItems.length} material{validItems.length !== 1 ? 's' : ''} in purchase
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button 
+            type="button" 
+            onClick={() => navigate('/raw-materials/purchase-list')}
+            className="p-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold flex items-center gap-1"
+            title="Purchase List"
+          >
+            <List size={14} />
+            <span>List</span>
+          </button>
+          {validItems.length > 0 && (
+            <button 
+              type="button"
+              onClick={() => setIsMobileCheckoutOpen(true)}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 shadow-sm"
+            >
+              <ShoppingCart size={13} />
+              <span>{formatCurrency(grandTotal)}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Mobile Main Body */}
+      <div className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden bg-slate-50">
+        {/* Mobile Sticky Bar: Search + Quick Supplier & Invoice Info */}
+        <div className="bg-white px-3 py-2.5 border-b border-slate-200 shrink-0 flex flex-col gap-2">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text"
+              value={mobileSearch}
+              onChange={e => setMobileSearch(e.target.value)}
+              placeholder="Search material name, code..."
+              className="w-full pl-9 pr-8 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-slate-500 transition-all font-medium"
+            />
+            {mobileSearch && (
+              <button 
+                type="button"
+                onClick={() => setMobileSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] gap-2">
+            <button 
+              type="button"
+              onClick={() => setIsMobileSupplierPickerOpen(true)}
+              className="flex items-center gap-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md max-w-[55%] truncate border border-slate-200 font-medium"
+            >
+              <User size={12} className="text-emerald-600 shrink-0" />
+              <span className="truncate">{selectedSupplier ? selectedSupplier.name : 'Select Supplier *'}</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+              <span>Inv:</span>
+              <input 
+                type="text"
+                value={invoiceNo}
+                onChange={e => setInvoiceNo(e.target.value)}
+                placeholder="Bill #"
+                className="w-24 px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-center text-[11px] font-bold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Raw Materials Catalog List */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
+          {filteredMaterials.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <Package size={36} className="mx-auto mb-2 opacity-40" />
+              <p className="text-xs font-semibold">No raw materials found</p>
+            </div>
+          ) : (
+            filteredMaterials.map((mat: any) => {
+              const inCartItem = items.find(i => Number(i.rawMaterialId) === Number(mat.id));
+              const hasInCart = !!inCartItem && Number(inCartItem.rawMaterialId) > 0;
+
+              return (
+                <div 
+                  key={mat.id}
+                  className={`bg-white rounded-xl p-3 border transition-all shadow-sm ${
+                    hasInCart ? 'border-emerald-400 ring-1 ring-emerald-400/40 bg-emerald-50/20' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs text-slate-800 truncate">{mat.name}</span>
+                        {mat.code && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200">
+                            {mat.code}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                        <span>Stock: <strong className={mat.currentStock > 0 ? 'text-slate-800 font-semibold' : 'text-rose-600 font-semibold'}>{mat.currentStock || 0}</strong></span>
+                        {mat.purchaseRate > 0 && (
+                          <span>• Rate: <strong className="text-slate-700">{formatCurrency(mat.purchaseRate)}</strong></span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button"
+                      onClick={() => handleMobileOpenEdit(mat)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-all ${
+                        hasInCart 
+                          ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 active:scale-95' 
+                          : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95'
+                      }`}
+                    >
+                      {hasInCart ? (
+                        <>
+                          <Edit3 size={13} />
+                          <span>Edit</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={13} />
+                          <span>Add</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* If item in cart, show specs pill */}
+                  {hasInCart && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600 bg-white/70 px-2.5 py-1.5 rounded-lg border border-slate-200/60">
+                      <div className="truncate pr-2">
+                        <span className="font-bold text-emerald-700">{inCartItem.quantity || 1} roll(s)</span>
+                        <span className="text-slate-400 mx-1">•</span>
+                        <span>{inCartItem.widthMm || 0}mm × {inCartItem.lengthM || 0}m</span>
+                        <span className="text-slate-400 mx-1">•</span>
+                        <span className="font-mono text-[10px] text-slate-500">{inCartItem.sqM || 0} m²</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-bold text-slate-900">{formatCurrency(inCartItem.amount || 0)}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => handleMobileRemoveItem(mat.id)}
+                          className="text-rose-500 hover:text-rose-700 p-0.5"
+                          title="Remove item"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Mobile Floating Action Cart Bar */}
+        {validItems.length > 0 && (
+          <div className="bg-white border-t border-slate-200 p-3 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase font-bold text-slate-400">Total Purchase</p>
+              <p className="text-base font-black text-emerald-600 leading-none">{formatCurrency(grandTotal)}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{validItems.length} material{validItems.length !== 1 ? 's' : ''}</p>
+            </div>
+
+            <button 
+              type="button"
+              onClick={() => setIsMobileCheckoutOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+            >
+              <span>Review & Confirm</span>
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================= */}
+      {/* MOBILE EDIT MATERIAL MODAL / DRAWER                      */}
+      {/* ========================================================= */}
+      {isMobileEditItemOpen && editingMaterial && (
+        <div className="fixed inset-0 bg-black/60 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Package size={17} className="text-emerald-400" />
+                <div>
+                  <h3 className="font-bold text-sm leading-tight truncate">{editingMaterial.name}</h3>
+                  <p className="text-[10px] text-slate-300">
+                    {editingMaterial.code} • In Stock: {editingMaterial.currentStock || 0}
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsMobileEditItemOpen(false)}
+                className="text-slate-300 hover:text-white p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Width (mm) *</label>
+                  <input 
+                    type="number"
+                    value={editForm.widthMm}
+                    onChange={e => {
+                      const w = e.target.value;
+                      const l = editForm.lengthM;
+                      const sqM = (parseFloat(w || '0') / 1000) * parseFloat(l || '0');
+                      setEditForm({ ...editForm, widthMm: w, sqM: parseFloat(sqM.toFixed(4)) });
+                    }}
+                    placeholder="e.g. 1000"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Length (m) *</label>
+                  <input 
+                    type="number"
+                    value={editForm.lengthM}
+                    onChange={e => {
+                      const l = e.target.value;
+                      const w = editForm.widthMm;
+                      const sqM = (parseFloat(w || '0') / 1000) * parseFloat(l || '0');
+                      setEditForm({ ...editForm, lengthM: l, sqM: parseFloat(sqM.toFixed(4)) });
+                    }}
+                    placeholder="e.g. 50"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Calculated Sq.M display */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-600">Calculated Area (Sq.M):</span>
+                <span className="font-black text-slate-800 text-sm">
+                  {((parseFloat(editForm.widthMm || '0') / 1000) * parseFloat(editForm.lengthM || '0')).toFixed(4)} m²
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Quantity (Rolls) *</label>
+                  <input 
+                    type="number"
+                    value={editForm.quantity}
+                    onChange={e => setEditForm({ ...editForm, quantity: e.target.value })}
+                    placeholder="1"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate / Sq.M (₹) *</label>
+                  <input 
+                    type="number"
+                    value={editForm.price}
+                    onChange={e => setEditForm({ ...editForm, price: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Total preview for this item */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-emerald-800">Item Total Amount</p>
+                  <p className="text-xs text-emerald-600">Sq.M × Qty × Rate</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-black text-emerald-700">
+                    {formatCurrency(
+                      ((parseFloat(editForm.widthMm || '0') / 1000) * parseFloat(editForm.lengthM || '0')) *
+                      parseFloat(editForm.quantity || '0') *
+                      parseFloat(editForm.price || '0')
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center gap-2">
+              {items.some(i => Number(i.rawMaterialId) === Number(editingMaterial.id)) && (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    handleMobileRemoveItem(editingMaterial.id);
+                    setIsMobileEditItemOpen(false);
+                  }}
+                  className="px-3 py-2.5 border border-rose-200 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-all"
+                >
+                  Remove
+                </button>
+              )}
+              <button 
+                type="button"
+                onClick={handleMobileSaveEdit}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+              >
+                <CheckCircle size={15} />
+                <span>Save to Order</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MOBILE CHECKOUT / CONFIRM PURCHASE DRAWER                */}
+      {/* ========================================================= */}
+      {isMobileCheckoutOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="bg-[#475569] text-white px-4 py-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <ShoppingCart size={17} className="text-emerald-400" />
+                <h3 className="font-bold text-sm">Review & Confirm Purchase</h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsMobileCheckoutOpen(false)}
+                className="text-slate-300 hover:text-white p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-4">
+              {/* Purchase Details */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-3">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText size={13} className="text-slate-500" />
+                  Bill Details
+                </h4>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Invoice No *</label>
+                    <input 
+                      type="text"
+                      value={invoiceNo}
+                      onChange={e => setInvoiceNo(e.target.value)}
+                      placeholder="Inv / Bill #"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Date *</label>
+                    <input 
+                      type="date"
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Supplier selection card */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-600">Supplier *</label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsSupplierModalOpen(true)}
+                      className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
+                    >
+                      <UserPlus size={12} />
+                      <span>New</span>
+                    </button>
+                  </div>
+                  <div 
+                    onClick={() => setIsMobileSupplierPickerOpen(true)}
+                    className="p-2.5 bg-white border border-slate-300 rounded-lg cursor-pointer hover:border-slate-400 flex items-center justify-between text-xs"
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <User size={14} className="text-slate-400 shrink-0" />
+                      <span className="font-semibold text-slate-800 truncate">
+                        {selectedSupplier ? selectedSupplier.name : 'Choose a supplier...'}
+                      </span>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                  </div>
+                </div>
+
+                {/* Payment Mode */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1.5">Payment Mode *</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {paymentModes.map((pm: any) => (
+                      <button 
+                        key={pm.id}
+                        type="button"
+                        onClick={() => setPaymentModeId(pm.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          paymentModeId === pm.id 
+                            ? 'bg-slate-900 text-white shadow-sm' 
+                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        {pm.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Items in Cart */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Materials ({validItems.length})
+                  </h4>
+                  <button 
+                    type="button"
+                    onClick={() => setIsMobileCheckoutOpen(false)}
+                    className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700"
+                  >
+                    + Add More
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {validItems.map((item, idx) => {
+                    const mat = rawMaterials.find((m: any) => m.id === Number(item.rawMaterialId));
+                    return (
+                      <div key={idx} className="bg-white border border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-sm text-xs">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 truncate">{mat?.name || 'Raw Material'}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {item.quantity} rolls • {item.widthMm}mm × {item.lengthM}m ({item.sqM} m²) @ {formatCurrency(item.price)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-slate-900">{formatCurrency(item.amount || 0)}</p>
+                          <div className="flex items-center justify-end gap-1.5 mt-1">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setIsMobileCheckoutOpen(false);
+                                if (mat) handleMobileOpenEdit(mat);
+                              }}
+                              className="text-slate-500 hover:text-slate-700 p-0.5"
+                            >
+                              <Edit3 size={12} />
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => handleMobileRemoveItem(item.rawMaterialId)}
+                              className="text-rose-500 hover:text-rose-700 p-0.5"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Extra Charges */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Truck size={13} className="text-slate-500" />
+                  Additional Charges
+                </h4>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Transport (₹)</label>
+                    <input 
+                      type="number"
+                      value={transportCharge}
+                      onChange={e => setTransportCharge(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0.00"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-500 text-right"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Wages (₹)</label>
+                    <input 
+                      type="number"
+                      value={wages}
+                      onChange={e => setwages(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0.00"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-500 text-right"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Cost Summary */}
+              <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3 space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Materials Subtotal</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+                {transportAmt > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Transport Charges</span>
+                    <span>+{formatCurrency(transportAmt)}</span>
+                  </div>
+                )}
+                {wagesAmt > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>Wages</span>
+                    <span>+{formatCurrency(wagesAmt)}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-emerald-200 flex justify-between items-center text-sm font-black text-emerald-800">
+                  <span>Grand Total</span>
+                  <span className="text-base text-emerald-700">{formatCurrency(grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0">
+              <button 
+                type="button"
+                disabled={mutation.isPending}
+                onClick={() => handleSubmit()}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <CheckCircle size={18} />
+                <span>{mutation.isPending ? 'Saving Purchase...' : `SAVE PURCHASE • ${formatCurrency(grandTotal)}`}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MOBILE SUPPLIER PICKER MODAL                             */}
+      {/* ========================================================= */}
+      {isMobileSupplierPickerOpen && (
+        <div className="fixed inset-0 bg-black/60 z-[130] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <User size={16} className="text-emerald-400" />
+                <span>Select Supplier</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setIsMobileSupplierPickerOpen(false)}
+                className="text-slate-300 hover:text-white p-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 border-b border-slate-200 shrink-0 flex items-center gap-2">
+              <input 
+                type="text"
+                placeholder="Search supplier..."
+                className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-slate-400"
+                id="supplierSearchInput"
+                onChange={(e) => {
+                  const val = e.target.value.toLowerCase();
+                  const list = document.querySelectorAll('.supplier-item');
+                  list.forEach((item: any) => {
+                    const text = item.getAttribute('data-name')?.toLowerCase() || '';
+                    item.style.display = text.includes(val) ? 'flex' : 'none';
+                  });
+                }}
+              />
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsMobileSupplierPickerOpen(false);
+                  setIsSupplierModalOpen(true);
+                }}
+                className="px-2.5 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold shrink-0 flex items-center gap-1 hover:bg-emerald-700"
+              >
+                <Plus size={13} />
+                <span>New</span>
+              </button>
+            </div>
+
+            <div className="p-3 overflow-y-auto space-y-1.5 flex-1 min-h-0">
+              {suppliers.map((s: any) => (
+                <div 
+                  key={s.id}
+                  data-name={`${s.name} ${s.phone || ''}`}
+                  onClick={() => {
+                    setSupplierId(s.id);
+                    setIsMobileSupplierPickerOpen(false);
+                  }}
+                  className={`supplier-item p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                    supplierId === s.id 
+                      ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500' 
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div>
+                    <p className="font-bold text-xs text-slate-800">{s.name}</p>
+                    <p className="text-[10px] text-slate-500">{s.phone || 'No phone'} • {s.state || 'General'}</p>
+                  </div>
+                  {supplierId === s.id && (
+                    <CheckCircle size={16} className="text-emerald-600" />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Add Supplier Modal */}
       {isSupplierModalOpen && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Box, Grid, Maximize, Minimize } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Box, Grid, Maximize, Minimize, Plus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +27,7 @@ const RawMaterialMaster = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullTable, setIsFullTable] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
 
   const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<RawMaterialFormValues>({
@@ -52,11 +53,25 @@ const RawMaterialMaster = () => {
     queryFn: async () => (await api.get('/raw-materials')).data 
   });
 
+  const generateNextCode = () => {
+    const rmCodes = rawMaterials
+      .filter((m: any) => m.code?.startsWith('RM-'))
+      .map((m: any) => parseInt(m.code.replace('RM-', '')))
+      .filter((n: number) => !isNaN(n));
+    const maxCode = rmCodes.length > 0 ? Math.max(...rmCodes) : 0;
+    return `RM-${String(maxCode + 1).padStart(3, '0')}`;
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
       if (e.key === 'Escape' && !isInput) {
-        if (itemToDelete) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+          setEditingId(null);
+          reset();
+          setValue('code', generateNextCode());
+        } else if (itemToDelete) {
           setItemToDelete(null);
         } else if (isLeaveModalOpen) {
           setIsLeaveModalOpen(false);
@@ -67,7 +82,7 @@ const RawMaterialMaster = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [itemToDelete, isLeaveModalOpen, navigate]);
+  }, [itemToDelete, isLeaveModalOpen, isMobileDrawerOpen, navigate, rawMaterials]);
 
   const filteredMaterials = rawMaterials.filter((m: any) => {
     if (searchTerm && !m.name.toLowerCase().includes(searchTerm.toLowerCase()) && !m.code.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -91,6 +106,7 @@ const RawMaterialMaster = () => {
       toast.success(editingId ? 'Raw Material updated successfully!' : 'Raw Material added successfully!');
       reset();
       setEditingId(null);
+      setIsMobileDrawerOpen(false);
     },
     onError: (err: any) => {
       console.error(err);
@@ -112,15 +128,6 @@ const RawMaterialMaster = () => {
     }
   });
 
-  const generateNextCode = () => {
-    const rmCodes = rawMaterials
-      .filter((m: any) => m.code?.startsWith('RM-'))
-      .map((m: any) => parseInt(m.code.replace('RM-', '')))
-      .filter((n: number) => !isNaN(n));
-    const maxCode = rmCodes.length > 0 ? Math.max(...rmCodes) : 0;
-    return `RM-${String(maxCode + 1).padStart(3, '0')}`;
-  };
-
   useEffect(() => {
     if (rawMaterials && !editingId && !getValues('code')) {
       setValue('code', generateNextCode());
@@ -131,7 +138,22 @@ const RawMaterialMaster = () => {
     mutation.mutate(data);
   };
 
+  const handleAddNew = () => {
+    setIsFullTable(false);
+    setEditingId(null);
+    reset({
+      code: generateNextCode(),
+      name: '',
+      unitId: '',
+      hsnCode: '',
+      currentStock: '' as any,
+      purchaseRate: '' as any,
+    });
+    setIsMobileDrawerOpen(true);
+  };
+
   const handleEdit = (material: any) => {
+    setIsFullTable(false);
     setEditingId(material.id);
     setValue('code', material.code);
     setValue('name', material.name);
@@ -139,21 +161,45 @@ const RawMaterialMaster = () => {
     setValue('hsnCode', material.hsnCode || '');
     setValue('currentStock', Number(material.currentStock));
     setValue('purchaseRate', Number(material.purchaseRate));
+    setIsMobileDrawerOpen(true);
   };
 
   return (
-    <div className="bg-[#F7F7F7] min-h-[calc(100vh-100px)] grid grid-cols-1 xl:grid-cols-3 gap-4 p-4">
+    <div className="bg-[#F7F7F7] h-[calc(100vh-6rem)] grid grid-cols-1 xl:grid-cols-3 gap-4 p-4">
       
+      {/* Mobile Drawer Backdrop */}
+      {isMobileDrawerOpen && (
+        <div 
+          className="xl:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); setValue('code', generateNextCode()); }}
+        />
+      )}
+
+      {/* Left Column: Form (Desktop: Inline Column, Mobile: Slide-over Right Drawer) */}
       {!isFullTable && (
-      <div className="xl:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col">
-        <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between rounded-t-sm">
+      <div className={`
+        bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col h-full overflow-hidden
+        xl:col-span-1 xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex xl:flex-col
+        ${isMobileDrawerOpen 
+          ? 'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200' 
+          : 'hidden xl:flex'
+        }
+      `}>
+        <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between rounded-t-sm shrink-0">
           <div className="flex items-center gap-2">
             <Box size={18} />
-            <h2 className="font-bold text-[14px]">RAW MATERIAL MASTER</h2>
+            <h2 className="font-bold text-[14px] uppercase">{editingId ? 'EDIT RAW MATERIAL' : 'RAW MATERIAL MASTER'}</h2>
           </div>
+          <button
+            type="button"
+            onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); setValue('code', generateNextCode()); }}
+            className="xl:hidden p-1 rounded hover:bg-white/20 text-white"
+          >
+            <X size={18} />
+          </button>
         </div>
         
-        <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col gap-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col gap-3 overflow-y-auto custom-scrollbar flex-1">
           <div>
             <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Material Code *</label>
             <input 
@@ -231,7 +277,7 @@ const RawMaterialMaster = () => {
           {editingId && (
             <button 
               type="button" 
-              onClick={() => { reset(); setEditingId(null); setValue('code', generateNextCode()); }}
+              onClick={() => { reset(); setEditingId(null); setValue('code', generateNextCode()); setIsMobileDrawerOpen(false); }}
               className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
             >
               CANCEL EDIT
@@ -247,8 +293,18 @@ const RawMaterialMaster = () => {
             <Grid size={16} className="text-[#3B82F6]" />
             <h2 className="font-bold text-[14px]">RAW MATERIAL LIST</h2>
           </div>
-          <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
-            {filteredMaterials.length} Materials
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAddNew}
+              className="xl:hidden whitespace-nowrap bg-[#16A34A] hover:bg-[#15803D] text-white px-2.5 py-1 rounded text-[12px] font-bold flex items-center gap-1 shadow-sm transition-colors"
+            >
+              <Plus size={14} />
+              <span>Add</span>
+            </button>
+            <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+              {filteredMaterials.length} Materials
+            </div>
           </div>
         </div>
         
@@ -268,10 +324,10 @@ const RawMaterialMaster = () => {
           <div className="flex justify-end gap-2">
             <button type="button" 
               onClick={() => setIsFullTable(!isFullTable)}
-              className="justify-center text-[#3B82F6] hover:bg-[#EFF6FF] px-3 py-1.5 rounded text-[12px] font-bold flex items-center gap-2 transition-colors border border-[#3B82F6]"
+              className="hidden xl:flex justify-center text-[#3B82F6] hover:bg-[#EFF6FF] px-3 py-1.5 rounded text-[12px] font-bold items-center gap-2 transition-colors border border-[#3B82F6]"
             >
               {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
-              {isFullTable ? 'Show Form' : 'View Full Table'}
+              <span>{isFullTable ? 'Show Form' : 'View Full Table'}</span>
             </button>
           </div>
         </div>

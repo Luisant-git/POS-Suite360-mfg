@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Package, Grid, Maximize, Minimize, Eye, X, Upload, Download } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Package, Grid, Maximize, Minimize, Eye, X, Upload, Download, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -33,6 +33,7 @@ type ProductFormValues = z.infer<typeof productSchema>;
 
 const Products = () => {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const navigate = useNavigate();
 
   const queryClient = useQueryClient();
@@ -209,6 +210,7 @@ const Products = () => {
       toast.success(editingId ? 'Product updated successfully!' : 'Product added successfully!');
       reset();
       setEditingId(null);
+      setIsMobileDrawerOpen(false);
     },
     onError: (err: any) => {
       console.error(err);
@@ -250,6 +252,31 @@ const Products = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSubmit, onSubmit]);
 
+  const handleAddNew = () => {
+    setIsFullTable(false);
+    setEditingId(null);
+    reset({
+      code: '',
+      name: '',
+      categoryId: '',
+      brandId: '',
+      unitId: '',
+      supplierId: '',
+      currentStock: '' as any,
+      purchaseRate: '' as any,
+      wholesaleRate: '' as any,
+      sellingRate: '' as any,
+      taxPercent: '' as any,
+      hsnCode: '',
+      minStock: '' as any,
+      reorderLevel: '' as any,
+    });
+    if (nextCodeData?.code) {
+      setValue('code', nextCodeData.code);
+    }
+    setIsMobileDrawerOpen(true);
+  };
+
   const handleEdit = (product: any) => {
     setIsFullTable(false);
     setEditingId(product.id);
@@ -267,13 +294,18 @@ const Products = () => {
     setValue('hsnCode', product.hsnCode || '');
     setValue('minStock', Number(product.minStock));
     setValue('reorderLevel', Number(product.reorderLevel));
+    setIsMobileDrawerOpen(true);
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
       if (e.key === 'Escape' && !isInput) {
-        if (typeof itemToDelete !== 'undefined' && itemToDelete) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+          setEditingId(null);
+          reset();
+        } else if (typeof itemToDelete !== 'undefined' && itemToDelete) {
           setItemToDelete(null);
         } else if (isLeaveModalOpen) {
           setIsLeaveModalOpen(false);
@@ -284,25 +316,49 @@ const Products = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [typeof itemToDelete !== 'undefined' ? itemToDelete : null, isLeaveModalOpen, navigate]);
+  }, [typeof itemToDelete !== 'undefined' ? itemToDelete : null, isLeaveModalOpen, isMobileDrawerOpen, navigate]);
 
   return (
-    <div className="bg-[#F7F7F7] min-h-[calc(100vh-100px)] grid grid-cols-1 xl:grid-cols-3 gap-4">
+    <div className="bg-[#F7F7F7] h-[calc(100vh-6rem)] grid grid-cols-1 xl:grid-cols-3 gap-4">
 
-      {/* Left Column: Form */}
+      {/* Mobile Drawer Backdrop */}
+      {isMobileDrawerOpen && (
+        <div 
+          className="xl:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); }}
+        />
+      )}
+
+      {/* Left Column: Form (Desktop: Inline Column, Mobile: Slide-over Right Drawer) */}
       {!isFullTable && (
-        <div className="xl:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col">
-          <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between rounded-t-sm">
+        <div className={`
+          bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col h-full overflow-hidden
+          xl:col-span-1 xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex xl:flex-col
+          ${isMobileDrawerOpen 
+            ? 'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200' 
+            : 'hidden xl:flex'
+          }
+        `}>
+          <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between rounded-t-sm shrink-0">
             <div className="flex items-center gap-2">
               <Package size={18} className="text-white" />
-              <h2 className="font-bold text-[14px]">PRODUCT MASTER</h2>
+              <h2 className="font-bold text-[14px] uppercase">{editingId ? 'EDIT PRODUCT' : 'PRODUCT MASTER'}</h2>
             </div>
-            <button type="button" onClick={handleAutoCode} className="bg-[#1E3A8A] text-white text-[11px] px-3 py-1 font-bold rounded">
-              Auto Code
-            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={handleAutoCode} className="bg-[#1E3A8A] text-white text-[11px] px-3 py-1 font-bold rounded">
+                Auto Code
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); }}
+                className="xl:hidden p-1 rounded hover:bg-white/20 text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit as any, onFormError)} className="p-4 flex flex-col gap-3">
+          <form onSubmit={handleSubmit(onSubmit as any, onFormError)} className="p-4 flex flex-col gap-3 overflow-y-auto custom-scrollbar flex-1">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Product Code *</label>
@@ -475,7 +531,7 @@ const Products = () => {
             {editingId && (
               <button
                 type="button"
-                onClick={() => { reset(); setEditingId(null); }}
+                onClick={() => { reset(); setEditingId(null); setIsMobileDrawerOpen(false); }}
                 className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
               >
                 CANCEL EDIT
@@ -499,13 +555,20 @@ const Products = () => {
           </div>
 
           <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleAddNew}
+              className="xl:hidden whitespace-nowrap bg-[#16A34A] hover:bg-[#15803D] text-white px-2.5 py-1 rounded text-[12px] font-bold flex items-center gap-1 shadow-sm transition-colors"
+            >
+              <Plus size={14} />
+              <span>Add</span>
+            </button>
             <button type="button"
               onClick={() => setIsFullTable(!isFullTable)}
-              className="whitespace-nowrap text-[#3B82F6] hover:bg-[#EFF6FF] px-2 py-1 rounded text-[12px] font-bold flex items-center gap-1 transition-colors border border-[#3B82F6]"
+              className="hidden xl:flex whitespace-nowrap text-[#3B82F6] hover:bg-[#EFF6FF] px-2 py-1 rounded text-[12px] font-bold items-center gap-1 transition-colors border border-[#3B82F6]"
             >
               {isFullTable ? <Minimize size={13} /> : <Maximize size={13} />}
-              <span className="hidden sm:inline">{isFullTable ? 'Show Form' : 'Full Table'}</span>
-              <span className="sm:hidden">{isFullTable ? 'Form' : 'Table'}</span>
+              <span>{isFullTable ? 'Show Form' : 'Full Table'}</span>
             </button>
             <div className="hidden md:block bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
               {filteredProducts.length} Products

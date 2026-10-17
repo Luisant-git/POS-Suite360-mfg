@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Percent, Grid, Search, Maximize, Minimize } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Percent, Grid, Search, Maximize, Minimize, Plus, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,6 +25,7 @@ const Taxes = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullTable, setIsFullTable] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<TaxFormValues>({
     resolver: zodResolver(taxSchema),
@@ -52,6 +53,7 @@ const Taxes = () => {
       queryClient.invalidateQueries({ queryKey: ['taxes'] });
       reset();
       setEditingId(null);
+      setIsMobileDrawerOpen(false);
     }
   });
 
@@ -65,6 +67,13 @@ const Taxes = () => {
 
   const onSubmit = (data: TaxFormValues) => {
     mutation.mutate(data);
+  };
+
+  const handleAddNew = () => {
+    setIsFullTable(false);
+    setEditingId(null);
+    reset({ name: '', rate: 0 });
+    setIsMobileDrawerOpen(true);
   };
 
   useEffect(() => {
@@ -83,13 +92,16 @@ const Taxes = () => {
     setEditingId(tax.id);
     setValue('name', tax.name);
     setValue('rate', tax.rate);
+    setIsMobileDrawerOpen(true);
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
       if (e.key === 'Escape' && !isInput) {
-        if (typeof itemToDelete !== 'undefined' && itemToDelete) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+        } else if (typeof itemToDelete !== 'undefined' && itemToDelete) {
           setItemToDelete(null);
         } else if (isLeaveModalOpen) {
           setIsLeaveModalOpen(false);
@@ -100,20 +112,44 @@ const Taxes = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [typeof itemToDelete !== 'undefined' ? itemToDelete : null, isLeaveModalOpen, navigate]);
+  }, [typeof itemToDelete !== 'undefined' ? itemToDelete : null, isLeaveModalOpen, isMobileDrawerOpen, navigate]);
 
   return (
     <div className="bg-[#F7F7F7] min-h-[calc(100vh-100px)] grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
 
-      {/* Left Column: Form */}
+      {/* Mobile Drawer Backdrop */}
+      {isMobileDrawerOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+          onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); }}
+        />
+      )}
+
+      {/* Left Column: Form (Desktop: Inline Column, Mobile: Slide-over Right Drawer) */}
       {!isFullTable && (
-        <div className="lg:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm">
-          <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex items-center gap-2 rounded-t-sm">
-            <Percent size={16} className="text-[#1E3A8A]" />
-            <h2 className="font-bold text-[14px] text-[#1E3A8A]">TAX MASTER FORM</h2>
+        <div className={`
+          bg-white border border-[#E6E9ED] shadow-sm rounded-sm
+          lg:col-span-1 lg:static lg:z-auto lg:h-auto lg:max-w-none lg:shadow-sm lg:rounded-sm lg:flex lg:flex-col
+          ${isMobileDrawerOpen 
+            ? 'fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200' 
+            : 'hidden lg:flex'
+          }
+        `}>
+          <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex items-center justify-between rounded-t-sm shrink-0">
+            <div className="flex items-center gap-2">
+              <Percent size={16} className="text-[#1E3A8A]" />
+              <h2 className="font-bold text-[14px] text-[#1E3A8A] uppercase">{editingId ? 'EDIT TAX' : 'TAX MASTER FORM'}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); }}
+              className="lg:hidden p-1 rounded hover:bg-blue-100 text-[#1E3A8A]"
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="p-5 flex flex-col gap-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="p-5 flex flex-col gap-4 overflow-y-auto flex-1">
             <div>
               <label className="block text-[13px] font-bold text-[#1F2937] mb-1">Tax Name *</label>
               <input
@@ -149,7 +185,7 @@ const Taxes = () => {
             {editingId && (
               <button
                 type="button"
-                onClick={() => { reset(); setEditingId(null); }}
+                onClick={() => { reset(); setEditingId(null); setIsMobileDrawerOpen(false); }}
                 className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
               >
                 CANCEL EDIT
@@ -189,13 +225,23 @@ const Taxes = () => {
                   className="pl-7 pr-3 py-1 border border-[#ccc] rounded text-[12px] w-full md:w-48 outline-none focus:border-[#3B82F6]"
                 />
               </div>
+
+              {/* Mobile Add Tax Button */}
+              <button
+                type="button"
+                onClick={handleAddNew}
+                className="lg:hidden whitespace-nowrap bg-[#16A34A] hover:bg-[#15803D] text-white px-2.5 py-1 rounded text-[12px] font-bold flex items-center gap-1 shadow-sm transition-colors"
+              >
+                <Plus size={14} />
+                <span>Add</span>
+              </button>
+
               <button type="button"
                 onClick={() => setIsFullTable(!isFullTable)}
-                className="whitespace-nowrap text-[#3B82F6] hover:bg-white px-2 py-1 rounded text-[12px] font-bold flex items-center justify-center gap-1 transition-colors border border-[#3B82F6]"
+                className="hidden lg:flex whitespace-nowrap text-[#3B82F6] hover:bg-white px-2 py-1 rounded text-[12px] font-bold items-center justify-center gap-1 transition-colors border border-[#3B82F6]"
               >
                 {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
-                <span className="hidden sm:inline">{isFullTable ? 'Show Form' : 'View Full Table'}</span>
-                <span className="sm:hidden">{isFullTable ? 'Form' : 'Full Table'}</span>
+                <span>{isFullTable ? 'Show Form' : 'View Full Table'}</span>
               </button>
             </div>
           </div>

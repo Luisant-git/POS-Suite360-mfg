@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle, PlusCircle, RotateCcw, List, Plus, Trash2, FileText } from 'lucide-react';
+import { CheckCircle, PlusCircle, RotateCcw, List, Plus, Trash2, FileText, ArrowLeft, Factory } from 'lucide-react';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
 import ShortcutHelpButton from '../../components/ShortcutHelp';
@@ -233,7 +233,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       {/* Top Bar */}
 
 
-      <form className="flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit}>
+      <form className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit}>
         
         {/* Header Section */}
         <div className="bg-white p-3 sm:p-4 border-b border-[#E5E7EB] shrink-0">
@@ -497,6 +497,264 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
         </div>
 
       </form>
+
+      {/* ========================================================= */}
+      {/* MOBILE-ONLY VIEW (md:hidden)                             */}
+      {/* ========================================================= */}
+
+      {/* Mobile Top Header Bar */}
+      <div className="md:hidden bg-[#0F172A] text-white px-3 py-2.5 flex items-center justify-between shrink-0 shadow-sm z-20">
+        <div className="flex items-center gap-2">
+          <button 
+            type="button" 
+            onClick={() => setShowLeaveModal(true)}
+            className="p-1 rounded hover:bg-white/10 active:scale-95 transition-all text-white/90"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="font-bold text-[13px] tracking-wide flex items-center gap-1.5">
+              <Factory size={15} className="text-emerald-400" />
+              Grid Entry View
+            </h1>
+            <p className="text-[10px] text-slate-400 font-mono">
+              {batchCode || 'Batch Production'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button 
+            type="button" 
+            onClick={() => { if (onSwitchToMaster) onSwitchToMaster(); }}
+            className="p-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold flex items-center gap-1"
+          >
+            <List size={13} />
+            <span>List</span>
+          </button>
+          <button 
+            type="button" 
+            onClick={() => navigate('/reports/production')}
+            className="p-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-semibold flex items-center gap-1"
+          >
+            <FileText size={13} />
+            <span>Report</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Main Body */}
+      <div className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden bg-slate-50">
+        {/* Mobile Header Inputs: Date, Batch, Work Name */}
+        <div className="bg-white px-3 py-3 border-b border-slate-200 shrink-0 space-y-2.5 shadow-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Production Date *</label>
+              <input 
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Batch Code</label>
+              <input 
+                type="text"
+                value={batchCode}
+                readOnly
+                className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-500 bg-slate-100 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] uppercase font-bold text-slate-700">Name of Work *</label>
+              <button 
+                type="button"
+                onClick={handleClear}
+                className="text-[10px] text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-0.5"
+              >
+                <RotateCcw size={10} />
+                <span>Reset</span>
+              </button>
+            </div>
+            <input 
+              type="text"
+              value={workName}
+              onChange={e => setWorkName(e.target.value)}
+              placeholder="e.g. Manufacturing Batch A"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+
+        {/* Mobile Production Cards List */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
+          {items.map((item, index) => {
+            const product = products.find((p: any) => p.id === item.finishedProductId);
+            const material = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
+
+            return (
+              <div 
+                key={index} 
+                className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm space-y-3 relative"
+              >
+                {/* Card Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold">
+                      {index + 1}
+                    </span>
+                    <span className="text-xs font-bold text-slate-800">
+                      Row #{index + 1}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button 
+                      type="button" 
+                      onClick={addItem}
+                      className="p-1 rounded text-emerald-600 hover:bg-emerald-50"
+                      title="Add Row"
+                    >
+                      <Plus size={15} />
+                    </button>
+                    {items.length > 1 && (
+                      <button 
+                        type="button" 
+                        onClick={() => removeItem(index)}
+                        className="p-1 rounded text-rose-500 hover:bg-rose-50"
+                        title="Remove Row"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 1. Finished Product (Outcome) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-700">Finished Product (Outcome) *</label>
+                    {product && (
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Area: {product.sqM || '0.000'} m²
+                      </span>
+                    )}
+                  </div>
+                  <SearchableSelect
+                    value={item.finishedProductId}
+                    onChange={(val) => updateItem(index, 'finishedProductId', Number(val))}
+                    placeholder="Select product..."
+                    options={[
+                      { label: 'Select product...', value: 0 },
+                      ...finishedProducts.map((p: any) => ({ label: `${p.name} (Stock: ${p.currentStock})`, value: p.id }))
+                    ]}
+                  />
+                </div>
+
+                {/* 2. Raw Material (Intake) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-700">Raw Material (Intake) *</label>
+                    {material && (
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        Stock: <strong className={material.currentStock > 0 ? 'text-slate-800' : 'text-rose-600'}>{material.currentStock || 0}</strong>
+                      </span>
+                    )}
+                  </div>
+                  <SearchableSelect
+                    value={item.rawMaterialId}
+                    onChange={(val) => updateItem(index, 'rawMaterialId', Number(val))}
+                    placeholder="Select material..."
+                    options={[
+                      { label: 'Select material...', value: 0 },
+                      ...rawMaterials.map((m: any) => ({ label: `${m.name}`, value: m.id }))
+                    ]}
+                  />
+                </div>
+
+                {/* 3. Quantities Grid */}
+                <div className="grid grid-cols-3 gap-2 pt-1 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                  <div>
+                    <label className="block text-[10px] font-bold text-blue-900 mb-1">Intake Qty *</label>
+                    <input 
+                      type="number"
+                      value={item.intakeQuantity}
+                      onChange={e => updateItem(index, 'intakeQuantity', e.target.value)}
+                      placeholder="0"
+                      className="w-full px-2 py-1.5 border border-blue-200 bg-white rounded-lg text-xs font-bold text-blue-700 text-right outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Raw Sq.M</label>
+                    <input 
+                      type="text"
+                      value={item.sqM || '0.000'}
+                      readOnly
+                      tabIndex={-1}
+                      className="w-full px-2 py-1.5 border border-slate-200 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 text-right outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-900 mb-1">Outcome Qty</label>
+                    <input 
+                      type="number"
+                      value={item.outcomeQuantity}
+                      onChange={e => updateItem(index, 'outcomeQuantity', e.target.value)}
+                      readOnly
+                      placeholder="0"
+                      className="w-full px-2 py-1.5 border border-emerald-200 bg-emerald-50/50 rounded-lg text-xs font-bold text-emerald-700 text-right outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Add Another Row Button */}
+          <button 
+            type="button"
+            onClick={addItem}
+            className="w-full py-2.5 border-2 border-dashed border-slate-300 hover:border-slate-400 text-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 transition-all active:scale-[0.99]"
+          >
+            <Plus size={15} />
+            <span>Add Another Production Row</span>
+          </button>
+        </div>
+
+        {/* Mobile Sticky Bottom Summary & CTA */}
+        <div className="bg-white border-t border-slate-200 p-3 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] space-y-2">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-rose-800">Total Intake:</span>
+              <span className="font-black text-rose-700 text-sm">
+                {items.reduce((acc, item) => acc + (Number(item.intakeQuantity) || 0), 0)}
+              </span>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold text-emerald-800">Total Outcome:</span>
+              <span className="font-black text-emerald-700 text-sm">
+                {items.reduce((acc, item) => acc + (Number(item.outcomeQuantity) || 0), 0)}
+              </span>
+            </div>
+          </div>
+
+          <button 
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => handleSubmit()}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 active:scale-95 transition-all disabled:opacity-50"
+          >
+            <CheckCircle size={16} />
+            <span>{mutation.isPending ? 'Saving Production...' : 'SAVE PRODUCTION ENTRY'}</span>
+          </button>
+        </div>
+      </div>
       <LeaveConfirmModal 
         isOpen={showLeaveModal}
         onConfirm={() => navigate('/dashboard')}
