@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Box, Grid, Maximize, Minimize, Search, PlusCircle, RotateCcw, Eye } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Box, Grid, Maximize, Minimize, Search, PlusCircle, RotateCcw, Eye, X } from 'lucide-react';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -44,6 +44,7 @@ const Production = () => {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullTable, setIsFullTable] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   const { data: rawMaterials = [] } = useQuery({ 
     queryKey: ['rawMaterials'], 
@@ -91,6 +92,13 @@ const Production = () => {
     setEditingId(null);
   };
 
+  const handleAddNew = () => {
+    setIsFullTable(false);
+    setEditingId(null);
+    handleClear();
+    setIsMobileDrawerOpen(true);
+  };
+
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items];
     
@@ -118,25 +126,19 @@ const Production = () => {
   };
 
   const handleFinishedProductChange = (val: number) => {
-    const product = products.find((p: any) => p.id === val);
-    if (product && product.rawMaterials && product.rawMaterials.length > 0) {
-      const newItems = product.rawMaterials.map((rmMap: any) => {
-        return {
-          rawMaterialId: rmMap.rawMaterialId,
-          sqM: '0.000',
-          intakeQuantity: '',
-          finishedProductId: val,
-          outcomeQuantity: items[0]?.outcomeQuantity || ''
-        };
-      });
-      setItems(newItems);
-    } else {
-      setItems(items.map(i => ({ ...i, finishedProductId: val })));
-    }
+    const newItems = items.map(item => ({
+      ...item,
+      finishedProductId: val
+    }));
+    setItems(newItems);
   };
 
   const handleOutcomeChange = (val: string) => {
-    setItems(items.map(i => ({ ...i, outcomeQuantity: val })));
+    const newItems = items.map(item => ({
+      ...item,
+      outcomeQuantity: val
+    }));
+    setItems(newItems);
   };
 
   const saveMutation = useMutation({
@@ -174,6 +176,7 @@ const Production = () => {
       queryClient.invalidateQueries({ queryKey: ['productions'] });
       toast.success(editingId ? 'Production updated successfully' : 'Production entries saved successfully');
       handleClear();
+      setIsMobileDrawerOpen(false);
     },
     onError: (err: any) => {
       console.error(err);
@@ -234,6 +237,7 @@ const Production = () => {
       finishedProductId: production.finishedProductId,
       outcomeQuantity: production.outcomeQuantity || ''
     }]);
+    setIsMobileDrawerOpen(true);
   };
 
   const handleView = (production: any) => {
@@ -252,14 +256,16 @@ const Production = () => {
         e.preventDefault();
         handleClear();
       } else if (e.key === 'Escape') {
-        if (!showLeaveModal) {
+        if (isMobileDrawerOpen) {
+          setIsMobileDrawerOpen(false);
+        } else if (!showLeaveModal) {
           setShowLeaveModal(true);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSubmit, handleClear, showLeaveModal]);
+  }, [handleSubmit, handleClear, showLeaveModal, isMobileDrawerOpen, editingId]);
 
   const filteredProductions = productions.filter((p: any) => {
     const isCompleted = p.outcomeQuantity && p.outcomeQuantity > 0;
@@ -276,9 +282,9 @@ const Production = () => {
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col z-10 font-sans">
       {/* Tabs */}
-      <div className="flex border-b border-gray-300 shrink-0 bg-white shadow-sm">
+      <div className="flex border-b border-gray-300 shrink-0 bg-white shadow-sm overflow-x-auto">
         <button
-          className={`px-6 py-3 text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 ${
+          className={`px-4 sm:px-6 py-3 text-[12px] sm:text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'master' 
               ? 'border-b-2 border-[#3B82F6] text-[#3B82F6] bg-blue-50/50' 
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -288,7 +294,7 @@ const Production = () => {
           <Box size={16} /> Master View
         </button>
         <button
-          className={`px-6 py-3 text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 ${
+          className={`px-4 sm:px-6 py-3 text-[12px] sm:text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === 'grid' 
               ? 'border-b-2 border-[#10B981] text-[#10B981] bg-emerald-50/50' 
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -304,320 +310,441 @@ const Production = () => {
           <ProductionGridEntry onSwitchToMaster={() => setActiveTab('master')} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 overflow-hidden p-4">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 flex-1 overflow-hidden p-2 sm:p-4 relative">
           
+          {/* Mobile Drawer Backdrop */}
+          {isMobileDrawerOpen && (
+            <div 
+              className="xl:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
+              onClick={() => setIsMobileDrawerOpen(false)}
+            />
+          )}
+
+          {/* Left Column: Form (Desktop: Inline Column, Mobile: Slide-over Right Drawer) */}
           {!isFullTable && (
-      <div className="xl:col-span-2 bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col h-full overflow-hidden">
-        <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-2 flex items-center justify-between rounded-t-sm shrink-0">
-          <div className="flex items-center gap-2">
-            <Box size={16} className="text-[#1E3A8A]" />
-            <h2 className="font-bold text-[14px] text-[#1E3A8A]">PRODUCTION ENTRY</h2>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              type="button"
-              onClick={handleClear}
-              className="text-[#EF4444] hover:bg-red-50 px-2 py-1 rounded flex items-center gap-1 text-[11px] font-bold transition-colors"
-            >
-              <RotateCcw size={12} /> CLEAR (F4)
-            </button>
-          </div>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar flex-1">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Batch Code (Auto)</label>
-              <input 
-                type="text" 
-                value={batchCode}
-                readOnly
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner outline-none text-[13px] bg-gray-100 text-gray-500 cursor-not-allowed"
-              />
-            </div>
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Work Name *</label>
-              <input 
-                type="text" 
-                value={workName}
-                onChange={e => setWorkName(e.target.value)}
-                readOnly={!!editingId}
-                placeholder="e.g. Manufacturing A"
-                className={`w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner outline-none text-[13px] ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'focus:border-[#3B82F6]'}`}
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Production Date *</label>
-              <input 
-                type="date" 
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                readOnly={!!editingId}
-                className={`w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner outline-none text-[13px] ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'focus:border-[#3B82F6]'}`}
-              />
-            </div>
-          </div>
-
-          <div className="bg-emerald-50/50 p-3 rounded-md border border-emerald-200 mt-2">
-            <h3 className="font-bold text-[13px] text-emerald-800 mb-3 border-b border-emerald-200 pb-2">Finished Product Details</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="sm:col-span-3">
-                <label className="block text-[12px] font-bold text-gray-800 mb-1">Finished Product (Outcome) *</label>
-                <SearchableSelect
-                  value={items[0]?.finishedProductId || 0}
-                  onChange={(val) => handleFinishedProductChange(Number(val))}
-                  disabled={!!editingId}
-                  options={[
-                    { label: 'Select product...', value: 0 },
-                    ...products.map((p: any) => ({ label: `${p.name}`, value: p.id }))
-                  ]}
-                />
+            <div className={`
+              bg-white border border-[#E6E9ED] shadow-sm rounded-sm
+              xl:col-span-2 xl:static xl:z-auto xl:h-full xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex xl:flex-col
+              ${isMobileDrawerOpen 
+                ? 'fixed inset-y-0 right-0 z-50 w-full max-w-lg shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200' 
+                : 'hidden xl:flex'
+              }
+            `}>
+              <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-2 flex items-center justify-between rounded-t-sm shrink-0">
+                <div className="flex items-center gap-2">
+                  <Box size={16} className="text-[#1E3A8A]" />
+                  <h2 className="font-bold text-[14px] text-[#1E3A8A] uppercase">
+                    {editingId ? 'EDIT PRODUCTION' : 'PRODUCTION ENTRY'}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    type="button"
+                    onClick={handleClear}
+                    className="text-[#EF4444] hover:bg-red-50 px-2 py-1 rounded flex items-center gap-1 text-[11px] font-bold transition-colors"
+                  >
+                    <RotateCcw size={12} /> CLEAR (F4)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileDrawerOpen(false)}
+                    className="xl:hidden p-1 rounded hover:bg-blue-100 text-[#1E3A8A] transition-colors"
+                    title="Close drawer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="sm:col-span-1">
-                <label className="block text-[12px] font-bold text-gray-800 mb-1">Product Sq.M</label>
-                <input 
-                  type="text" readOnly tabIndex={-1}
-                  value={products.find((p: any) => p.id === items[0]?.finishedProductId)?.sqM || '0.000'}
-                  className="w-full px-3 py-1.5 border border-[#ccc] rounded bg-gray-100 text-[13px] outline-none text-right font-bold text-gray-500 cursor-not-allowed" 
-                />
-              </div>
-            </div>
-          </div>
+              
+              <form onSubmit={handleSubmit} className="p-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar flex-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Batch Code (Auto)</label>
+                    <input 
+                      type="text" 
+                      value={batchCode}
+                      readOnly
+                      className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner outline-none text-[13px] bg-gray-100 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Work Name *</label>
+                    <input 
+                      type="text" 
+                      value={workName}
+                      onChange={e => setWorkName(e.target.value)}
+                      readOnly={!!editingId}
+                      placeholder="e.g. Manufacturing A"
+                      className={`w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner outline-none text-[13px] ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'focus:border-[#3B82F6]'}`}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Production Date *</label>
+                    <input 
+                      type="date" 
+                      value={date}
+                      onChange={e => setDate(e.target.value)}
+                      readOnly={!!editingId}
+                      className={`w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner outline-none text-[13px] ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'focus:border-[#3B82F6]'}`}
+                    />
+                  </div>
+                </div>
 
-          <div className="flex justify-between items-center mt-2 border-b border-[#E5E7EB] pb-2">
-            <h3 className="font-bold text-[13px] text-blue-800">Raw Materials Used (Intake)</h3>
-          </div>
+                <div className="bg-emerald-50/50 p-3 rounded-md border border-emerald-200 mt-2">
+                  <h3 className="font-bold text-[13px] text-emerald-800 mb-3 border-b border-emerald-200 pb-2">Finished Product Details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-3">
+                      <label className="block text-[12px] font-bold text-gray-800 mb-1">Finished Product (Outcome) *</label>
+                      <SearchableSelect
+                        value={items[0]?.finishedProductId || 0}
+                        onChange={(val) => handleFinishedProductChange(Number(val))}
+                        disabled={!!editingId}
+                        options={[
+                          { label: 'Select product...', value: 0 },
+                          ...products.map((p: any) => ({ label: `${p.name}`, value: p.id }))
+                        ]}
+                      />
+                    </div>
+                    <div className="sm:col-span-1">
+                      <label className="block text-[12px] font-bold text-gray-800 mb-1">Product Sq.M</label>
+                      <input 
+                        type="text" readOnly tabIndex={-1}
+                        value={products.find((p: any) => p.id === items[0]?.finishedProductId)?.sqM || '0.000'}
+                        className="w-full px-3 py-1.5 border border-[#ccc] rounded bg-gray-100 text-[13px] outline-none text-right font-bold text-gray-500 cursor-not-allowed" 
+                      />
+                    </div>
+                  </div>
+                </div>
 
-          <div className="flex flex-col gap-3">
-            {items.map((item, index) => (
-              <div key={index} className="bg-blue-50/30 p-2 rounded-md border border-blue-100 flex flex-col sm:flex-row items-start gap-2">
-                <div className="flex-1 w-full">
-                  <label className="block text-[10px] font-bold text-blue-800 mb-1">Material Name</label>
-                  <SearchableSelect
-                    value={item.rawMaterialId}
-                    onChange={(val) => updateItem(index, 'rawMaterialId', Number(val))}
-                    disabled={!!editingId}
-                    options={[
-                      { label: 'Select material...', value: 0 },
-                      ...rawMaterials.map((m: any) => ({ label: `${m.name} (Stock: ${m.currentStock})`, value: m.id }))
-                    ]}
+                <div className="flex justify-between items-center mt-2 border-b border-[#E5E7EB] pb-2">
+                  <h3 className="font-bold text-[13px] text-blue-800">Raw Materials Used (Intake)</h3>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {items.map((item, index) => (
+                    <div key={index} className="bg-blue-50/30 p-2 rounded-md border border-blue-100 flex flex-col sm:flex-row items-start gap-2">
+                      <div className="flex-1 w-full">
+                        <label className="block text-[10px] font-bold text-blue-800 mb-1">Material Name</label>
+                        <SearchableSelect
+                          value={item.rawMaterialId}
+                          onChange={(val) => updateItem(index, 'rawMaterialId', Number(val))}
+                          disabled={!!editingId}
+                          options={[
+                            { label: 'Select material...', value: 0 },
+                            ...rawMaterials.map((m: any) => ({ label: `${m.name} (Stock: ${m.currentStock})`, value: m.id }))
+                          ]}
+                        />
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <div className="w-24">
+                          <label className="block text-[10px] font-bold text-gray-600 mb-1">Quantity</label>
+                          <input 
+                            type="number" value={item.intakeQuantity} onChange={e => updateItem(index, 'intakeQuantity', e.target.value)}
+                            placeholder="0" onFocus={e => !editingId && e.target.select()}
+                            readOnly={!!editingId}
+                            className={`w-full px-2 py-1.5 border border-[#ccc] rounded text-[13px] outline-none text-right font-bold ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'focus:border-blue-500 text-blue-700 bg-white'}`} 
+                          />
+                        </div>
+                        <div className="w-24">
+                          <label className="block text-[10px] font-bold text-gray-600 mb-1">Sq.M</label>
+                          <input 
+                            type="text" value={item.sqM || '0.000'} readOnly tabIndex={-1}
+                            className="w-full px-2 py-1.5 border border-[#E5E7EB] rounded bg-gray-100 text-[13px] outline-none text-right font-bold text-gray-500 cursor-not-allowed" 
+                          />
+                        </div>
+                        {!editingId && items.length > 1 && (
+                          <div className="pt-5 flex-shrink-0">
+                            <button type="button" onClick={() => removeItem(index)} className="text-red-500 hover:bg-red-50 p-1.5 rounded">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {!editingId && (
+                  <div className="flex justify-center mt-1">
+                    <button 
+                      type="button"
+                      onClick={addItem}
+                      className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded flex items-center gap-1.5 text-[11px] font-bold transition-colors border border-blue-200 border-dashed bg-white"
+                    >
+                      <PlusCircle size={14} /> ADD MATERIAL (F2)
+                    </button>
+                  </div>
+                )}
+
+                <div className="mt-2 border-t-[3px] border-emerald-500 bg-emerald-50 p-3 rounded-lg shadow-sm">
+                  <label className="block text-[11px] font-black text-emerald-900 mb-1 uppercase tracking-wide">Total Outcome Quantity *</label>
+                  <input 
+                    type="number" value={items[0]?.outcomeQuantity || ''} onChange={e => handleOutcomeChange(e.target.value)}
+                    placeholder="0" onFocus={e => e.target.select()}
+                    readOnly={!editingId}
+                    className={`w-full px-3 py-2 border-2 rounded-md text-[18px] outline-none text-right font-black shadow-inner transition-all ${!editingId ? 'border-[#E5E7EB] bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-emerald-500 bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/30 text-emerald-900'}`} 
                   />
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <div className="w-24">
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">Quantity</label>
-                    <input 
-                      type="number" value={item.intakeQuantity} onChange={e => updateItem(index, 'intakeQuantity', e.target.value)}
-                      placeholder="0" onFocus={e => !editingId && e.target.select()}
-                      readOnly={!!editingId}
-                      className={`w-full px-2 py-1.5 border border-[#ccc] rounded text-[13px] outline-none text-right font-bold ${editingId ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'focus:border-blue-500 text-blue-700 bg-white'}`} 
-                    />
-                  </div>
-                  <div className="w-24">
-                    <label className="block text-[10px] font-bold text-gray-600 mb-1">Sq.M</label>
-                    <input 
-                      type="text" value={item.sqM || '0.000'} readOnly tabIndex={-1}
-                      className="w-full px-2 py-1.5 border border-[#E5E7EB] rounded bg-gray-100 text-[13px] outline-none text-right font-bold text-gray-500 cursor-not-allowed" 
-                    />
-                  </div>
-                  {!editingId && items.length > 1 && (
-                    <div className="pt-5 flex-shrink-0">
-                      <button type="button" onClick={() => removeItem(index)} className="text-red-500 hover:bg-red-50 p-1.5 rounded">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+
+                <div className="flex flex-col gap-2 mt-4 shrink-0">
+                  <button 
+                    type="submit" 
+                    disabled={saveMutation.isPending}
+                    className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    <CheckCircle size={16} />
+                    {saveMutation.isPending ? 'SAVING...' : editingId ? 'UPDATE PRODUCTION' : 'SAVE PRODUCTION (F10)'}
+                  </button>
+                  {editingId && (
+                    <button 
+                      type="button" 
+                      onClick={handleClear}
+                      className="w-full bg-[#6B7280] hover:bg-[#4B5563] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 transition-colors"
+                    >
+                      <RotateCcw size={16} />
+                      CANCEL EDIT
+                    </button>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {!editingId && (
-            <div className="flex justify-center mt-1">
-              <button 
-                type="button"
-                onClick={addItem}
-                className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded flex items-center gap-1.5 text-[11px] font-bold transition-colors border border-blue-200 border-dashed bg-white"
-              >
-                <PlusCircle size={14} /> ADD MATERIAL (F2)
-              </button>
+              </form>
             </div>
           )}
 
-          <div className="mt-2 border-t-[3px] border-emerald-500 bg-emerald-50 p-3 rounded-lg shadow-sm">
-            <label className="block text-[11px] font-black text-emerald-900 mb-1 uppercase tracking-wide">Total Outcome Quantity *</label>
-            <input 
-              type="number" value={items[0]?.outcomeQuantity || ''} onChange={e => handleOutcomeChange(e.target.value)}
-              placeholder="0" onFocus={e => e.target.select()}
-              readOnly={!editingId}
-              className={`w-full px-3 py-2 border-2 rounded-md text-[18px] outline-none text-right font-black shadow-inner transition-all ${!editingId ? 'border-[#E5E7EB] bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-emerald-500 bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/30 text-emerald-900'}`} 
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 mt-4 shrink-0">
-            <button 
-              type="submit" 
-              disabled={saveMutation.isPending}
-              className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 transition-colors"
-            >
-              <CheckCircle size={16} />
-              {editingId ? 'UPDATE PRODUCTION' : 'SAVE PRODUCTION (F10)'}
-            </button>
-            {editingId && (
-              <button 
-                type="button" 
-                onClick={handleClear}
-                className="w-full bg-[#6B7280] hover:bg-[#4B5563] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 transition-colors"
-              >
-                <RotateCcw size={16} />
-                CANCEL EDIT
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-      )}
-
-      {/* Right Column: List */}
-      <div className={`${isFullTable ? 'xl:col-span-5' : 'xl:col-span-3'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col h-full`}>
-        <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-3 flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-2 text-[#1E3A8A]">
-            <Grid size={16} className="text-[#1E3A8A]" />
-            <h2 className="font-bold text-[14px]">PRODUCTION LIST</h2>
-          </div>
-          <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
-            {filteredProductions.length} Entries
-          </div>
-        </div>
-
-        <div className="p-3 border-b border-[#E6E9ED] bg-white flex flex-col sm:flex-row justify-between items-center gap-3 shrink-0">
-          <div className="relative w-full sm:w-auto">
-            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-              <Search size={14} className="text-gray-400" />
+          {/* Right Column: List */}
+          <div className={`${isFullTable ? 'xl:col-span-5' : 'xl:col-span-3'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col h-full w-full`}>
+            <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2 text-[#1E3A8A]">
+                <Grid size={16} className="text-[#1E3A8A]" />
+                <h2 className="font-bold text-[13px] sm:text-[14px]">PRODUCTION LIST</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddNew}
+                  className="xl:hidden bg-[#16A34A] hover:bg-[#15803D] text-white px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 shadow-xs transition-colors"
+                >
+                  <PlusCircle size={13} /> New Entry
+                </button>
+                <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+                  {filteredProductions.length} Entries
+                </div>
+              </div>
             </div>
-            <input 
-              type="text" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by batch, material or product..."
-              className="w-full sm:w-64 pl-7 pr-3 py-1.5 border border-[#ccc] rounded text-[13px] outline-none focus:border-[#3B82F6]"
-            />
-          </div>
-          
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            <div className="flex bg-gray-100 p-0.5 rounded border border-gray-300 w-full sm:w-auto">
-              <button 
-                type="button"
-                onClick={() => setFilterStatus('pending')}
-                className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors ${filterStatus === 'pending' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Pending
-              </button>
-              <button 
-                type="button"
-                onClick={() => setFilterStatus('completed')}
-                className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors ${filterStatus === 'completed' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Completed
-              </button>
-            </div>
-            <button type="button" 
-              onClick={() => setIsFullTable(!isFullTable)}
-              className="w-full sm:w-auto justify-center text-[#3B82F6] hover:bg-[#EFF6FF] px-3 py-1.5 rounded text-[12px] font-bold flex items-center gap-2 transition-colors border border-[#3B82F6]"
-            >
-              {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
-              {isFullTable ? 'Show Form' : 'View Full Table'}
-            </button>
-          </div>
-        </div>
 
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="bg-[#2A2A2A] text-white font-bold">
-                <th className="px-3 py-2.5 border-r border-[#444] text-center w-8">#</th>
-                <th className="px-3 py-2.5 border-r border-[#444] text-center">Date</th>
-                <th className="px-3 py-2.5 border-r border-[#444]">Batch Name</th>
-                <th className="px-3 py-2.5 border-r border-[#444]">Material (Intake)</th>
-                <th className="px-3 py-2.5 border-r border-[#444] text-center">Intake Qty</th>
-                <th className="px-3 py-2.5 border-r border-[#444]">Product (Outcome)</th>
-                <th className="px-3 py-2.5 border-r border-[#444] text-center">Outcome Qty</th>
-                <th className="px-3 py-2.5 text-center w-20">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+            <div className="p-2.5 sm:p-3 border-b border-[#E6E9ED] bg-white flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 shrink-0">
+              <div className="relative w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                  <Search size={14} className="text-gray-400" />
+                </div>
+                <input 
+                  type="text" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by batch, material or product..."
+                  className="w-full sm:w-64 pl-7 pr-3 py-1.5 border border-[#ccc] rounded text-[13px] outline-none focus:border-[#3B82F6]"
+                />
+              </div>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                <div className="flex bg-gray-100 p-0.5 rounded border border-gray-300 w-full sm:w-auto">
+                  <button 
+                    type="button"
+                    onClick={() => setFilterStatus('pending')}
+                    className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors ${filterStatus === 'pending' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Pending
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setFilterStatus('completed')}
+                    className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors ${filterStatus === 'completed' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Completed
+                  </button>
+                </div>
+                <button type="button" 
+                  onClick={() => setIsFullTable(!isFullTable)}
+                  className="hidden xl:flex items-center gap-2 text-[#3B82F6] hover:bg-[#EFF6FF] px-3 py-1.5 rounded text-[12px] font-bold transition-colors border border-[#3B82F6]"
+                >
+                  {isFullTable ? <Minimize size={14} /> : <Maximize size={14} />}
+                  {isFullTable ? 'Show Form' : 'View Full Table'}
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Card List (< SM) */}
+            <div className="sm:hidden flex-1 overflow-y-auto p-2.5 space-y-2.5 bg-gray-50">
               {isLoading ? (
-                <tr><td colSpan={8} className="text-center p-4">Loading...</td></tr>
+                <div className="text-center p-6 text-gray-500">Loading...</div>
               ) : filteredProductions.length === 0 ? (
-                <tr><td colSpan={8} className="text-center p-4">No production entries found.</td></tr>
+                <div className="text-center p-6 text-gray-500 bg-white rounded-lg border border-dashed border-gray-300">
+                  No production entries found.
+                </div>
               ) : (
-                filteredProductions.map((production: any, index: number) => (
-                  <tr key={production.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F9F9F9]'} hover:bg-blue-50`}>
-                    <td data-label="#" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-gray-700">{index + 1}</td>
-                    <td data-label="Date" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-medium text-gray-600">{new Date(production.date).toLocaleDateString()}</td>
-                    <td data-label="Batch Name" className="px-3 py-3 border-r border-[#E5E7EB] font-bold text-blue-700">{production.workName}</td>
-                    <td data-label="Material" className="px-3 py-3 border-r border-[#E5E7EB] text-gray-800">{production.rawMaterial?.name}</td>
-                    <td data-label="Intake Qty" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-blue-600">{production.intakeQuantity}</td>
-                    <td data-label="Product" className="px-3 py-3 border-r border-[#E5E7EB] text-gray-800">{production.finishedProduct?.name}</td>
-                    <td data-label="Outcome Qty" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-emerald-600">{production.outcomeQuantity}</td>
-                    <td data-label="Actions" className="px-3 py-3 text-center">
-                      <div className="flex justify-center gap-2">
-                        {!(production.outcomeQuantity > 0) ? (
+                filteredProductions.map((production: any) => {
+                  const isCompleted = production.outcomeQuantity > 0;
+                  return (
+                    <div key={production.id} className="bg-white rounded-xl p-3 border border-gray-200 shadow-xs space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-extrabold text-blue-700 text-sm leading-snug">{production.workName}</p>
+                          <p className="text-[11px] text-gray-500 mt-0.5">{new Date(production.date).toLocaleDateString()}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isCompleted ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                        }`}>
+                          {isCompleted ? 'Completed' : 'Pending'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2 rounded-lg border border-gray-100 text-xs">
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Intake (Material)</span>
+                          <p className="font-bold text-gray-800 truncate">{production.rawMaterial?.name}</p>
+                          <p className="text-blue-600 font-extrabold mt-0.5">Qty: {production.intakeQuantity}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase block">Outcome (Product)</span>
+                          <p className="font-bold text-gray-800 truncate">{production.finishedProduct?.name}</p>
+                          <p className="text-emerald-600 font-extrabold mt-0.5">Qty: {production.outcomeQuantity || '0'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1.5 border-t border-gray-100">
+                        {!isCompleted ? (
                           <>
-                            <button type="button" 
+                            <button
+                              type="button"
                               onClick={() => handleEdit(production)}
-                              className="text-[#3B82F6] border border-[#3B82F6] rounded p-1 hover:bg-[#3B82F6] hover:text-white transition-colors title='Edit Pending Entry'"
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50/50"
                             >
-                              <Edit size={12} />
+                              <Edit size={13} /> Edit
                             </button>
-                            <button type="button" 
+                            <button
+                              type="button"
                               onClick={() => setItemToDelete(production)}
-                              className="text-[#EF4444] border border-[#EF4444] rounded p-1 hover:bg-[#EF4444] hover:text-white transition-colors title='Delete Pending Entry'"
+                              className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 font-bold px-2.5 py-1 rounded-lg border border-red-200 bg-red-50/50"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={13} /> Delete
                             </button>
                           </>
                         ) : (
-                          <button type="button" 
+                          <button
+                            type="button"
                             onClick={() => handleView(production)}
-                            className="text-[#10B981] border border-[#10B981] rounded p-1 hover:bg-[#10B981] hover:text-white transition-colors title='View Completed Entry'"
+                            className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-800 font-bold px-3 py-1 rounded-lg border border-emerald-200 bg-emerald-50/50"
                           >
-                            <Eye size={12} />
+                            <Eye size={13} /> View Details
                           </button>
                         )}
                       </div>
-                    </td>
-                  </tr>
-                ))
+                    </div>
+                  );
+                })
               )}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop & Tablet Table (>= SM) */}
+            <div className="hidden sm:block flex-1 overflow-auto">
+              <table className="w-full text-left text-[13px] min-w-[700px]">
+                <thead>
+                  <tr className="bg-[#2A2A2A] text-white font-bold">
+                    <th className="px-3 py-2.5 border-r border-[#444] text-center w-8">#</th>
+                    <th className="px-3 py-2.5 border-r border-[#444] text-center">Date</th>
+                    <th className="px-3 py-2.5 border-r border-[#444]">Batch Name</th>
+                    <th className="px-3 py-2.5 border-r border-[#444]">Material (Intake)</th>
+                    <th className="px-3 py-2.5 border-r border-[#444] text-center">Intake Qty</th>
+                    <th className="px-3 py-2.5 border-r border-[#444]">Product (Outcome)</th>
+                    <th className="px-3 py-2.5 border-r border-[#444] text-center">Outcome Qty</th>
+                    <th className="px-3 py-2.5 text-center w-20">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr><td colSpan={8} className="text-center p-4">Loading...</td></tr>
+                  ) : filteredProductions.length === 0 ? (
+                    <tr><td colSpan={8} className="text-center p-4">No production entries found.</td></tr>
+                  ) : (
+                    filteredProductions.map((production: any, index: number) => (
+                      <tr key={production.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F9F9F9]'} hover:bg-blue-50`}>
+                        <td data-label="#" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-gray-700">{index + 1}</td>
+                        <td data-label="Date" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-medium text-gray-600">{new Date(production.date).toLocaleDateString()}</td>
+                        <td data-label="Batch Name" className="px-3 py-3 border-r border-[#E5E7EB] font-bold text-blue-700">{production.workName}</td>
+                        <td data-label="Material" className="px-3 py-3 border-r border-[#E5E7EB] text-gray-800">{production.rawMaterial?.name}</td>
+                        <td data-label="Intake Qty" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-blue-600">{production.intakeQuantity}</td>
+                        <td data-label="Product" className="px-3 py-3 border-r border-[#E5E7EB] text-gray-800">{production.finishedProduct?.name}</td>
+                        <td data-label="Outcome Qty" className="px-3 py-3 border-r border-[#E5E7EB] text-center font-bold text-emerald-600">{production.outcomeQuantity}</td>
+                        <td data-label="Actions" className="px-3 py-3 text-center">
+                          <div className="flex justify-center gap-2">
+                            {!(production.outcomeQuantity > 0) ? (
+                              <>
+                                <button type="button" 
+                                  onClick={() => handleEdit(production)}
+                                  className="text-[#3B82F6] border border-[#3B82F6] rounded p-1 hover:bg-[#3B82F6] hover:text-white transition-colors"
+                                  title="Edit Pending Entry"
+                                >
+                                  <Edit size={12} />
+                                </button>
+                                <button type="button" 
+                                  onClick={() => setItemToDelete(production)}
+                                  className="text-[#EF4444] border border-[#EF4444] rounded p-1 hover:bg-[#EF4444] hover:text-white transition-colors"
+                                  title="Delete Pending Entry"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" 
+                                onClick={() => handleView(production)}
+                                className="text-[#10B981] border border-[#10B981] rounded p-1 hover:bg-[#10B981] hover:text-white transition-colors"
+                                title="View Completed Entry"
+                              >
+                                <Eye size={12} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Floating Action Button */}
+          <button
+            type="button"
+            onClick={handleAddNew}
+            className="xl:hidden fixed bottom-6 right-6 z-30 bg-[#16A34A] hover:bg-[#15803D] text-white p-3.5 rounded-full shadow-2xl active:scale-95 transition-transform flex items-center justify-center"
+            title="Create new production entry"
+          >
+            <PlusCircle size={24} />
+          </button>
+
+          <DeleteConfirmationModal 
+            isOpen={!!itemToDelete}
+            itemName={itemToDelete?.workName}
+            isDeleting={deleteMutation.isPending}
+            onConfirm={() => {
+              if (itemToDelete) {
+                deleteMutation.mutate(itemToDelete.id);
+              }
+            }}
+            onCancel={() => setItemToDelete(null)}
+          />
+
+          <ProductionViewModal 
+            isOpen={!!viewingProduction}
+            onClose={() => setViewingProduction(null)}
+            production={viewingProduction}
+          />
+          <LeaveConfirmModal 
+            isOpen={showLeaveModal}
+            onConfirm={() => navigate('/dashboard')}
+            onClose={() => setShowLeaveModal(false)}
+          />
         </div>
-      </div>
-
-      <DeleteConfirmationModal 
-        isOpen={!!itemToDelete}
-        itemName={itemToDelete?.workName}
-        isDeleting={deleteMutation.isPending}
-        onConfirm={() => {
-          if (itemToDelete) {
-            deleteMutation.mutate(itemToDelete.id);
-          }
-        }}
-        onCancel={() => setItemToDelete(null)}
-      />
-
-      <ProductionViewModal 
-        isOpen={!!viewingProduction}
-        onClose={() => setViewingProduction(null)}
-        production={viewingProduction}
-      />
-      <LeaveConfirmModal 
-        isOpen={showLeaveModal}
-        onConfirm={() => navigate('/dashboard')}
-        onClose={() => setShowLeaveModal(false)}
-      />
-    </div>
       )}
     </div>
   );
