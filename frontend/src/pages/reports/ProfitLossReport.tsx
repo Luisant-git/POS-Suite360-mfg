@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Download, Printer, Filter, PieChart as PieChartIcon } from 'lucide-react';
+import { Download, Printer, Filter, PieChart as PieChartIcon, Loader2 } from 'lucide-react';
 import { format, startOfMonth, startOfYear } from 'date-fns';
 import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
@@ -213,7 +213,10 @@ const ProfitLossReport = () => {
 
           <div className="flex-1 flex flex-col px-4 py-1.5 font-sans text-[12px] overflow-y-auto">
             {isLoading ? (
-              <div className="flex-1 flex items-center justify-center">Loading P&L...</div>
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
+                <Loader2 className="w-8 h-8 animate-spin text-[#3B82F6]" />
+                <span className="font-bold">Loading P&L data...</span>
+              </div>
             ) : (
               <>
                 {/* 1. Operating Revenue */}
