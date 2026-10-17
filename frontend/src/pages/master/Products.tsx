@@ -37,7 +37,7 @@ const Products = () => {
 
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<number | null>(null);
-  
+
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -154,9 +154,9 @@ const Products = () => {
   const { data: taxes = [] } = useQuery({ queryKey: ['taxes'], queryFn: async () => (await api.get('/taxes')).data, enabled: !!settings?.enableTax });
 
   // Fetch Products
-  const { data: products = [], isLoading } = useQuery({ 
-    queryKey: ['products'], 
-    queryFn: async () => (await api.get('/products')).data 
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => (await api.get('/products')).data
   });
 
   const { data: nextCodeData } = useQuery({
@@ -197,7 +197,7 @@ const Products = () => {
         unitId: parseInt(data.unitId || '0'),
         supplierId: data.supplierId ? parseInt(data.supplierId) : undefined,
       };
-      
+
       if (editingId) {
         return api.patch(`/products/${editingId}`, payload);
       }
@@ -288,219 +288,226 @@ const Products = () => {
 
   return (
     <div className="bg-[#F7F7F7] min-h-[calc(100vh-100px)] grid grid-cols-1 xl:grid-cols-3 gap-4">
-      
+
       {/* Left Column: Form */}
       {!isFullTable && (
-      <div className="xl:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col">
-        <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between rounded-t-sm">
-          <div className="flex items-center gap-2">
-            <Package size={18} className="text-white" />
-            <h2 className="font-bold text-[14px]">PRODUCT MASTER</h2>
-          </div>
-          <button type="button" onClick={handleAutoCode} className="bg-[#1E3A8A] text-white text-[11px] px-3 py-1 font-bold rounded">
-            Auto Code
-          </button>
-        </div>
-        
-        <form onSubmit={handleSubmit(onSubmit as any, onFormError)} className="p-4 flex flex-col gap-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Product Code *</label>
-              <input 
-                {...register('code')}
-                type="text" 
-                readOnly
-                placeholder="Code"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-gray-100"
-              />
-              {errors.code && <span className="text-red-500 text-xs mt-1 block">{errors.code.message}</span>}
+        <div className="xl:col-span-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex flex-col">
+          <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between rounded-t-sm">
+            <div className="flex items-center gap-2">
+              <Package size={18} className="text-white" />
+              <h2 className="font-bold text-[14px]">PRODUCT MASTER</h2>
             </div>
-            <div>
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Unit *</label>
-              <select 
-                {...register('unitId')}
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
-              >
-                <option value="">-- Select --</option>
-                {units.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              {errors.unitId && <span className="text-red-500 text-xs mt-1 block">{errors.unitId.message}</span>}
-            </div>
+            <button type="button" onClick={handleAutoCode} className="bg-[#1E3A8A] text-white text-[11px] px-3 py-1 font-bold rounded">
+              Auto Code
+            </button>
           </div>
 
-          <div>
-            <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Product Name *</label>
-            <input 
-              {...register('name')}
-              type="text" 
-              placeholder="Full item description"
-              className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
-            />
-            {errors.name && <span className="text-red-500 text-xs mt-1 block">{errors.name.message}</span>}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-gray-700 mb-1">Category</label>
-              <select 
-                {...register('categoryId')}
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
-              >
-                <option value="">-- Select Category --</option>
-                {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Brand</label>
-              <select 
-                {...register('brandId')}
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
-              >
-                <option value="">-- Select Brand --</option>
-                {brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Default Supplier</label>
-              <select 
-                {...register('supplierId')}
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
-              >
-                <option value="">-- Select Supplier --</option>
-                {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            {settings?.enableTax && (
+          <form onSubmit={handleSubmit(onSubmit as any, onFormError)} className="p-4 flex flex-col gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[12px] font-bold text-[#1F2937] mb-1">GST % (Tax)</label>
-                <select 
-                  {...register('taxPercent')}
+                <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Product Code *</label>
+                <input
+                  {...register('code')}
+                  type="text"
+                  readOnly
+                  placeholder="Code"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-gray-100"
+                />
+                {errors.code && <span className="text-red-500 text-xs mt-1 block">{errors.code.message}</span>}
+              </div>
+              <div>
+                <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Unit *</label>
+                <select
+                  {...register('unitId')}
                   className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
                 >
-                  <option value="0">None (0%)</option>
-                  {taxes.map((t: any) => <option key={t.id} value={Number(t.rate)}>{t.name} ({Number(t.rate)}%)</option>)}
+                  <option value="">-- Select --</option>
+                  {units.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
+                {errors.unitId && <span className="text-red-500 text-xs mt-1 block">{errors.unitId.message}</span>}
               </div>
-            )}
-          </div>
+            </div>
 
-          {settings?.enableTax && (
             <div>
-              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">HSN Code <span className="text-gray-400 font-normal">(Optional)</span></label>
+              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Product Name *</label>
               <input
-                {...register('hsnCode')}
+                {...register('name')}
                 type="text"
-                placeholder="e.g. 6403"
+                placeholder="Full item description"
                 className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
               />
+              {errors.name && <span className="text-red-500 text-xs mt-1 block">{errors.name.message}</span>}
             </div>
-          )}
 
-          <h3 className="font-bold text-[13px] text-gray-500 mt-2 uppercase">Pricing Matrix</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] text-[#1F2937] mb-1">Opening Stock</label>
-              <input 
-                {...register('currentStock')}
-                type="number" 
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 mb-1">Category</label>
+                <select
+                  {...register('categoryId')}
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
+                >
+                  <option value="">-- Select Category --</option>
+                  {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Brand</label>
+                <select
+                  {...register('brandId')}
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
+                >
+                  <option value="">-- Select Brand --</option>
+                  {brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-[12px] text-[#1F2937] mb-1">Pur Rate</label>
-              <input 
-                {...register('purchaseRate')}
-                type="number" 
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
-              />
-            </div>
-            <div>
-              <label className="block text-[12px] font-bold text-[#16A34A] mb-1">Wholesale Rate</label>
-              <input 
-                {...register('wholesaleRate')}
-                type="number" 
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
-              />
-            </div>
-            <div>
-              <label className="block text-[12px] font-bold text-[#3B82F6] mb-1">Sale Rate (Retail)</label>
-              <input 
-                {...register('sellingRate')}
-                type="number" 
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
-              />
-            </div>
-          </div>
 
-          <h3 className="font-bold text-[13px] text-red-500 mt-2 uppercase">Stock Alerts & Thresholds</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-            <div>
-              <label className="block text-[12px] text-[#1F2937] mb-1">Min Qty (Alert)</label>
-              <input 
-                {...register('minStock')}
-                type="number" 
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Default Supplier</label>
+                <select
+                  {...register('supplierId')}
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
+                >
+                  <option value="">-- Select Supplier --</option>
+                  {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              {settings?.enableTax && (
+                <div>
+                  <label className="block text-[12px] font-bold text-[#1F2937] mb-1">GST % (Tax)</label>
+                  <select
+                    {...register('taxPercent')}
+                    className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
+                  >
+                    <option value="0">None (0%)</option>
+                    {taxes.map((t: any) => <option key={t.id} value={Number(t.rate)}>{t.name} ({Number(t.rate)}%)</option>)}
+                  </select>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="block text-[12px] text-[#1F2937] mb-1">Reorder Level</label>
-              <input 
-                {...register('reorderLevel')}
-                type="number" 
-                placeholder="0"
-                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
-              />
-            </div>
-          </div>
 
-          <button 
-            type="submit" 
-            disabled={mutation.isPending}
-            className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 transition-colors"
-          >
-            <CheckCircle size={16} />
-            {editingId ? 'UPDATE PRODUCT' : 'SAVE PRODUCT (F10)'}
-          </button>
-          
-          {editingId && (
-            <button 
-              type="button" 
-              onClick={() => { reset(); setEditingId(null); }}
-              className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
+            {settings?.enableTax && (
+              <div>
+                <label className="block text-[12px] font-bold text-[#1F2937] mb-1">HSN Code <span className="text-gray-400 font-normal">(Optional)</span></label>
+                <input
+                  {...register('hsnCode')}
+                  type="text"
+                  placeholder="e.g. 6403"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
+                />
+              </div>
+            )}
+
+            <h3 className="font-bold text-[13px] text-gray-500 mt-2 uppercase">Pricing Matrix</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[12px] text-[#1F2937] mb-1">Opening Stock</label>
+                <input
+                  {...register('currentStock')}
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#1F2937] mb-1">Pur Rate</label>
+                <input
+                  {...register('purchaseRate')}
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-bold text-[#16A34A] mb-1">Wholesale Rate</label>
+                <input
+                  {...register('wholesaleRate')}
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] font-bold text-[#3B82F6] mb-1">Sale Rate (Retail)</label>
+                <input
+                  {...register('sellingRate')}
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
+                />
+              </div>
+            </div>
+
+            <h3 className="font-bold text-[13px] text-red-500 mt-2 uppercase">Stock Alerts & Thresholds</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+              <div>
+                <label className="block text-[12px] text-[#1F2937] mb-1">Min Qty (Alert)</label>
+                <input
+                  {...register('minStock')}
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#1F2937] mb-1">Reorder Level</label>
+                <input
+                  {...register('reorderLevel')}
+                  type="number"
+                  placeholder="0"
+                  className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] text-right"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="w-full bg-[#16A34A] hover:bg-[#15803D] text-white font-bold py-2.5 rounded flex justify-center items-center gap-2 transition-colors"
             >
-              CANCEL EDIT
+              <CheckCircle size={16} />
+              {editingId ? 'UPDATE PRODUCT' : 'SAVE PRODUCT (F10)'}
             </button>
-          )}
-        </form>
-      </div>
+
+            {editingId && (
+              <button
+                type="button"
+                onClick={() => { reset(); setEditingId(null); }}
+                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
+              >
+                CANCEL EDIT
+              </button>
+            )}
+          </form>
+        </div>
       )}
 
       {/* Right Column: List */}
       <div className={`${isFullTable ? 'xl:col-span-3' : 'xl:col-span-2'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col`}>
-        <div className="bg-[#E5E7EB] border-b border-[#E6E9ED] px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-[#1F2937]">
-            <Grid size={16} className="text-[#3B82F6]" />
-            <h2 className="font-bold text-[14px]">MASTER PRODUCT LIST BY CATEGORY & BRAND</h2>
+        <div className="bg-[#E5E7EB] border-b border-[#E6E9ED] px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0">
+          <div className="flex items-center justify-between w-full md:w-auto">
+            <div className="flex items-center gap-2 text-[#1F2937]">
+              <Grid size={16} className="text-[#3B82F6]" />
+              <h2 className="font-bold text-[14px]">MASTER PRODUCT LIST</h2>
+            </div>
+            <div className="md:hidden bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+              {filteredProducts.length}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
             <button type="button"
               onClick={() => setIsFullTable(!isFullTable)}
-              className="text-[#3B82F6] hover:bg-[#EFF6FF] px-3 py-1 rounded text-[12px] font-bold flex items-center gap-1 transition-colors border border-[#3B82F6]"
+              className="whitespace-nowrap text-[#3B82F6] hover:bg-[#EFF6FF] px-2 py-1 rounded text-[12px] font-bold flex items-center gap-1 transition-colors border border-[#3B82F6]"
             >
               {isFullTable ? <Minimize size={13} /> : <Maximize size={13} />}
-              {isFullTable ? 'Show Form' : 'Full Table'}
+              <span className="hidden sm:inline">{isFullTable ? 'Show Form' : 'Full Table'}</span>
+              <span className="sm:hidden">{isFullTable ? 'Form' : 'Table'}</span>
             </button>
-            <div className="bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
+            <div className="hidden md:block bg-gray-500 text-white text-[11px] font-bold px-2 py-1 rounded-xl">
               {filteredProducts.length} Products
             </div>
           </div>
@@ -612,13 +619,13 @@ const Products = () => {
                         >
                           <Eye size={12} />
                         </button>
-                        <button type="button" 
+                        <button type="button"
                           onClick={() => handleEdit(product)}
                           className="text-[#3B82F6] border border-[#3B82F6] rounded p-1 hover:bg-[#3B82F6] hover:text-white transition-colors"
                         >
                           <Edit size={12} />
                         </button>
-                        <button type="button" 
+                        <button type="button"
                           onClick={() => setItemToDelete(product)}
                           className="text-[#EF4444] border border-[#EF4444] rounded p-1 hover:bg-[#EF4444] hover:text-white transition-colors"
                         >
@@ -633,9 +640,9 @@ const Products = () => {
           </table>
         </div>
       </div>
-      
+
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal 
+      <DeleteConfirmationModal
         isOpen={!!itemToDelete}
         itemName={itemToDelete?.name}
         isDeleting={deleteMutation.isPending}
@@ -646,11 +653,11 @@ const Products = () => {
         }}
         onCancel={() => setItemToDelete(null)}
       />
-    
-      <LeaveConfirmModal 
-        isOpen={isLeaveModalOpen} 
-        onClose={() => setIsLeaveModalOpen(false)} 
-        onConfirm={() => navigate('/dashboard')} 
+
+      <LeaveConfirmModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        onConfirm={() => navigate('/dashboard')}
       />
 
       {/* Import Preview Modal */}
@@ -764,7 +771,7 @@ const Products = () => {
           </div>
         </div>
       )}
-</div>
+    </div>
   );
 };
 

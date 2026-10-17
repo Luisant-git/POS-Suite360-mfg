@@ -10,10 +10,10 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-  
+
   const [formData, setFormData] = useState({
     id: null,
     username: '',
@@ -100,41 +100,43 @@ export default function Users() {
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredUsers = users.filter(u =>
+    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <UsersIcon className="text-blue-600" /> Users & Roles
           </h1>
           <p className="text-gray-500 text-sm mt-1">Manage system users and access</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <Link
             to="/master/permissions"
             className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm"
           >
             <Shield size={18} />
-            <span>Menu Permissions</span>
+            <span className="hidden sm:inline">Menu Permissions</span>
+            <span className="sm:hidden">Permissions</span>
           </Link>
           <button
             onClick={() => openModal()}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm"
           >
             <Plus size={18} />
-            <span>New User</span>
+            <span className="hidden sm:inline">New User</span>
+            <span className="sm:hidden">New</span>
           </button>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="relative w-72">
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
@@ -220,7 +222,7 @@ export default function Users() {
                 {formData.id ? 'Edit User' : 'New User'}
               </h2>
             </div>
-            
+
             <form onSubmit={handleSave} className="p-6">
               <div className="space-y-4">
                 <div>
@@ -233,7 +235,7 @@ export default function Users() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Username</label>
                   <input

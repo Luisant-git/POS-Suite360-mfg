@@ -121,7 +121,7 @@ const MenuPermissions = () => {
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
-  
+
   const location = useLocation();
 
   useEffect(() => {
@@ -135,9 +135,9 @@ const MenuPermissions = () => {
       if (data.length > 0) {
         const passedRoleId = location.state?.roleId;
         const initialRoleId = passedRoleId || data[0].id;
-        
+
         setSelectedRoleId(initialRoleId);
-        
+
         const targetRole = data.find((r: any) => r.id === initialRoleId) || data[0];
         setActivePermissions(targetRole.permissions || []);
       }
@@ -158,8 +158,8 @@ const MenuPermissions = () => {
   };
 
   const togglePermission = (permId: string) => {
-    setActivePermissions(prev => 
-      prev.includes(permId) 
+    setActivePermissions(prev =>
+      prev.includes(permId)
         ? prev.filter(p => p !== permId)
         : [...prev, permId]
     );
@@ -179,7 +179,7 @@ const MenuPermissions = () => {
     setIsSaving(true);
     try {
       await api.put(`/roles/${selectedRoleId}/permissions`, { permissions: activePermissions });
-      
+
       const storedUser = localStorage.getItem('user');
       let isCurrentUserRole = false;
       if (storedUser) {
@@ -191,11 +191,11 @@ const MenuPermissions = () => {
             parsed.role.permissions = activePermissions;
             localStorage.setItem('user', JSON.stringify(parsed));
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       toast.success('Permissions saved successfully!');
-      
+
       if (isCurrentUserRole) {
         setTimeout(() => {
           window.location.reload();
@@ -252,29 +252,29 @@ const MenuPermissions = () => {
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col font-sans overflow-hidden">
       {/* Header */}
-      <div className="bg-[#0F172A] text-white px-4 py-2 flex items-center justify-between shrink-0 shadow-sm z-10">
+      <div className="bg-[#0F172A] text-white px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between shrink-0 shadow-sm z-10 gap-3">
         <div>
           <h1 className="text-base font-bold flex items-center gap-2">
-            <Shield className="text-[#3B82F6]" size={16} /> 
+            <Shield className="text-[#3B82F6]" size={16} />
             Menu Permissions
           </h1>
           <p className="text-slate-400 text-xs">Control module access</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <Link
             to="/master/users"
-            className="bg-indigo-50/10 text-indigo-200 hover:text-white px-3 py-1.5 rounded font-bold text-xs flex items-center gap-1.5 transition-colors border border-indigo-400/30 hover:bg-indigo-500/30 mr-2"
+            className="bg-indigo-50/10 text-indigo-200 hover:text-white px-3 py-1.5 rounded font-bold text-xs flex items-center gap-1.5 transition-colors border border-indigo-400/30 hover:bg-indigo-500/30"
           >
-            <Users size={14} /> Users & Roles
+            <Users size={14} /> <span className="hidden sm:inline">Users & Roles</span><span className="sm:hidden">Users</span>
           </Link>
           <button onClick={deselectAll} className="text-[#94A3B8] hover:text-white px-3 py-1.5 rounded font-bold text-xs transition-colors border border-[#334155] hover:bg-[#1E293B]">
-            Uncheck All
+            <span className="hidden sm:inline">Uncheck All</span><span className="sm:hidden">Clear</span>
           </button>
           <button onClick={selectAll} className="text-[#3B82F6] hover:text-white px-3 py-1.5 rounded font-bold text-xs transition-colors border border-[#3B82F6] hover:bg-[#3B82F6]">
-            Select All
+            <span className="hidden sm:inline">Select All</span><span className="sm:hidden">All</span>
           </button>
-          <button 
-            onClick={handleSave} 
+          <button
+            onClick={handleSave}
             disabled={isSaving}
             className="bg-[#10B981] hover:bg-[#059669] text-white px-4 py-1.5 rounded font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
           >
@@ -285,7 +285,7 @@ const MenuPermissions = () => {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-          
+
           {/* Role Selector */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-4 flex-1 w-full">
@@ -294,7 +294,7 @@ const MenuPermissions = () => {
               </div>
               <div className="flex-1 w-full max-w-md">
                 <label className="text-sm font-bold text-gray-500 block mb-1">Select Role to Modify</label>
-                <select 
+                <select
                   value={selectedRoleId || ''}
                   onChange={(e) => handleRoleChange(Number(e.target.value))}
                   className="w-full border-0 bg-gray-50 px-4 py-2.5 rounded-lg font-bold text-gray-800 outline-none ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 transition-all"
@@ -305,7 +305,7 @@ const MenuPermissions = () => {
                 </select>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 w-full md:w-auto justify-end">
               {isCreatingRole ? (
                 <div className="flex items-center gap-2 w-full md:w-auto">
@@ -322,13 +322,13 @@ const MenuPermissions = () => {
                 </div>
               ) : (
                 <>
-                  <button 
+                  <button
                     onClick={() => setIsCreatingRole(true)}
                     className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors"
                   >
                     + New Role
                   </button>
-                  <button 
+                  <button
                     onClick={handleDeleteRole}
                     className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded-lg text-sm font-bold transition-colors"
                   >
@@ -353,8 +353,8 @@ const MenuPermissions = () => {
                       {module.icon} {module.name}
                     </h3>
                     <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         className="sr-only peer"
                         checked={isAllChecked}
                         ref={input => {
@@ -365,13 +365,13 @@ const MenuPermissions = () => {
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
-                  
+
                   <div className="p-2 flex-1 flex flex-col gap-1">
                     {module.permissions.map(perm => {
                       const isChecked = activePermissions.includes(perm.id);
                       return (
-                        <label 
-                          key={perm.id} 
+                        <label
+                          key={perm.id}
                           onClick={(e) => {
                             e.preventDefault(); // Prevent double trigger
                             togglePermission(perm.id);
