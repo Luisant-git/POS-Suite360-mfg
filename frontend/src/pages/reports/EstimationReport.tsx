@@ -279,7 +279,7 @@ const EstimationReport = () => {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={7} className="p-0"><TableLoader /></td></tr>
+                  <TableLoader columns={7} />
                 ) : filteredEstimations.length === 0 ? (
                   <tr><td colSpan={7} className="text-center p-6 text-gray-500">No estimation records found.</td></tr>
                 ) : (

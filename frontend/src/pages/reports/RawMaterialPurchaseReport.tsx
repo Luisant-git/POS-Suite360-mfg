@@ -278,7 +278,7 @@ const RawMaterialPurchaseReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={11} className="p-0"><TableLoader /></td></tr>
+                <TableLoader columns={11} />
               ) : filteredPurchases.length === 0 ? (
                 <tr><td colSpan={11} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
               ) : (

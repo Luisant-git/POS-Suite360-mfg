@@ -273,7 +273,7 @@ const BatchPnlReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={3} className="p-0"><TableLoader /></td></tr>
+                <TableLoader columns={3} />
               ) : !reportData ? (
                 <tr><td colSpan={3} className="text-center p-6 text-gray-500">Select a batch or product and click Calculate P&L</td></tr>
               ) : reportData.materialsUsed.length === 0 ? (

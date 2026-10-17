@@ -342,7 +342,7 @@ const ProductionReport = () => {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={9} className="p-0"><TableLoader /></td></tr>
+                  <TableLoader columns={9} />
                 ) : filteredProductions.length === 0 ? (
                   <tr><td colSpan={9} className="text-center p-6 text-gray-500">No production records found.</td></tr>
                 ) : (

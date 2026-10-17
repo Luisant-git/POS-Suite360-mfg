@@ -337,7 +337,7 @@ ${totalTax > 0 ? `<div style="display:flex;justify-content:space-between;font-si
               </thead>
               <tbody>
                 {isLoading ? (
-                  <tr><td colSpan={10} className="p-0"><TableLoader /></td></tr>
+                  <TableLoader columns={10} />
                 ) : filteredSales.length === 0 ? (
                   <tr><td colSpan={10} className="text-center p-6 text-gray-500">No service billing records found.</td></tr>
                 ) : paginatedSales.map((s: any, index: number) => (

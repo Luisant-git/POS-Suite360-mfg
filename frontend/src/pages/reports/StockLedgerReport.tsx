@@ -11,7 +11,7 @@ import SearchableSelect from '../../components/SearchableSelect';
 import TableLoader from '../../components/TableLoader';
 
 const StockLedgerReport = () => {
-  const { formatCurrency, settings } = useSettings();
+  const { settings } = useSettings();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [productId, setProductId] = useState('');
   const [fromDate, setFromDate] = useState('');
@@ -219,9 +219,9 @@ const StockLedgerReport = () => {
                         <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-bold">{e.date ? new Date(e.date).toISOString().split('T')[0] : '-'}</td>
                         <td className="px-4 py-3 border-r border-[#E2E8F0]">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${e.type === 'Purchase' ? 'bg-[#22C55E] text-white' :
-                              e.type === 'Sale' ? 'bg-[#3B82F6] text-white' :
-                                e.type === 'Return' ? 'bg-[#EF4444] text-white' :
-                                  'bg-[#64748B] text-white'
+                            e.type === 'Sale' ? 'bg-[#3B82F6] text-white' :
+                              e.type === 'Return' ? 'bg-[#EF4444] text-white' :
+                                'bg-[#64748B] text-white'
                             }`}>{e.type || '-'}</span>
                         </td>
                         <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-[#3B82F6]">{e.reference || '-'}</td>
