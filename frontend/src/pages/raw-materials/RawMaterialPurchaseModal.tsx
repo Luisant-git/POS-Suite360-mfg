@@ -100,22 +100,29 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden relative">
         
         {/* Modal Header */}
-        <div className="bg-[#0B355B] text-white px-6 py-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Receipt size={20} className="text-amber-400" />
-            <h2 className="text-lg font-bold">Purchase Details</h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => handlePrint()} className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 text-[12px] font-bold transition-colors">
-              <Printer size={14} /> Print
-            </button>
-            <button onClick={generatePDF} className="bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-2 text-[12px] font-bold transition-colors">
-              <Download size={14} /> PDF
-            </button>
-            <div className="w-px h-6 bg-white/20"></div>
-            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white">
-              <X size={20} />
-            </button>
+        <div className="bg-[#0B355B] text-white px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
+              <div className="flex items-center gap-2">
+                <Receipt size={18} className="text-amber-400" />
+                <h2 className="text-base sm:text-lg font-bold">Purchase Details</h2>
+              </div>
+              <button onClick={onClose} className="sm:hidden p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 justify-end pt-1 sm:pt-0 border-t border-white/10 sm:border-0">
+              <button onClick={() => handlePrint()} className="flex-1 sm:flex-initial justify-center bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-1.5 text-[11px] sm:text-[12px] font-bold transition-colors">
+                <Printer size={13} /> Print
+              </button>
+              <button onClick={generatePDF} className="flex-1 sm:flex-initial justify-center bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 text-[11px] sm:text-[12px] font-bold transition-colors">
+                <Download size={13} /> PDF
+              </button>
+              <div className="hidden sm:block w-px h-6 bg-white/20"></div>
+              <button onClick={onClose} className="hidden sm:block p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -130,32 +137,32 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
         ) : (
           <>
             {/* --- WEB UI --- */}
-            <div className="flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
+            <div className="flex-1 overflow-auto p-3 sm:p-6 custom-scrollbar">
             {/* Invoice Header */}
-            <div className="border-b border-gray-200 pb-6 mb-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="border-b border-gray-200 pb-4 sm:pb-6 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
                 <div>
-                  <h1 className="text-2xl font-black text-gray-800 uppercase tracking-wide">RM Purchase Invoice</h1>
-                  <p className="text-gray-500 font-medium mt-1 print:hidden">Status: <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Completed</span></p>
+                  <h1 className="text-lg sm:text-2xl font-black text-gray-800 uppercase tracking-wide">RM Purchase Invoice</h1>
+                  <p className="text-gray-500 text-xs sm:text-sm font-medium mt-0.5 print:hidden">Status: <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Completed</span></p>
                 </div>
                 <div className="text-left sm:text-right">
-                  <h2 className="text-xl font-bold text-blue-600">{settings?.shopName || 'Suite360'}</h2>
-                  <p className="text-gray-500 text-sm mt-1">{settings?.shopAddress}</p>
-                  <p className="text-gray-500 text-sm">{settings?.phone}</p>
+                  <h2 className="text-base sm:text-xl font-bold text-blue-600">{settings?.shopName || 'Suite360'}</h2>
+                  <p className="text-gray-500 text-xs sm:text-sm mt-0.5">{settings?.shopAddress}</p>
+                  <p className="text-gray-500 text-xs sm:text-sm">{settings?.phone}</p>
                 </div>
               </div>
             </div>
 
             {/* Invoice Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 border border-gray-200 rounded-xl p-5 mb-6">
-              <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-slate-50 border border-gray-200 rounded-xl p-3.5 sm:p-5 mb-4 sm:mb-6">
+              <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                     <FileText size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Invoice Number</p>
-                    <p className="font-bold text-gray-800">{purchase.invoiceNo}</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Invoice Number</p>
+                    <p className="font-bold text-[13px] sm:text-base text-gray-800">{purchase.invoiceNo}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -163,8 +170,8 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                     <Calendar size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Date</p>
-                    <p className="font-bold text-gray-800">{new Date(purchase.date).toLocaleDateString()}</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Date</p>
+                    <p className="font-bold text-[13px] sm:text-base text-gray-800">{new Date(purchase.date).toLocaleDateString()}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -172,21 +179,21 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                     <CreditCard size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Payment Mode</p>
-                    <p className="font-bold text-gray-800">{purchase.paymentMode?.name || 'Cash'}</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Payment Mode</p>
+                    <p className="font-bold text-[13px] sm:text-base text-gray-800">{purchase.paymentMode?.name || 'Cash'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
                     <Building2 size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Supplier</p>
-                    <p className="font-bold text-gray-800">{purchase.supplier?.name}</p>
-                    {purchase.supplier?.phone && <p className="text-sm text-gray-600">{purchase.supplier.phone}</p>}
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Supplier</p>
+                    <p className="font-bold text-[13px] sm:text-base text-gray-800">{purchase.supplier?.name}</p>
+                    {purchase.supplier?.phone && <p className="text-xs sm:text-sm text-gray-600">{purchase.supplier.phone}</p>}
                   </div>
                 </div>
                 {purchase.supplierInvoiceNo && (
@@ -195,18 +202,42 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                       <Truck size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Supplier Bill No</p>
-                      <p className="font-bold text-gray-800">{purchase.supplierInvoiceNo}</p>
+                      <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Supplier Bill No</p>
+                      <p className="font-bold text-[13px] sm:text-base text-gray-800">{purchase.supplierInvoiceNo}</p>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Items Table */}
-            <div className="mb-6">
-              <h3 className="font-bold text-gray-800 mb-3 text-sm uppercase tracking-wider">Order Items</h3>
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            {/* Items Table / Cards */}
+            <div className="mb-4 sm:mb-6">
+              <h3 className="font-bold text-gray-800 mb-2 sm:mb-3 text-xs sm:text-sm uppercase tracking-wider">Order Items</h3>
+              
+              {/* Mobile Item Cards */}
+              <div className="sm:hidden space-y-2">
+                {purchase.items?.map((item: any, index: number) => (
+                  <div key={index} className="bg-white border border-gray-200 rounded-lg p-3">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-bold text-[13px] text-gray-800">{item.rawMaterial?.name}</span>
+                      <span className="font-black text-[14px] text-blue-600">{formatCurrency(item.amount)}</span>
+                    </div>
+                    <div className="text-[11px] text-gray-600 space-y-0.5">
+                      <div className="flex justify-between">
+                        <span>Dimensions:</span>
+                        <span className="font-semibold text-gray-700">{item.widthMm}mm × {item.lengthM}m ({Number(item.sqM).toFixed(3)} Sq.M)</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Qty: <strong className="text-gray-800">{item.quantity} Rolls</strong></span>
+                        <span>Price: <strong className="text-gray-800">{formatCurrency(item.price)}/Sq.M</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Items Table */}
+              <div className="hidden sm:block overflow-x-auto border border-gray-200 rounded-lg">
                 <table className="w-full text-left text-[13px] whitespace-nowrap">
                   <thead>
                     <tr className="bg-gray-100 text-gray-600 font-bold">

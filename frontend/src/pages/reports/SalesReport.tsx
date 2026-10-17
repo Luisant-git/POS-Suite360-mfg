@@ -300,7 +300,72 @@ const SalesReport = () => {
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="flex-1 overflow-auto overflow-x-auto">
-              <table className="w-full text-left text-[12px] whitespace-nowrap">
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-[#E2E8F0]">
+                {isLoading ? (
+                  <div className="p-6 text-center text-gray-500 font-bold">Loading sales records...</div>
+                ) : filteredSales.length === 0 ? (
+                  <div className="text-center p-6 text-gray-500">No sales records found.</div>
+                ) : (
+                  paginatedSales.map((s: any) => (
+                    <div key={s.id} className="p-3.5 bg-white hover:bg-[#F8FAFC]">
+                      <div className="flex justify-between items-start gap-2 mb-1.5">
+                        <div>
+                          <span className="font-black text-[#1E3A8A] text-[13px]">{s.invoiceNo}</span>
+                          <span className="text-[11px] text-gray-500 block">{s.date}</span>
+                        </div>
+                        <span className="font-black text-[15px] text-[#2563EB]">{s.netPayable}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[12px] text-gray-700 mb-2.5">
+                        <span className="font-bold">{s.customerName}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          s.paymentMode?.toLowerCase() === 'credit'
+                            ? 'bg-rose-500 text-white'
+                            : s.paymentMode?.toLowerCase() === 'cash'
+                              ? 'bg-[#22C55E] text-white'
+                              : 'bg-[#3B82F6] text-white'
+                        }`}>
+                          {s.paymentMode}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-dashed border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedViewSaleId(s.id);
+                            setIsViewModalOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded"
+                        >
+                          <Eye size={13} /> View
+                        </button>
+                        {settings?.enableInvoiceEdit && new Date(s.date).getTime() >= Date.now() - ((settings?.invoiceEditDays || 30) * 24 * 60 * 60 * 1000) && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/sales/pos?editId=${s.id}`)}
+                            className="flex items-center gap-1 text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded"
+                          >
+                            <Pencil size={13} /> Edit
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSale({ id: s.id });
+                            setIsPrintModalOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-bold text-white bg-[#3B82F6] hover:bg-[#2563EB] px-2.5 py-1 rounded-full"
+                        >
+                          <Printer size={12} /> Print
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <table className="hidden md:table w-full text-left text-[12px] whitespace-nowrap">
                 <thead>
                   <tr className="bg-[#0F172A] text-white font-bold">
                     <th className="px-4 py-3 border-r border-[#1E293B] w-12 text-center">S.No</th>

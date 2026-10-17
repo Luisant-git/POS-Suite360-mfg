@@ -96,22 +96,29 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden relative">
         
         {/* Modal Header */}
-        <div className="bg-[#0F172A] text-white px-6 py-4 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2">
-            <Layers size={20} className="text-amber-400" />
-            <h2 className="text-lg font-bold">Production Details</h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => handlePrint()} className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 text-[12px] font-bold transition-colors">
-              <Printer size={14} /> Print
-            </button>
-            <button onClick={generatePDF} className="bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-2 text-[12px] font-bold transition-colors">
-              <Download size={14} /> PDF
-            </button>
-            <div className="w-px h-6 bg-white/20"></div>
-            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white">
-              <X size={20} />
-            </button>
+        <div className="bg-[#0F172A] text-white px-4 sm:px-6 py-3 sm:py-4 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
+              <div className="flex items-center gap-2">
+                <Layers size={18} className="text-amber-400" />
+                <h2 className="text-base sm:text-lg font-bold">Production Details</h2>
+              </div>
+              <button onClick={onClose} className="sm:hidden p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 justify-end pt-1 sm:pt-0 border-t border-white/10 sm:border-0">
+              <button onClick={() => handlePrint()} className="flex-1 sm:flex-initial justify-center bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-1.5 text-[11px] sm:text-[12px] font-bold transition-colors">
+                <Printer size={13} /> Print
+              </button>
+              <button onClick={generatePDF} className="flex-1 sm:flex-initial justify-center bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded flex items-center gap-1.5 text-[11px] sm:text-[12px] font-bold transition-colors">
+                <Download size={13} /> PDF
+              </button>
+              <div className="hidden sm:block w-px h-6 bg-white/20"></div>
+              <button onClick={onClose} className="hidden sm:block p-1.5 hover:bg-white/10 rounded-lg transition-colors text-white/80 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -126,24 +133,24 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
         ) : (
           <>
             {/* --- WEB UI --- */}
-            <div className="flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
+            <div className="flex-1 overflow-auto p-3 sm:p-6 custom-scrollbar">
             {/* Invoice Header */}
-            <div className="border-b border-gray-200 pb-6 mb-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="border-b border-gray-200 pb-4 sm:pb-6 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
                 <div>
-                  <h1 className="text-2xl font-black text-gray-800 uppercase tracking-wide">Production Entry</h1>
-                  <p className="text-gray-500 font-medium mt-1 print:hidden">Status: <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Completed</span></p>
+                  <h1 className="text-lg sm:text-2xl font-black text-gray-800 uppercase tracking-wide">Production Entry</h1>
+                  <p className="text-gray-500 text-xs sm:text-sm font-medium mt-0.5 print:hidden">Status: <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Completed</span></p>
                 </div>
                 <div className="text-left sm:text-right">
-                  <h2 className="text-xl font-bold text-blue-600">{settings?.shopName || 'Suite360'}</h2>
-                  <p className="text-gray-500 text-sm mt-1">{settings?.shopAddress}</p>
-                  <p className="text-gray-500 text-sm">{settings?.phone}</p>
+                  <h2 className="text-base sm:text-xl font-bold text-blue-600">{settings?.shopName || 'Suite360'}</h2>
+                  <p className="text-gray-500 text-xs sm:text-sm mt-0.5">{settings?.shopAddress}</p>
+                  <p className="text-gray-500 text-xs sm:text-sm">{settings?.phone}</p>
                 </div>
               </div>
             </div>
 
             {/* Info Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 border border-gray-200 rounded-xl p-5 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-slate-50 border border-gray-200 rounded-xl p-3.5 sm:p-5 mb-4 sm:mb-8">
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
@@ -211,6 +218,13 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Footer */}
+          <div className="bg-gray-100 border-t border-gray-200 px-3 sm:px-5 py-2.5 sm:py-3 flex justify-end rounded-b-xl shrink-0">
+            <button onClick={onClose} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white px-4 sm:px-5 py-2 rounded text-[12px] sm:text-[13px] font-bold transition-colors shadow-sm text-center">
+              Close Window
+            </button>
           </div>
 
           {/* --- PRINT UI (Hidden in DOM, used by react-to-print) --- */}

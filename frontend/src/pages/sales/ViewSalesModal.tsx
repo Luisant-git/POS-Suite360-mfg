@@ -123,84 +123,141 @@ export default function ViewSalesModal({ saleId, onClose }: Props) {
   if (!sale) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white w-full max-w-5xl rounded-md shadow-lg overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4">
+      <div className="bg-white w-full max-w-5xl rounded-xl sm:rounded-md shadow-2xl overflow-hidden flex flex-col max-h-[96vh] sm:max-h-[90vh]">
         
         {/* Header */}
-        <div className="bg-[#3B82F6] text-white px-4 py-3 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="font-bold text-[16px]">Sales Invoice - {sale.invoiceNo}</h2>
-            <div className="flex gap-2 items-center text-[12px] text-blue-100">
-              <span>{sale.date ? new Date(sale.date).toISOString().split('T')[0] : ''}</span>
-              <span>•</span>
-              <span className={`flex items-center gap-1 font-bold px-2.5 py-0.5 rounded text-[11px] ${
-                sale.paymentMode?.name?.toLowerCase() === 'credit'
-                  ? 'bg-rose-500 text-white'
-                  : 'bg-[#22C55E] text-white'
-              }`}>
-                {sale.paymentMode?.name?.toLowerCase() === 'credit' ? 'CREDIT' : <><CheckCircle2 size={12} /> PAID</>}
-              </span>
+        <div className="bg-[#1E3A8A] text-white px-3 sm:px-5 py-3 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center justify-between sm:justify-start gap-3">
+              <div>
+                <h2 className="font-bold text-[14px] sm:text-[16px] flex items-center gap-1.5">
+                  <span>Sales Invoice</span>
+                  <span className="text-blue-200">#{sale.invoiceNo}</span>
+                </h2>
+                <div className="flex gap-2 items-center text-[11px] sm:text-[12px] text-blue-100 mt-0.5">
+                  <span>{sale.date ? new Date(sale.date).toISOString().split('T')[0] : ''}</span>
+                  <span>•</span>
+                  <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded text-[10px] ${
+                    sale.paymentMode?.name?.toLowerCase() === 'credit'
+                      ? 'bg-rose-500 text-white'
+                      : 'bg-[#22C55E] text-white'
+                  }`}>
+                    {sale.paymentMode?.name?.toLowerCase() === 'credit' ? 'CREDIT' : <><CheckCircle2 size={11} /> PAID</>}
+                  </span>
+                </div>
+              </div>
+              <button onClick={onClose} className="sm:hidden p-1.5 hover:bg-blue-800 rounded-full transition-colors text-white/90">
+                <X size={18} />
+              </button>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsPrintModalOpen(true)}
-              className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded font-bold text-[12px] transition-colors"
-            >
-              <Printer size={14} /> Print
-            </button>
-            <button 
-              onClick={handleShare}
-              disabled={isSharing}
-              className="flex items-center gap-1.5 bg-[#22C55E] hover:bg-[#16A34A] disabled:opacity-70 px-3 py-1.5 rounded font-bold text-[12px] transition-colors"
-            >
-              {isSharing ? (
-                <><Loader2 size={13} className="animate-spin" /> Preparing...</>
-              ) : (
-                <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share Invoice</>
-              )}
-            </button>
-            <button onClick={onClose} className="hover:bg-blue-600 p-1.5 rounded transition-colors ml-2"><X size={18} /></button>
+
+            <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t border-blue-700/60 sm:border-0">
+              <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                <button 
+                  onClick={() => setIsPrintModalOpen(true)}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded font-bold text-[11px] sm:text-[12px] transition-colors"
+                >
+                  <Printer size={13} /> Print
+                </button>
+                <button 
+                  onClick={handleShare}
+                  disabled={isSharing}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-[#22C55E] hover:bg-[#16A34A] disabled:opacity-70 px-3 py-1.5 rounded font-bold text-[11px] sm:text-[12px] transition-colors"
+                >
+                  {isSharing ? (
+                    <><Loader2 size={13} className="animate-spin" /> Preparing...</>
+                  ) : (
+                    <><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Share</>
+                  )}
+                </button>
+              </div>
+              <button onClick={onClose} className="hidden sm:block hover:bg-blue-800 p-1.5 rounded transition-colors ml-1 text-white/90">
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto bg-[#F8FAFC]">
-          <div className="flex gap-6 flex-col md:flex-row">
+        <div className="p-3 sm:p-6 overflow-y-auto bg-[#F8FAFC]">
+          <div className="flex gap-4 sm:gap-6 flex-col md:flex-row">
             
             {/* Left Column - Details */}
-            <div className="flex-1 space-y-6">
-              <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-                <div className="bg-[#1E293B] px-4 py-2 flex items-center gap-2 text-white">
-                  <FileText size={16} />
-                  <h3 className="font-bold text-[14px]">INVOICE DETAILS</h3>
+            <div className="flex-1 space-y-4 sm:space-y-6">
+              <div className="bg-white rounded-lg sm:rounded shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-[#1E293B] px-3.5 sm:px-4 py-2 flex items-center gap-2 text-white">
+                  <FileText size={15} />
+                  <h3 className="font-bold text-[13px] sm:text-[14px]">INVOICE DETAILS</h3>
                 </div>
-                <div className="p-5 flex justify-between">
+                <div className="p-3.5 sm:p-5 flex flex-col sm:flex-row justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Bill To</p>
-                    <p className="font-bold text-[15px] text-gray-800">{sale.customer?.name || 'Counter Sale'}</p>
-                    <p className="text-[13px] text-gray-600 mt-1">{sale.customer?.phone || 'No phone number'}</p>
-                    {sale.customer?.address && <p className="text-[13px] text-gray-600 mt-1 max-w-[250px]">{sale.customer.address}</p>}
+                    <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Bill To</p>
+                    <p className="font-bold text-[14px] sm:text-[15px] text-gray-800">{sale.customer?.name || 'Counter Sale'}</p>
+                    <p className="text-[12px] sm:text-[13px] text-gray-600 mt-0.5">{sale.customer?.phone || 'No phone number'}</p>
+                    {sale.customer?.address && <p className="text-[12px] sm:text-[13px] text-gray-600 mt-0.5 max-w-[280px]">{sale.customer.address}</p>}
                   </div>
-                  <div className="text-right">
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Payment Details</p>
-                    <p className={`font-bold text-[13px] sm:text-[14px] inline-block px-2.5 py-0.5 rounded ${
+                  <div className="sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
+                    <p className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Payment Details</p>
+                    <p className={`font-bold text-[12px] sm:text-[13px] inline-block px-2.5 py-0.5 rounded ${
                       sale.paymentMode?.name?.toLowerCase() === 'credit'
                         ? 'bg-rose-500 text-white'
                         : 'bg-[#22C55E] text-white'
                     }`}>
                       {sale.paymentMode?.name?.toUpperCase() || 'CASH'}
                     </p>
-                    <p className="text-[13px] text-gray-600 mt-1">Status: {sale.paymentMode?.name?.toLowerCase() === 'credit' ? 'Credit' : 'Paid'}</p>
+                    <p className="text-[12px] sm:text-[13px] text-gray-600 mt-1">Status: {sale.paymentMode?.name?.toLowerCase() === 'credit' ? 'Credit' : 'Paid'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-                <div className="bg-[#F8FAFC] px-4 py-2 border-b border-gray-200">
-                  <h3 className="font-bold text-[14px] text-gray-800">ITEMIZED BILLING</h3>
+              <div className="bg-white rounded-lg sm:rounded shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-[#F8FAFC] px-3.5 sm:px-4 py-2 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="font-bold text-[13px] sm:text-[14px] text-gray-800">ITEMIZED BILLING</h3>
+                  <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                    {sale.items?.length || 0} {sale.items?.length === 1 ? 'Item' : 'Items'}
+                  </span>
                 </div>
-                <div className="overflow-x-auto p-4">
+
+                {/* Mobile Cards View (Visible on small screens) */}
+                <div className="sm:hidden p-2.5 space-y-2">
+                  {sale.items?.map((item: any, idx: number) => {
+                    const displayName = item.isService 
+                      ? (item.itemName || item.serviceItem?.name || '')
+                      : (item.product?.name || '');
+                    return (
+                      <div key={idx} className="bg-slate-50 border border-slate-200/80 rounded-lg p-3">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex-1">
+                            <span className="font-bold text-[13px] text-gray-800 block">{displayName}</span>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-500">
+                              {!item.isService && item.product?.code && <span>Code: {item.product.code}</span>}
+                              {!item.isService && item.product?.hsnCode && <span>• HSN: {item.product.hsnCode}</span>}
+                            </div>
+                          </div>
+                          <span className="font-bold text-[14px] text-[#2563EB] shrink-0">
+                            {formatCurrency(item.amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200 text-[12px] text-gray-600">
+                          <div>
+                            Qty: <span className="font-bold text-gray-800">{item.quantity}</span> {item.isService ? 'Svc' : (item.product?.unit?.shortCode || item.product?.unit?.name || 'Nos')}
+                            <span className="mx-1 text-gray-300">|</span>
+                            Rate: <span className="font-medium text-gray-700">{formatCurrency(item.rate)}</span>
+                          </div>
+                          {item.discount > 0 && (
+                            <div className="text-red-500 text-[11px] font-bold">
+                              Disc: -{formatCurrency(item.discount)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop / Tablet Table View */}
+                <div className="hidden sm:block overflow-x-auto p-4">
                   <table className="w-full text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr className="border-b-2 border-gray-200 text-gray-500">
@@ -241,19 +298,21 @@ export default function ViewSalesModal({ saleId, onClose }: Props) {
 
             {/* Right Column - Summary */}
             <div className="w-full md:w-[320px] shrink-0">
-              <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-                <div className="bg-[#F8FAFC] px-4 py-2 border-b border-gray-200">
-                  <h3 className="font-bold text-[14px] text-gray-800">SUMMARY</h3>
+              <div className="bg-white rounded-lg sm:rounded shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-[#F8FAFC] px-3.5 sm:px-4 py-2 border-b border-gray-200">
+                  <h3 className="font-bold text-[13px] sm:text-[14px] text-gray-800">SUMMARY</h3>
                 </div>
-                <div className="p-4 space-y-3 text-[14px]">
+                <div className="p-3.5 sm:p-4 space-y-2.5 sm:space-y-3 text-[13px] sm:text-[14px]">
                   <div className="flex justify-between items-center text-gray-600">
                     <span>Subtotal</span>
                     <span className="font-bold">{formatCurrency(sale.subtotal)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-red-500 border-b border-gray-100 pb-3">
-                    <span>Discount</span>
-                    <span className="font-bold">- {formatCurrency(sale.discount)}</span>
-                  </div>
+                  {Number(sale.discount) > 0 && (
+                    <div className="flex justify-between items-center text-red-500 border-b border-gray-100 pb-2.5">
+                      <span>Discount</span>
+                      <span className="font-bold">- {formatCurrency(sale.discount)}</span>
+                    </div>
+                  )}
                   {settings?.enableTax && (
                     (() => {
                       if (Number(sale.tax) === 0) return null;
@@ -283,9 +342,9 @@ export default function ViewSalesModal({ saleId, onClose }: Props) {
                       }
                     })()
                   )}
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-[16px] font-black text-gray-900">GRAND TOTAL</span>
-                    <span className="text-[20px] font-black text-[#2563EB]">{formatCurrency(sale.grandTotal)}</span>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                    <span className="text-[14px] sm:text-[16px] font-black text-gray-900">GRAND TOTAL</span>
+                    <span className="text-[18px] sm:text-[20px] font-black text-[#2563EB]">{formatCurrency(sale.grandTotal)}</span>
                   </div>
                 </div>
               </div>
@@ -295,8 +354,8 @@ export default function ViewSalesModal({ saleId, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-100 border-t border-gray-200 px-3 sm:px-5 py-2 sm:py-3 flex justify-end rounded-b-md shrink-0">
-          <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white px-4 sm:px-5 py-2 rounded text-[12px] sm:text-[13px] font-bold transition-colors shadow-sm">
+        <div className="bg-gray-100 border-t border-gray-200 px-3 sm:px-5 py-2.5 sm:py-3 flex justify-end rounded-b-xl sm:rounded-b-md shrink-0">
+          <button onClick={onClose} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-700 text-white px-4 sm:px-5 py-2 rounded text-[12px] sm:text-[13px] font-bold transition-colors shadow-sm text-center">
             Close Window
           </button>
         </div>

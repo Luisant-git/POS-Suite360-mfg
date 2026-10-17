@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, FileText, Download, Calendar, FileDigit, Truck, RotateCcw, Plus, Eye } from 'lucide-react';
+import { Search, FileText, Download, Calendar, FileDigit, Truck, RotateCcw, Plus, Eye, Filter, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
@@ -14,6 +14,7 @@ import TableLoader from '../../components/TableLoader';
 const RawMaterialPurchaseReport = () => {
   const navigate = useNavigate();
   const { formatCurrency, settings } = useSettings();
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [supplierId, setSupplierId] = useState('');
@@ -80,8 +81,55 @@ const RawMaterialPurchaseReport = () => {
 
       <ReportTabs />
 
-      {/* Filter Section */}
-      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md mb-4 p-4 shrink-0">
+      {/* Mobile Quick Bar */}
+      <div className="md:hidden flex items-center justify-between gap-2 mb-2 shrink-0">
+        <div className="flex gap-2 flex-1">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="w-1/2 px-2 py-1.5 border border-[#CBD5E1] rounded text-[12px] font-bold text-black"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="w-1/2 px-2 py-1.5 border border-[#CBD5E1] rounded text-[12px] font-bold text-black"
+          />
+        </div>
+        <button
+          onClick={() => setIsFilterOpen(true)}
+          className="flex items-center gap-1 shrink-0 bg-[#1E3A8A] text-white px-3 py-1.5 rounded text-[12px] font-bold"
+        >
+          <Filter size={16} />
+        </button>
+      </div>
+
+      {isFilterOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9998] md:hidden"
+          onClick={() => setIsFilterOpen(false)}
+        />
+      )}
+
+      {/* Filter Section - Desktop Inline & Mobile Drawer */}
+      <div
+        className={`bg-white border border-[#E2E8F0] shadow-sm rounded-md mb-3 p-4 shrink-0 ${
+          isFilterOpen
+            ? 'fixed inset-y-0 right-0 w-[290px] sm:w-[320px] z-[9999] m-0 rounded-none rounded-l-xl overflow-y-auto shadow-2xl'
+            : 'hidden md:block'
+        }`}
+      >
+        <div className="flex justify-between items-center pb-3 border-b border-[#E2E8F0] mb-3 md:hidden">
+          <h3 className="font-bold text-[15px] text-[#1E3A8A]">RM Purchase Filters</h3>
+          <button
+            onClick={() => setIsFilterOpen(false)}
+            className="p-1.5 bg-red-50 text-red-600 rounded-full"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
 
           <div>
@@ -156,16 +204,28 @@ const RawMaterialPurchaseReport = () => {
 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-2 border-t border-dashed border-[#E2E8F0] gap-3 md:gap-0">
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <button type="button" onClick={() => refetch()} className="bg-[#0F172A] hover:bg-[#1E293B] text-white px-4 py-1.5 rounded-md flex items-center gap-2 text-[13px] font-bold transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                refetch();
+                setIsFilterOpen(false);
+              }}
+              className="flex-1 md:flex-initial justify-center bg-[#0F172A] hover:bg-[#1E293B] text-white px-4 py-1.5 rounded-md flex items-center gap-2 text-[13px] font-bold transition-colors"
+            >
               <Search size={14} /> Apply Filter
             </button>
-            <button type="button" onClick={() => {
-              setFromDate(new Date(new Date().setDate(1)).toISOString().split('T')[0]);
-              setToDate(new Date().toISOString().split('T')[0]);
-              setSupplierId('');
-              setInvoiceNo('');
-              setQuickSearch('');
-            }} className="text-[#64748B] hover:text-[#334155] flex items-center gap-1 text-[13px] font-bold transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate(new Date(new Date().setDate(1)).toISOString().split('T')[0]);
+                setToDate(new Date().toISOString().split('T')[0]);
+                setSupplierId('');
+                setInvoiceNo('');
+                setQuickSearch('');
+                setIsFilterOpen(false);
+              }}
+              className="text-[#64748B] hover:text-[#334155] flex items-center gap-1 text-[13px] font-bold transition-colors"
+            >
               <RotateCcw size={14} /> Reset Filters
             </button>
           </div>
@@ -174,20 +234,20 @@ const RawMaterialPurchaseReport = () => {
 
       {/* Report Table Section */}
       <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col flex-1">
-        <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 shrink-0">
+        <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-3 sm:px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 shrink-0">
           <div className="flex items-center gap-2 text-[#64748B]">
             <FileText size={16} />
             <h2 className="font-bold text-[13px] tracking-wide">RAW MATERIAL PURCHASE REPORT</h2>
           </div>
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
+            <div className="relative flex-1 md:flex-initial">
               <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
               <input
                 type="text"
                 value={quickSearch}
                 onChange={(e) => setQuickSearch(e.target.value)}
-                placeholder="Quick search table..."
-                className="pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] w-64 focus:border-[#3B82F6]"
+                placeholder="Quick search..."
+                className="w-full pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] md:w-64 focus:border-[#3B82F6]"
               />
             </div>
             <button type="button"
@@ -260,7 +320,61 @@ const RawMaterialPurchaseReport = () => {
         </div>
 
         <div className="flex-1 overflow-auto overflow-x-auto">
-          <table className="w-full text-left text-[12px] whitespace-nowrap">
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-[#E2E8F0]">
+            {isLoading ? (
+              <div className="p-6 text-center text-gray-500 font-bold">Loading RM purchases...</div>
+            ) : filteredPurchases.length === 0 ? (
+              <div className="text-center p-6 text-gray-500">No purchase records found.</div>
+            ) : (
+              paginatedPurchases.map((p: any) => (
+                <div key={p.id} className="p-3.5 bg-white hover:bg-[#F8FAFC]">
+                  <div className="flex justify-between items-start gap-2 mb-1.5">
+                    <div>
+                      <span className="font-black text-[#1E3A8A] text-[13px]">{p.entryNo}</span>
+                      <span className="text-[11px] text-gray-500 block">Inv: {p.invoiceNo} • {p.date}</span>
+                    </div>
+                    <span className="font-black text-[15px] text-[#2563EB]">{p.netAmount}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[12px] text-gray-700 mb-2">
+                    <span className="font-bold">{p.supplierName}</span>
+                    <span className="inline-block px-2 py-0.5 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase">
+                      {p.paymentMode?.name || 'Cash'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 bg-slate-50 p-2 rounded text-[11px] text-gray-600 mb-2">
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Inv Value</span>
+                      <span className="font-bold text-gray-800">{p.invoiceValue}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Transport</span>
+                      <span className="font-bold text-gray-800">{p.transportCharge}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Wages</span>
+                      <span className="font-bold text-gray-800">{p.wages}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setViewId(p.id)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded"
+                    >
+                      <Eye size={13} /> View Invoice
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="hidden md:table w-full text-left text-[12px] whitespace-nowrap">
             <thead>
               <tr className="bg-[#0F172A] text-white font-bold">
                 <th className="px-4 py-3 border-r border-[#1E293B] text-center">S.No</th>

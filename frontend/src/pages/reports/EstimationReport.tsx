@@ -377,7 +377,57 @@ const EstimationReport = () => {
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="flex-1 overflow-auto overflow-x-auto">
-              <table className="w-full text-left text-[12px] whitespace-nowrap">
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-[#E2E8F0]">
+                {isLoading ? (
+                  <div className="p-6 text-center text-gray-500 font-bold">Loading estimation records...</div>
+                ) : filteredEstimations.length === 0 ? (
+                  <div className="text-center p-6 text-gray-500">No estimation records found.</div>
+                ) : (
+                  paginatedEstimations.map((e: any) => (
+                    <div key={e.id} className="p-3.5 bg-white hover:bg-[#F8FAFC]">
+                      <div className="flex justify-between items-start gap-2 mb-1.5">
+                        <div>
+                          <span className="font-black text-[#1E3A8A] text-[13px]">{e.estimationNo}</span>
+                          <span className="text-[11px] text-gray-500 block">{e.date}</span>
+                        </div>
+                        <span className="font-black text-[15px] text-[#2563EB]">{e.netPayable}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[12px] text-gray-700 mb-2.5">
+                        <span className="font-bold">{e.customerName}</span>
+                        <span className={`${getStatusColor(e.status)} text-white px-2 py-0.5 rounded text-[10px] font-bold`}>
+                          {e.status?.toUpperCase() || 'PENDING'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-dashed border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedViewEstimationId(e.id);
+                            setIsViewModalOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded"
+                        >
+                          <Eye size={13} /> View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedEstimation({ id: e.id });
+                            setIsPrintModalOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-bold text-white bg-[#3B82F6] hover:bg-[#2563EB] px-2.5 py-1 rounded-full"
+                        >
+                          <Printer size={12} /> Print
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <table className="hidden md:table w-full text-left text-[12px] whitespace-nowrap">
                 <thead>
                   <tr className="bg-[#0F172A] text-white font-bold">
                     <th className="px-4 py-3 border-r border-[#1E293B] text-center w-12">S.No</th>
