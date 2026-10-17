@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Trash2, Save, X, Printer, RefreshCw, List, UserPlus, AlertTriangle, FileText, Clock, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Save, X, Printer, RefreshCw, List, UserPlus, AlertTriangle, FileText, Clock, DollarSign, Search, ShoppingCart, User, CheckCircle, MinusCircle, PlusCircle, ChevronRight } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
@@ -856,63 +856,216 @@ const POS = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSubmit, isCustomerModalOpen, showLossWarning, isSaveModalOpen, isLeaveModalOpen, handleClear, append, navigate, onSubmit, onError]);
 
+  // ─── Mobile View State & Handlers (Matches mobile/src/app/(tabs)/sales-entry.tsx) ───
+  const [mobileSearch, setMobileSearch] = useState('');
+  const [isMobileCheckoutOpen, setIsMobileCheckoutOpen] = useState(false);
+  const [isMobileCustomerPickerOpen, setIsMobileCustomerPickerOpen] = useState(false);
+  const [mobileCustomerSearch, setMobileCustomerSearch] = useState('');
+  const [isMobileEditItemOpen, setIsMobileEditItemOpen] = useState(false);
+  const [mobileEditingIndex, setMobileEditingIndex] = useState<number | null>(null);
+  const [mobileEditQty, setMobileEditQty] = useState('');
+  const [mobileEditRate, setMobileEditRate] = useState('');
+  const [mobileEditDiscPct, setMobileEditDiscPct] = useState('');
+
+  // Default payment mode if none selected
+  useEffect(() => {
+    if (!watch('paymentModeId') && paymentModes.length > 0) {
+      const cash = paymentModes.find((m: any) => m.name.toLowerCase() === 'cash');
+      setValue('paymentModeId', cash ? cash.id : paymentModes[0].id);
+    }
+  }, [paymentModes, setValue, watch]);
+
+  const handleMobileAddToCart = (product: any) => {
+    const currentItems = getValues('items') || [];
+    const isSvc = !!product.isService;
+    const existingIdx = currentItems.findIndex((it: any) =>
+      isSvc ? (it.isService && it.serviceItemId === product.originalServiceId) : (Number(it.productId) === Number(product.id))
+    );
+
+    if (existingIdx >= 0) {
+      const curQty = Number(currentItems[existingIdx].quantity) || 0;
+      const newQty = curQty + 1;
+      if (!isSvc && newQty > (product.currentStock || 0)) {
+        toast.error(`Cannot exceed stock (${product.currentStock})`);
+        return;
+      }
+      setValue(`items.${existingIdx}.quantity`, newQty, { shouldValidate: true });
+      const rate = Number(currentItems[existingIdx].rate) || 0;
+      const discAmt = Number(currentItems[existingIdx].discAmt) || 0;
+      setValue(`items.${existingIdx}.total`, Number(((newQty * rate) - discAmt).toFixed(2)), { shouldValidate: true });
+    } else {
+      const rateType = getValues('rateType');
+      let rate = Number(product.sellingRate) || 0;
+      if (rateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
+      else if (rateType === 'MRP') rate = Number(product.mrp) || 0;
+
+      if ((settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && !isSvc) {
+        let customRate = customerRates?.find((r: any) => r.productId === product.id);
+        if (!customRate && selectedCustomer?.productRates) {
+          customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
+        }
+        if (customRate && Number(customRate.rate) > 0) {
+          rate = Number(customRate.rate);
+        }
+      }
+
+      const newItem = {
+        productId: isSvc ? 0 : Number(product.id),
+        quantity: 1,
+        stock: isSvc ? 999999 : Number(product.currentStock || 0),
+        rate: rate > 0 ? rate : 0,
+        unit: product.unit?.shortCode || product.unit?.name || 'Nos',
+        discPercent: 0,
+        discAmt: 0,
+        tax: 0,
+        total: rate > 0 ? rate : 0,
+        isService: isSvc,
+        serviceItemId: isSvc ? product.originalServiceId : undefined,
+        itemName: isSvc ? product.name : undefined,
+      };
+
+      if (currentItems.length === 1 && !currentItems[0].productId && !currentItems[0].serviceItemId) {
+        setValue('items.0', newItem, { shouldValidate: true });
+      } else {
+        append(newItem);
+      }
+    }
+  };
+
+  const handleMobileRemoveOne = (originalIndex: number) => {
+    const currentItems = getValues('items') || [];
+    const it = currentItems[originalIndex];
+    if (!it) return;
+    const curQty = Number(it.quantity) || 0;
+    if (curQty <= 1) {
+      if (currentItems.length === 1) {
+        setValue('items.0', { productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 }, { shouldValidate: true });
+      } else {
+        remove(originalIndex);
+      }
+    } else {
+      const newQty = curQty - 1;
+      setValue(`items.${originalIndex}.quantity`, newQty, { shouldValidate: true });
+      const rate = Number(it.rate) || 0;
+      const discAmt = Number(it.discAmt) || 0;
+      setValue(`items.${originalIndex}.total`, Number(((newQty * rate) - discAmt).toFixed(2)), { shouldValidate: true });
+    }
+  };
+
+  const handleMobileDeleteItem = (originalIndex: number) => {
+    const currentItems = getValues('items') || [];
+    if (currentItems.length === 1) {
+      setValue('items.0', { productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 }, { shouldValidate: true });
+    } else {
+      remove(originalIndex);
+    }
+  };
+
+  const handleMobileOpenEdit = (originalIndex: number) => {
+    const currentItems = getValues('items') || [];
+    const it = currentItems[originalIndex];
+    if (!it) return;
+    setMobileEditingIndex(originalIndex);
+    setMobileEditQty(String(it.quantity || 1));
+    setMobileEditRate(String(it.rate || 0));
+    setMobileEditDiscPct(String(it.discPercent || 0));
+    setIsMobileEditItemOpen(true);
+  };
+
+  const handleMobileSaveEdit = () => {
+    if (mobileEditingIndex === null) return;
+    const qty = parseFloat(mobileEditQty) || 1;
+    const rate = parseFloat(mobileEditRate) || 0;
+    const discPct = parseFloat(mobileEditDiscPct) || 0;
+    const gross = qty * rate;
+    const discAmt = parseFloat(((gross * discPct) / 100).toFixed(2));
+    const total = parseFloat((gross - discAmt).toFixed(2));
+
+    setValue(`items.${mobileEditingIndex}.quantity`, qty, { shouldValidate: true });
+    setValue(`items.${mobileEditingIndex}.rate`, rate, { shouldValidate: true });
+    setValue(`items.${mobileEditingIndex}.discPercent`, discPct, { shouldValidate: true });
+    setValue(`items.${mobileEditingIndex}.discAmt`, discAmt, { shouldValidate: true });
+    setValue(`items.${mobileEditingIndex}.total`, total, { shouldValidate: true });
+    setIsMobileEditItemOpen(false);
+    setMobileEditingIndex(null);
+  };
+
+  const filteredMobileProducts = products.filter((p: any) =>
+    (p.name || '').toLowerCase().includes(mobileSearch.toLowerCase()) ||
+    (p.code || '').toLowerCase().includes(mobileSearch.toLowerCase())
+  );
+
+  const filteredMobileCustomers = customers.filter((c: any) =>
+    (c.name || '').toLowerCase().includes(mobileCustomerSearch.toLowerCase()) ||
+    (c.phone || '').includes(mobileCustomerSearch)
+  );
+
+  const validMobileCartItems = (watch('items') || []).map((it, idx) => ({ ...it, originalIndex: idx })).filter(
+    (it: any) => (it.productId && Number(it.productId) > 0) || it.serviceItemId
+  );
+
+  const mobileCartTotalQty = validMobileCartItems.reduce((s: number, it: any) => s + (Number(it.quantity) || 0), 0);
+
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col font-sans overflow-hidden z-10 print:static print:block print:overflow-visible print:h-auto print:bg-white">
 
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-2 sm:px-4 py-2 flex flex-wrap gap-2 justify-between items-center shrink-0 print:hidden">
-        <div className="flex flex-wrap gap-2">
+      {/* ─── DESKTOP VIEW (MD and above) ─── */}
+      <div className="hidden md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden">
+
+        {/* Top Bar */}
+        <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-2 sm:px-4 py-2 flex flex-wrap gap-2 justify-between items-center shrink-0 print:hidden">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleSubmit(onSubmit as any, onError)}
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
+            >
+              <Printer size={16} /> <span className="hidden sm:inline">{editId ? 'UPDATE & PRINT' : 'SAVE & PRINT'} (F10)</span><span className="sm:hidden">{editId ? 'Update' : 'Save'}</span>
+            </button>
+            {!editId && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  className="bg-[#D97706] hover:bg-[#B45309] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
+                >
+                  <Save size={16} /> <span className="hidden sm:inline">Save Draft</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDraftsModalOpen(true)}
+                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors relative"
+                >
+                  <Clock size={16} /> <span className="hidden sm:inline">Drafts</span>
+                  {drafts.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-white text-[#7C3AED] text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">{drafts.length}</span>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
           <button
             type="button"
-            onClick={handleSubmit(onSubmit as any, onError)}
-            className="bg-[#10B981] hover:bg-[#059669] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
+            onClick={() => setIsLeaveModalOpen(true)}
+            className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
           >
-            <Printer size={16} /> <span className="hidden sm:inline">{editId ? 'UPDATE & PRINT' : 'SAVE & PRINT'} (F10)</span><span className="sm:hidden">{editId ? 'Update' : 'Save'}</span>
+            <X size={16} /> <span className="hidden sm:inline">Close (Esc)</span>
           </button>
-          {!editId && (
-            <>
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                className="bg-[#D97706] hover:bg-[#B45309] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
-              >
-                <Save size={16} /> <span className="hidden sm:inline">Save Draft</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsDraftsModalOpen(true)}
-                className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors relative"
-              >
-                <Clock size={16} /> <span className="hidden sm:inline">Drafts</span>
-                {drafts.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-white text-[#7C3AED] text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">{drafts.length}</span>
-                )}
-              </button>
-            </>
-          )}
         </div>
-        <button
-          type="button"
-          onClick={() => setIsLeaveModalOpen(true)}
-          className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
-        >
-          <X size={16} /> <span className="hidden sm:inline">Close (Esc)</span>
-        </button>
-      </div>
 
-      {editId && (
-        <div className="bg-amber-100 border-b border-amber-300 text-amber-800 px-4 py-1.5 text-[12px] font-bold flex items-center gap-2 shrink-0 print:hidden">
-          <FileText size={14} /> Editing Invoice {editSaleData?.invoiceNo || `#${editId}`} — changes will reverse and re-apply the stock automatically.
-        </div>
-      )}
+        {editId && (
+          <div className="bg-amber-100 border-b border-amber-300 text-amber-800 px-4 py-1.5 text-[12px] font-bold flex items-center gap-2 shrink-0 print:hidden">
+            <FileText size={14} /> Editing Invoice {editSaleData?.invoiceNo || `#${editId}`} — changes will reverse and re-apply the stock automatically.
+          </div>
+        )}
 
-      <form className="flex flex-col flex-1 min-h-0 overflow-hidden print:hidden" onSubmit={handleSubmit(onSubmit as any, onError)}>
+        <form className="flex flex-col flex-1 min-h-0 overflow-hidden print:hidden" onSubmit={handleSubmit(onSubmit as any, onError)}>
 
-        {/* Header Section */}
-        <div className="bg-white p-3 sm:p-4 border-b border-[#E5E7EB] shrink-0">
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:flex lg:flex-row gap-3 sm:gap-4">
+          {/* Header Section */}
+          <div className="bg-white p-3 sm:p-4 border-b border-[#E5E7EB] shrink-0">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:flex lg:flex-row gap-3 sm:gap-4">
 
-            <div className="w-full lg:flex-1 lg:max-w-[200px]">
+              <div className="w-full lg:flex-1 lg:max-w-[200px]">
               <label className="block text-[11px] font-bold text-[#1F2937] mb-1">Entry No</label>
               <input
                 {...register('invoiceNo')}
@@ -1507,6 +1660,517 @@ const POS = () => {
         </div>
 
       </form>
+      </div>
+
+      {/* ─── MOBILE VIEW (< MD) ─── */}
+      <div className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden relative bg-[#F3F4F6]">
+        {/* Mobile Header */}
+        <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-4 py-3 shrink-0 shadow-md">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-extrabold text-white leading-tight">
+                {editId ? 'Edit Invoice' : 'Sales Entry'}
+              </h1>
+              <p className="text-xs text-blue-200 mt-0.5 font-medium">
+                {editId ? (editSaleData?.invoiceNo || `#${editId}`) : 'Tap a product to add to cart'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {validMobileCartItems.length > 0 && !editId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Clear all items from sale?')) handleClear();
+                  }}
+                  className="flex items-center gap-1.5 bg-red-500/20 border border-red-500/40 text-red-200 px-2.5 py-1.5 rounded-lg text-xs font-bold active:bg-red-500/30 transition-colors"
+                >
+                  <RefreshCw size={13} />
+                  <span>Clear</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsLeaveModalOpen(true)}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Search Bar */}
+        <div className="px-3 py-2 bg-white border-b border-slate-200 shrink-0">
+          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 h-10 gap-2">
+            <Search size={16} className="text-slate-400 shrink-0" />
+            <input
+              type="text"
+              value={mobileSearch}
+              onChange={(e) => setMobileSearch(e.target.value)}
+              placeholder="Search product name or code..."
+              className="flex-1 bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none font-medium"
+            />
+            {mobileSearch.length > 0 && (
+              <button type="button" onClick={() => setMobileSearch('')} className="text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Product Catalog Cards */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2.5 pb-24">
+          {filteredMobileProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <p className="text-sm font-semibold">No products found</p>
+            </div>
+          ) : (
+            filteredMobileProducts.map((item: any) => {
+              const inCart = validMobileCartItems.find((c: any) =>
+                item.isService ? c.serviceItemId === item.originalServiceId : Number(c.productId) === Number(item.id)
+              );
+              const outOfStock = !item.isService && Number(item.currentStock) <= 0;
+              const rate = Number(item.sellingRate) || 0;
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => !outOfStock && handleMobileAddToCart(item)}
+                  className={`bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm flex items-center justify-between transition-all select-none ${
+                    outOfStock ? 'opacity-50 cursor-not-allowed' : 'active:scale-[0.99] cursor-pointer hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0 pr-3">
+                    <p className="font-bold text-slate-800 text-sm leading-snug line-clamp-1">{item.name}</p>
+                    <p className="text-[11px] text-slate-400 font-semibold tracking-wide mt-0.5">{item.code}</p>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      {item.isService ? (
+                        <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          Service
+                        </span>
+                      ) : outOfStock ? (
+                        <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          Out of Stock
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          Stock: {item.currentStock}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span className="text-base font-extrabold text-emerald-600">
+                      {formatCurrency(rate)}
+                    </span>
+                    {inCart ? (
+                      <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-[#1E3A8A] px-2.5 py-1 rounded-lg font-black text-xs">
+                        <ShoppingCart size={13} />
+                        <span>{inCart.quantity}</span>
+                      </div>
+                    ) : (
+                      <div className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-white shadow-sm ${
+                        outOfStock ? 'bg-slate-400' : 'bg-[#1E3A8A]'
+                      }`}>
+                        <Plus size={13} />
+                        <span>{outOfStock ? 'OOS' : 'Add'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Floating Cart Bar */}
+        {validMobileCartItems.length > 0 && (
+          <div
+            onClick={() => setIsMobileCheckoutOpen(true)}
+            className="fixed bottom-4 left-3 right-3 z-30 bg-[#1E3A8A] text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative bg-blue-50 text-[#1E3A8A] p-2 rounded-xl">
+                <ShoppingCart size={20} />
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#1E3A8A]">
+                  {mobileCartTotalQty}
+                </span>
+              </div>
+              <div>
+                <p className="text-lg font-black leading-tight text-white">
+                  {formatCurrency(watch('netAmount') || 0)}
+                </p>
+                <p className="text-xs text-blue-200 font-medium">
+                  {validMobileCartItems.length} item{validMobileCartItems.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl font-bold text-sm text-white">
+              <span>Checkout</span>
+              <ChevronRight size={18} />
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Checkout Drawer / Modal */}
+        {isMobileCheckoutOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end animate-in fade-in duration-200">
+            <div className="bg-white rounded-t-3xl max-h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+              <div className="flex justify-between items-center px-4 py-3.5 border-b border-slate-100 bg-slate-50">
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800">Checkout</h3>
+                  <p className="text-[11px] text-slate-500">Invoice: {watch('invoiceNo') || 'Generating...'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCheckoutOpen(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Cart Items List */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                    Items ({validMobileCartItems.length})
+                  </p>
+                  <div className="space-y-2">
+                    {validMobileCartItems.map((item: any) => {
+                      const prod = products.find((p: any) => p.id === Number(item.productId));
+                      const itemName = item.isService ? (item.itemName || 'Service Item') : (prod?.name || `Product #${item.productId}`);
+                      const itemCode = prod?.code || '';
+                      const discPercent = Number(item.discPercent) || 0;
+
+                      return (
+                        <div key={item.originalIndex} className="bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
+                          <div
+                            onClick={() => handleMobileOpenEdit(item.originalIndex)}
+                            className="flex justify-between items-start cursor-pointer"
+                          >
+                            <div className="flex-1 pr-2">
+                              <p className="text-sm font-bold text-slate-800 line-clamp-1">{itemName}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {itemCode && `${itemCode} · `}Rate: {formatCurrency(item.rate)}
+                                {discPercent > 0 && ` · Disc: ${discPercent}%`}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-extrabold text-emerald-600">
+                                {formatCurrency(item.total)}
+                              </p>
+                              <span className="text-[10px] text-slate-400 font-medium">tap to edit</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 pt-1 border-t border-slate-200/60">
+                            <button
+                              type="button"
+                              onClick={() => handleMobileRemoveOne(item.originalIndex)}
+                              className="text-red-500 hover:text-red-600 active:scale-90 transition-transform"
+                            >
+                              <MinusCircle size={22} />
+                            </button>
+                            <span className="text-base font-extrabold text-slate-800 min-w-[28px] text-center">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleMobileAddToCart(prod || { id: item.productId, sellingRate: item.rate })}
+                              className="text-emerald-500 hover:text-emerald-600 active:scale-90 transition-transform"
+                            >
+                              <PlusCircle size={22} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMobileDeleteItem(item.originalIndex)}
+                              className="ml-auto text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Customer Selector */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Customer</p>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileCustomerPickerOpen(true)}
+                    className="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <User size={18} className="text-slate-500 shrink-0" />
+                      <div className="truncate">
+                        <p className="text-sm font-bold text-slate-800 truncate">
+                          {selectedCustomer ? selectedCustomer.name : 'Walk-in (Cash)'}
+                        </p>
+                        {selectedCustomer?.phone && (
+                          <p className="text-xs text-slate-400">{selectedCustomer.phone}</p>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="text-slate-400 shrink-0" />
+                  </button>
+                </div>
+
+                {/* Rate Type */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Rate Type</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Retail Rate', 'Wholesale Rate', 'MRP'].map((rt) => (
+                      <button
+                        key={rt}
+                        type="button"
+                        onClick={() => setValue('rateType', rt)}
+                        className={`py-2 px-2 text-xs font-bold rounded-xl border text-center transition-all ${
+                          watch('rateType') === rt
+                            ? 'bg-[#1E3A8A] border-[#1E3A8A] text-white shadow-sm'
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {rt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Payment Mode */}
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Payment Mode</p>
+                  <div className="flex flex-wrap gap-2">
+                    {paymentModes.map((pm: any) => {
+                      const isSelected = Number(watch('paymentModeId')) === Number(pm.id);
+                      return (
+                        <button
+                          key={pm.id}
+                          type="button"
+                          onClick={() => setValue('paymentModeId', pm.id)}
+                          className={`px-3.5 py-2 rounded-xl border text-xs font-bold transition-all min-w-[70px] ${
+                            isSelected
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
+                              : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {pm.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Totals Summary */}
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-2">
+                  <div className="flex justify-between text-xs text-slate-500 font-semibold">
+                    <span>Total Items:</span>
+                    <span className="text-slate-800 font-bold">{mobileCartTotalQty}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 font-semibold">
+                    <span>Gross Amount:</span>
+                    <span className="text-slate-800 font-bold">{formatCurrency(watch('grossAmount') || 0)}</span>
+                  </div>
+                  {Number(watch('totalDiscount')) > 0 && (
+                    <div className="flex justify-between text-xs text-red-500 font-semibold">
+                      <span>Total Discount:</span>
+                      <span>- {formatCurrency(watch('totalDiscount') || 0)}</span>
+                    </div>
+                  )}
+                  {settings?.enableTax && Number(watch('tax')) > 0 && (
+                    <div className="flex justify-between text-xs text-slate-500 font-semibold">
+                      <span>Total Tax:</span>
+                      <span className="text-slate-800 font-bold">{formatCurrency(watch('tax') || 0)}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200 pt-2.5 flex justify-between items-center">
+                    <span className="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Net Amount:</span>
+                    <span className="text-2xl font-black text-emerald-600">
+                      {formatCurrency(watch('netAmount') || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Confirm / Save Button */}
+              <div className="p-4 border-t border-slate-200 bg-white shrink-0">
+                <button
+                  type="button"
+                  disabled={createMutation.isPending}
+                  onClick={() => {
+                    setIsMobileCheckoutOpen(false);
+                    handleSubmit(onSubmit as any, onError)();
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-50 text-white py-3.5 rounded-xl font-extrabold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+                >
+                  <CheckCircle size={20} />
+                  <span>{createMutation.isPending ? 'SAVING...' : 'CONFIRM SALE'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Picker Modal */}
+        {isMobileCustomerPickerOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end animate-in fade-in duration-200">
+            <div className="bg-white rounded-t-3xl max-h-[75vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+              <div className="flex justify-between items-center px-4 py-3.5 border-b border-slate-100 bg-slate-50">
+                <h3 className="text-base font-extrabold text-slate-800">Select Customer</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileCustomerPickerOpen(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-3 border-b border-slate-100 flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 h-10 gap-2">
+                  <Search size={16} className="text-slate-400" />
+                  <input
+                    type="text"
+                    value={mobileCustomerSearch}
+                    onChange={(e) => setMobileCustomerSearch(e.target.value)}
+                    placeholder="Search name or phone..."
+                    className="flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder-slate-400 font-medium"
+                    autoFocus
+                  />
+                  {mobileCustomerSearch.length > 0 && (
+                    <button type="button" onClick={() => setMobileCustomerSearch('')} className="text-slate-400">
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileCustomerPickerOpen(false);
+                    setIsCustomerModalOpen(true);
+                  }}
+                  className="bg-emerald-600 text-white px-3 h-10 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 shadow-sm"
+                >
+                  <Plus size={14} />
+                  <span>New</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                <div
+                  onClick={() => {
+                    setValue('customerId', 0);
+                    setIsMobileCustomerPickerOpen(false);
+                  }}
+                  className={`p-3.5 cursor-pointer hover:bg-slate-50 transition-colors ${
+                    !watch('customerId') ? 'bg-blue-50/70' : ''
+                  }`}
+                >
+                  <p className={`text-sm font-bold ${!watch('customerId') ? 'text-[#1E3A8A]' : 'text-slate-800'}`}>
+                    Walk-in (Cash)
+                  </p>
+                  <p className="text-xs text-slate-400">Default cash customer</p>
+                </div>
+
+                {filteredMobileCustomers.filter((c: any) => c.name !== 'Cash Customer').map((c: any) => {
+                  const isSelected = Number(watch('customerId')) === Number(c.id);
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setValue('customerId', c.id);
+                        setIsMobileCustomerPickerOpen(false);
+                      }}
+                      className={`p-3.5 cursor-pointer hover:bg-slate-50 transition-colors ${
+                        isSelected ? 'bg-blue-50/70' : ''
+                      }`}
+                    >
+                      <p className={`text-sm font-bold ${isSelected ? 'text-[#1E3A8A]' : 'text-slate-800'}`}>
+                        {c.name}
+                      </p>
+                      {c.phone && <p className="text-xs text-slate-400">{c.phone}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Item Modal */}
+        {isMobileEditItemOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <h3 className="text-sm font-extrabold text-slate-800">Edit Item</h3>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileEditItemOpen(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 space-y-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={mobileEditQty}
+                    onChange={(e) => setMobileEditQty(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-blue-500 text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Rate ({settings?.currencySymbol || '₹'})</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={mobileEditRate}
+                    onChange={(e) => setMobileEditRate(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-blue-500 text-right"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Discount (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={mobileEditDiscPct}
+                    onChange={(e) => setMobileEditDiscPct(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-blue-500 text-right"
+                  />
+                </div>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex justify-between items-center">
+                  <span className="text-xs font-bold text-emerald-800">Calculated Total</span>
+                  <span className="text-lg font-black text-emerald-600">
+                    {formatCurrency(
+                      ((parseFloat(mobileEditQty) || 0) * (parseFloat(mobileEditRate) || 0)) *
+                      (1 - (parseFloat(mobileEditDiscPct) || 0) / 100)
+                    )}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMobileSaveEdit}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+                >
+                  Update Item
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
 
       {/* Quick Add Customer Modal */}
       {isCustomerModalOpen && (

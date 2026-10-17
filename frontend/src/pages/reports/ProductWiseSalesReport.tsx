@@ -14,7 +14,9 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
-  RotateCcw
+  RotateCcw,
+  Filter,
+  X
 } from 'lucide-react';
 import { getMalaysiaDateStr, formatMalaysiaDate } from '../../utils/date';
 import { exportToExcel } from '../../utils/exportExcel';
@@ -47,6 +49,7 @@ const ProductWiseSalesReport = () => {
   // Quick Date Presets & Full View
   const [activePreset, setActivePreset] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all' | ''>('today');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const datePresets = useMemo(() => {
     const todayStr = getMalaysiaDateStr();
@@ -424,28 +427,28 @@ const ProductWiseSalesReport = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            {/* View Mode Switcher */}
-            <div className="bg-gray-100 p-1 rounded-md flex items-center gap-1 border border-gray-200 flex-1 sm:flex-none">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+            {/* View Mode Switcher - Reduced Height */}
+            <div className="bg-gray-100 p-0.5 rounded-md flex items-center gap-0.5 border border-gray-200 flex-1 sm:flex-none h-[28px]">
               <button
                 type="button"
                 onClick={() => setViewMode('product')}
-                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded text-[11px] sm:text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'product'
+                className={`flex-1 sm:flex-none px-2 py-0.5 rounded text-[10.5px] sm:text-[11.5px] font-bold transition-all flex items-center justify-center gap-1 h-[24px] ${viewMode === 'product'
                   ? 'bg-[#0F172A] text-white shadow-sm'
                   : 'text-black hover:text-[#0F172A]'
                   }`}
               >
-                <Package size={13} /> Product Wise
+                <Package size={12} /> Product Wise
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('supplier')}
-                className={`flex-1 sm:flex-none px-2.5 py-1.5 rounded text-[11px] sm:text-[12px] font-bold transition-all flex items-center justify-center gap-1.5 ${viewMode === 'supplier'
+                className={`flex-1 sm:flex-none px-2 py-0.5 rounded text-[10.5px] sm:text-[11.5px] font-bold transition-all flex items-center justify-center gap-1 h-[24px] ${viewMode === 'supplier'
                   ? 'bg-[#E11D48] text-white shadow-sm'
                   : 'text-black hover:text-[#E11D48]'
                   }`}
               >
-                <Truck size={13} /> Supplier Wise
+                <Truck size={12} /> Supplier Wise
               </button>
             </div>
 
@@ -454,32 +457,32 @@ const ProductWiseSalesReport = () => {
               type="button"
               onClick={handleExportExcel}
               disabled={isLoading || (viewMode === 'product' ? filteredProductGroups.length === 0 : filteredSupplierGroups.length === 0)}
-              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+              className="bg-[#10B981] hover:bg-[#059669] text-white px-2.5 sm:px-3 py-1 rounded text-[11px] sm:text-[12px] font-bold flex items-center justify-center gap-1 transition-colors shadow-sm disabled:opacity-50 shrink-0 h-[28px]"
               title="Export formatted Excel"
             >
-              <Download size={14} /> <span className="hidden sm:inline">Export Excel</span>
+              <Download size={13} /> <span className="hidden sm:inline">Export Excel</span>
             </button>
             <button
               type="button"
               onClick={handleExportPdf}
               disabled={isLoading || (viewMode === 'product' ? filteredProductGroups.length === 0 : filteredSupplierGroups.length === 0)}
-              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 py-1.5 rounded text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 sm:px-3 py-1 rounded text-[11px] sm:text-[12px] font-bold flex items-center justify-center gap-1 transition-colors shadow-sm disabled:opacity-50 shrink-0 h-[28px]"
               title="Print PDF Document"
             >
-              <Download size={14} /> <span className="hidden sm:inline">Export PDF</span>
+              <Download size={13} /> <span className="hidden sm:inline">Export PDF</span>
             </button>
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-bold rounded transition-colors shadow-sm ${isExpanded
+              className={`flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1 text-[11px] sm:text-[12px] font-bold rounded transition-colors shadow-sm shrink-0 h-[28px] ${isExpanded
                 ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
                 : 'bg-[#1E293B] text-white hover:bg-[#0F172A]'
                 }`}
             >
               {isExpanded ? (
-                <><Minimize2 size={13} /> <span className="hidden sm:inline">Exit Full View</span></>
+                <><Minimize2 size={12} /> <span className="hidden sm:inline">Exit Full View</span></>
               ) : (
-                <><Maximize2 size={13} /> <span className="hidden sm:inline">Full View</span></>
+                <><Maximize2 size={12} /> <span className="hidden sm:inline">Full View</span></>
               )}
             </button>
           </div>
@@ -488,22 +491,22 @@ const ProductWiseSalesReport = () => {
         {/* Stat Summary Cards */}
         {viewMode === 'product' ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5">
-            <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#1D4ED8] uppercase tracking-wide">Total Sales Revenue</span>
               <p className="text-base sm:text-lg font-bold text-[#1E3A8A] leading-tight">{formatCurrency(productMetrics.totalRevenue)}</p>
               <span className="text-[10px] font-bold text-[#2563EB] block">{productMetrics.productCount} distinct products</span>
             </div>
-            <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#15803D] uppercase tracking-wide">Total Units Sold</span>
               <p className="text-base sm:text-lg font-bold text-[#14532D] leading-tight">{productMetrics.totalQty.toLocaleString()}</p>
               <span className="text-[10px] font-bold text-[#16A34A] block">Sum of quantities</span>
             </div>
-            <div className="bg-[#FAF5FF] border border-[#E9D5FF] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#FAF5FF] border border-[#E9D5FF] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#7E22CE] uppercase tracking-wide">Total Product COGS</span>
               <p className="text-base sm:text-lg font-bold text-[#581C87] leading-tight">{formatCurrency(productMetrics.totalCost)}</p>
               <span className="text-[10px] font-bold text-[#9333EA] block">Purchase cost estimate</span>
             </div>
-            <div className="bg-[#ECFDF5] border border-[#A7F3D0] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#ECFDF5] border border-[#A7F3D0] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#059669] uppercase tracking-wide">Estimated Gross Profit</span>
               <p className="text-base sm:text-lg font-bold text-[#065F46] leading-tight">{formatCurrency(productMetrics.totalProfit)}</p>
               <span className="text-[10px] font-bold text-[#059669] block">
@@ -513,24 +516,24 @@ const ProductWiseSalesReport = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5">
-            <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#1D4ED8] uppercase tracking-wide">Supplier Sales Revenue</span>
               <p className="text-base sm:text-lg font-bold text-[#1E3A8A] leading-tight">{formatCurrency(supplierMetrics.totalRevenue)}</p>
               <span className="text-[10px] font-bold text-[#2563EB] block">{supplierMetrics.supplierCount} active suppliers</span>
             </div>
-            <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#15803D] uppercase tracking-wide">Units Sold</span>
               <p className="text-base sm:text-lg font-bold text-[#14532D] leading-tight">{supplierMetrics.totalQty.toLocaleString()}</p>
               <span className="text-[10px] font-bold text-[#16A34A] block">Supplied items sold</span>
             </div>
-            <div className="bg-[#ECFDF5] border border-[#A7F3D0] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#ECFDF5] border border-[#A7F3D0] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#059669] uppercase tracking-wide">Gross Margin</span>
               <p className="text-base sm:text-lg font-bold text-[#065F46] leading-tight">{formatCurrency(supplierMetrics.totalMargin)}</p>
               <span className="text-[10px] font-bold text-[#059669] block">
                 {supplierMetrics.totalRevenue > 0 ? `${((supplierMetrics.totalMargin / supplierMetrics.totalRevenue) * 100).toFixed(1)}% profit` : '0% margin'}
               </span>
             </div>
-            <div className="bg-[#FFF1F2] border border-[#FECDD3] p-2.5 rounded-md shadow-sm">
+            <div className="bg-[#FFF1F2] border border-[#FECDD3] p-2 sm:p-2.5 rounded-md shadow-sm">
               <span className="text-[10px] font-bold text-[#E11D48] uppercase tracking-wide flex items-center gap-1">
                 <AlertCircle size={11} /> Total Outstanding Payables
               </span>
@@ -541,73 +544,152 @@ const ProductWiseSalesReport = () => {
         )}
       </div>
 
-      {/* Main Table Container Card */}
-      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md flex-1 overflow-hidden flex flex-col min-h-0">
+      {isFilterOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[9998] md:hidden"
+          onClick={() => setIsFilterOpen(false)}
+        />
+      )}
 
-        {/* Filters Bar */}
-        <div className="px-3 py-1.5 bg-[#F8FAFC] border-b border-[#CBD5E1] flex flex-col gap-1.5">
+      {/* Main Table Container Card */}
+      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md flex-1 overflow-hidden flex flex-col min-h-[450px] lg:min-h-0">
+
+        {/* Mobile Front Quick Bar: Search + Filter Drawer Toggle + Expand */}
+        <div className="md:hidden px-2.5 py-1.5 bg-[#F8FAFC] border-b border-[#CBD5E1] flex items-center gap-1.5 shrink-0">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search table..."
+              className="w-full pl-7 pr-2.5 py-1 border border-[#CBD5E1] rounded-md text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white shadow-sm h-[30px]"
+            />
+            <Search size={13} className="absolute left-2 top-2 text-gray-500" />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsFilterOpen(true)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold shadow-sm transition-colors border shrink-0 h-[30px] ${
+              !isReset
+                ? 'bg-[#1E3A8A] text-white border-[#172554]'
+                : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
+            }`}
+            title="Open Filters Drawer"
+          >
+            <Filter size={13} className={!isReset ? 'text-amber-300' : 'text-gray-700'} />
+            <span>Filter</span>
+            {!isReset && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const allExpanded = Object.values(expandedGroups).some(v => v);
+              toggleAllGroups(!allExpanded);
+            }}
+            className="p-1 bg-white hover:bg-gray-100 border border-[#CBD5E1] rounded-md text-black shadow-sm h-[30px] w-[30px] flex items-center justify-center shrink-0"
+            title="Toggle Expand All"
+          >
+            <ChevronDown size={14} />
+          </button>
+        </div>
+
+        {/* Filter Section: Slide Drawer on Mobile, Inline Bar on Desktop */}
+        <div
+          className={`${
+            isFilterOpen
+              ? 'fixed inset-y-0 right-0 w-[300px] sm:w-[340px] z-[9999] bg-white shadow-2xl p-4 overflow-y-auto flex flex-col gap-3 rounded-l-xl'
+              : 'hidden md:flex flex-col gap-1.5 px-3 py-1.5 bg-[#F8FAFC] border-b border-[#CBD5E1]'
+          }`}
+        >
+          {/* Mobile Drawer Header */}
+          <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] md:hidden">
+            <div className="flex items-center gap-1.5 text-[#0F172A]">
+              <Filter size={15} className="text-[#3B82F6]" />
+              <span className="font-bold text-[14px]">Filter Options</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen(false)}
+              className="p-1.5 bg-red-50 text-red-600 rounded-full hover:bg-red-100"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
           {/* Quick Date Presets */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-bold text-black mr-1 flex items-center gap-1"><Calendar size={12} /> Dates:</span>
+            <span className="text-[11px] font-bold text-black mr-1 flex items-center gap-1">
+              <Calendar size={12} /> Dates:
+            </span>
             <button
               type="button"
               onClick={() => applyDatePreset('today')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('today')
-                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-                }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
+                isPresetActive('today')
+                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+              }`}
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('yesterday')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('yesterday')
-                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-                }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
+                isPresetActive('yesterday')
+                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+              }`}
             >
               Yesterday
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('week')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('week')
-                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-                }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
+                isPresetActive('week')
+                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+              }`}
             >
               Last 7 Days
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('month')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('month')
-                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-                }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
+                isPresetActive('month')
+                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+              }`}
             >
               This Month
             </button>
             <button
               type="button"
               onClick={() => applyDatePreset('all')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${isPresetActive('all')
-                ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
-                : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
-                }`}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all shadow-sm border ${
+                isPresetActive('all')
+                  ? 'bg-[#2563EB] text-white border-[#1D4ED8]'
+                  : 'bg-white hover:bg-blue-50 hover:text-blue-600 border-[#CBD5E1] text-black'
+              }`}
             >
               All Time
             </button>
 
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="hidden md:flex ml-auto items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition-all shadow-sm border flex items-center gap-1 ${!isReset
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
-                  : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
-                  }`}
+                className={`px-2 py-0.5 rounded text-[10.5px] font-bold transition-all shadow-sm border flex items-center gap-1 ${
+                  !isReset
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
+                    : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
+                }`}
                 title="Reset all filters to defaults"
               >
                 <RotateCcw size={11} /> Reset
@@ -630,7 +712,7 @@ const ProductWiseSalesReport = () => {
           </div>
 
           {/* Form Inputs Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-2.5 md:gap-2 items-end">
             <div>
               <label className="block text-[11px] font-bold text-black mb-0.5">From Date</label>
               <input
@@ -640,7 +722,7 @@ const ProductWiseSalesReport = () => {
                   setFromDate(e.target.value);
                   setActivePreset('');
                 }}
-                className="w-full px-2.5 py-1 border border-[#CBD5E1] rounded-md text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white shadow-sm"
+                className="w-full px-2.5 py-1.5 md:py-1 border border-[#CBD5E1] rounded-md text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white shadow-sm"
               />
             </div>
             <div>
@@ -652,7 +734,7 @@ const ProductWiseSalesReport = () => {
                   setToDate(e.target.value);
                   setActivePreset('');
                 }}
-                className="w-full px-2.5 py-1 border border-[#CBD5E1] rounded-md text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white shadow-sm"
+                className="w-full px-2.5 py-1.5 md:py-1 border border-[#CBD5E1] rounded-md text-[12px] font-bold text-black outline-none focus:border-[#3B82F6] bg-white shadow-sm"
               />
             </div>
 
@@ -684,7 +766,7 @@ const ProductWiseSalesReport = () => {
               />
             </div>
 
-            <div>
+            <div className="hidden md:block">
               <label className="block text-[11px] font-bold text-black mb-0.5">Quick Search</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
@@ -700,15 +782,59 @@ const ProductWiseSalesReport = () => {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold flex items-center gap-1 transition-all shadow-sm border shrink-0 h-[28px] ${!isReset
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
-                    : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
-                    }`}
+                  className={`px-2.5 py-1 rounded-md text-[11.5px] font-bold flex items-center gap-1 transition-all shadow-sm border shrink-0 h-[28px] ${
+                    !isReset
+                      ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
+                      : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
+                  }`}
                   title="Reset all filters"
                 >
                   <RotateCcw size={12} /> Reset
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Drawer Actions on Mobile */}
+          <div className="flex flex-col gap-2 pt-3 border-t border-[#E2E8F0] md:hidden mt-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => toggleAllGroups(true)}
+                className="px-2 py-1.5 bg-gray-50 hover:bg-gray-100 border border-[#CBD5E1] rounded-md text-[11px] font-bold text-black shadow-sm flex items-center justify-center gap-1"
+              >
+                <ChevronDown size={12} /> Expand All
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleAllGroups(false)}
+                className="px-2 py-1.5 bg-gray-50 hover:bg-gray-100 border border-[#CBD5E1] rounded-md text-[11px] font-bold text-black shadow-sm flex items-center justify-center gap-1"
+              >
+                <ChevronUp size={12} /> Collapse All
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen(false)}
+                className="flex-1 bg-[#1E3A8A] hover:bg-[#172554] text-white py-2 rounded-md font-bold text-[12px] transition-colors shadow-sm text-center"
+              >
+                Apply & Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleResetFilters();
+                  setIsFilterOpen(false);
+                }}
+                className={`px-3 py-2 rounded-md text-[12px] font-bold transition-all shadow-sm border flex items-center justify-center gap-1 ${
+                  !isReset
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
+                    : 'bg-white hover:bg-gray-100 text-black border-[#CBD5E1]'
+                }`}
+              >
+                <RotateCcw size={12} /> Reset
+              </button>
             </div>
           </div>
         </div>

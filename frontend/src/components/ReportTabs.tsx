@@ -1,14 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  ShoppingBag, 
-  CornerDownLeft, 
-  FileText, 
-  Box, 
-  PieChart, 
-  Users, 
+import {
+  ShoppingBag,
+  CornerDownLeft,
+  FileText,
+  Box,
+  PieChart,
+  Users,
   Truck,
   Package,
-  DollarSign
+  DollarSign,
+  Scissors
 } from 'lucide-react';
 
 const ReportTabs = () => {
@@ -26,6 +27,7 @@ const ReportTabs = () => {
     { name: 'Profit & Ledger', path: '/reports/profit-ledger', icon: <PieChart size={14} /> },
     { name: 'Expenses Report', path: '/reports/expenses', icon: <DollarSign size={14} /> },
     { name: 'Estimation Report', path: '/reports/estimations', icon: <FileText size={14} /> },
+    { name: 'Service Sales Report', path: '/reports/service-sales', icon: <Scissors size={14} /> },
     { name: 'RM Purchase Report', path: '/reports/raw-material-purchase', icon: <Truck size={14} /> },
     { name: 'Production Report', path: '/reports/production', icon: <Box size={14} /> },
     { name: 'Batch P&L Report', path: '/reports/batch-pnl', icon: <PieChart size={14} /> },
@@ -40,11 +42,10 @@ const ReportTabs = () => {
             <Link
               key={tab.path}
               to={tab.path}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-bold whitespace-nowrap transition-all ${
-                isActive
-                  ? 'bg-[#0F172A] text-white shadow-sm'
-                  : 'text-black font-bold hover:text-[#0F172A] hover:bg-[#F1F5F9]'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-bold whitespace-nowrap transition-all ${isActive
+                ? 'bg-[#0F172A] text-white shadow-sm'
+                : 'text-black font-bold hover:text-[#0F172A] hover:bg-[#F1F5F9]'
+                }`}
             >
               {tab.icon}
               <span>{tab.name}</span>
