@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -705,6 +706,14 @@ const POS = () => {
       errorMessage = 'Please add at least one product before saving.';
     }
 
+    // On mobile, jump straight into the rate editor when a rate is missing
+    if (Array.isArray(errors.items)) {
+      const rateErrorIdx = errors.items.findIndex((item: any) => item?.rate);
+      if (rateErrorIdx >= 0) {
+        handleMobileOpenEdit(rateErrorIdx);
+      }
+    }
+
     toast.error(errorMessage);
     console.error(errors);
   };
@@ -815,7 +824,12 @@ const POS = () => {
 
   const handleClear = () => {
     if (editId) return;
-    reset(freshFormValues());
+    // Keep the already-generated entry number, otherwise the form would stay on "Generating..."
+    const currentInvoice = getValues('invoiceNo');
+    const invoiceToKeep = currentInvoice && currentInvoice !== 'Generating...'
+      ? currentInvoice
+      : (nextInvoiceData?.invoiceNo || 'Generating...');
+    reset(freshFormValues(invoiceToKeep));
     setCustomerPaid('');
     if (activeDraftIdRef.current) {
       removeDraftById(activeDraftIdRef.current);
@@ -929,6 +943,19 @@ const POS = () => {
       } else {
         append(newItem);
       }
+
+      // If the product has no rate, immediately let the user type one instead of failing on save
+      if (rate <= 0) {
+        const newIndex = currentItems.length === 1 && !currentItems[0].productId && !currentItems[0].serviceItemId
+          ? 0
+          : currentItems.length;
+        setMobileEditingIndex(newIndex);
+        setMobileEditQty('1');
+        setMobileEditRate('');
+        setMobileEditDiscPct('0');
+        setIsMobileEditItemOpen(true);
+        toast.error('Rate is missing. Please enter the rate for this item.');
+      }
     }
   };
 
@@ -988,6 +1015,21 @@ const POS = () => {
     setValue(`items.${mobileEditingIndex}.total`, total, { shouldValidate: true });
     setIsMobileEditItemOpen(false);
     setMobileEditingIndex(null);
+  };
+
+  // Mobile save: if any cart item has no rate, open the edit sheet for it instead of failing validation
+  const handleMobileSave = () => {
+    const currentItems = getValues('items') || [];
+    const missingRateIdx = currentItems.findIndex((it: any) =>
+      ((it.productId && Number(it.productId) > 0) || it.serviceItemId) && !(Number(it.rate) >= 0.01)
+    );
+    if (missingRateIdx >= 0) {
+      setIsMobileCheckoutOpen(false);
+      handleMobileOpenEdit(missingRateIdx);
+      toast.error('Rate is missing. Please enter the rate for this item.');
+      return;
+    }
+    handleSubmit(onSubmit as any, onError)();
   };
 
   const filteredMobileProducts = products.filter((p: any) =>
@@ -1676,18 +1718,15 @@ const POS = () => {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {validMobileCartItems.length > 0 && !editId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('Clear all items from sale?')) handleClear();
-                  }}
-                  className="flex items-center gap-1.5 bg-red-500/20 border border-red-500/40 text-red-200 px-2.5 py-1.5 rounded-lg text-xs font-bold active:bg-red-500/30 transition-colors"
-                >
-                  <RefreshCw size={13} />
-                  <span>Clear</span>
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={createMutation.isPending}
+                onClick={handleMobileSave}
+                className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-extrabold shadow-sm transition-all"
+              >
+                <CheckCircle size={14} />
+                <span>{createMutation.isPending ? 'SAVING...' : 'SAVE'}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setIsLeaveModalOpen(true)}
@@ -1700,8 +1739,108 @@ const POS = () => {
           </div>
         </div>
 
+        {/* Scrollable mobile content */}
+        <div className="flex-1 min-h-0 overflow-y-auto pb-24">
+
+        {/* Mobile Entry Details (Entry No / Entry Date / Customer) */}
+        <div className="px-3 py-2.5 bg-white border-b border-slate-200 print:hidden">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Entry No</label>
+              <input
+                type="text"
+                readOnly
+                value={watch('invoiceNo') || ''}
+                placeholder="Generating..."
+                className="w-full h-9 px-2.5 border border-slate-200 bg-slate-50 rounded-lg text-xs font-bold text-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">Entry Date</label>
+              <input
+                type="date"
+                value={watch('date') || ''}
+                onChange={(e) => setValue('date', e.target.value, { shouldDirty: true, shouldValidate: true })}
+                className="w-full h-9 px-2.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-[#1E3A8A] bg-white"
+              />
+            </div>
+          </div>
+          <div className="mt-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+              Customer Name {!isCashMode && <span className="text-red-500">*</span>}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsMobileCustomerPickerOpen(true)}
+              className="w-full h-9 flex items-center justify-between px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-left active:bg-slate-100 transition-colors"
+            >
+              <span className={`truncate text-xs font-bold ${selectedCustomer ? 'text-slate-800' : 'text-slate-400'}`}>
+                {selectedCustomer
+                  ? `${selectedCustomer.name}${selectedCustomer.phone ? ` - ${selectedCustomer.phone}` : ''}`
+                  : 'Walk-in (Cash)'}
+              </span>
+              <ChevronRight size={16} className="text-slate-400 shrink-0" />
+            </button>
+          </div>
+
+          {/* Mobile Payment Mode */}
+          <div className="mt-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-500 mb-1">
+              Payment Mode {!isCashMode && <span className="text-red-500">*</span>}
+            </label>
+            <select
+              value={watch('paymentModeId') || ''}
+              onChange={(e) => {
+                const id = Number(e.target.value);
+                setValue('paymentModeId', id, { shouldDirty: true, shouldValidate: true });
+                const mode = paymentModes.find((pm: any) => Number(pm.id) === id);
+                if (mode?.name?.toLowerCase() === 'cash') setValue('customerId', 0);
+              }}
+              className="w-full h-9 px-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-[#1E3A8A] bg-white"
+            >
+              <option value="">Select mode...</option>
+              {paymentModes.map((pm: any) => (
+                <option key={pm.id} value={pm.id}>{pm.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Mobile Amount Summary + Clear Entry */}
+          <div className="mt-2 flex items-stretch gap-2">
+            <div className="flex-1 min-w-0 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-emerald-700">Total Amount</p>
+                <p className="text-base font-black text-emerald-600 leading-tight truncate">
+                  {formatCurrency(watch('netAmount') || 0)}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Gross / Disc</p>
+                <p className="text-[11px] font-bold text-slate-700 leading-tight">
+                  {formatCurrency(watch('grossAmount') || 0)}
+                  {Number(watch('totalDiscount')) > 0 && (
+                    <span className="text-red-500"> - {formatCurrency(watch('totalDiscount') || 0)}</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            {!editId && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Clear this entry? All items and details will be reset.')) handleClear();
+                }}
+                className="shrink-0 px-3 rounded-lg border border-red-200 bg-red-50 text-red-600 text-[11px] font-bold flex flex-col items-center justify-center gap-0.5 active:bg-red-100 transition-colors"
+              >
+                <RefreshCw size={13} />
+                <span>Clear</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Mobile Search Bar */}
-        <div className="px-3 py-2 bg-white border-b border-slate-200 shrink-0">
+        <div className="px-3 py-2 bg-white border-b border-slate-200">
           <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 h-10 gap-2">
             <Search size={16} className="text-slate-400 shrink-0" />
             <input
@@ -1720,7 +1859,7 @@ const POS = () => {
         </div>
 
         {/* Product Catalog Cards */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2.5 pb-24">
+        <div className="p-3 space-y-2.5">
           {filteredMobileProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <p className="text-sm font-semibold">No products found</p>
@@ -1784,35 +1923,51 @@ const POS = () => {
             })
           )}
         </div>
+        </div>
 
-        {/* Floating Cart Bar */}
-        {validMobileCartItems.length > 0 && (
-          <div
-            onClick={() => setIsMobileCheckoutOpen(true)}
-            className="fixed bottom-4 left-3 right-3 z-30 bg-[#1E3A8A] text-white rounded-2xl p-3.5 shadow-2xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform"
+        {/* Fixed Bottom Action Bar: Total + Cart + Save */}
+        <div className="shrink-0 bg-white border-t border-slate-200 px-3 py-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => validMobileCartItems.length > 0 && setIsMobileCheckoutOpen(true)}
+            className="flex-1 min-w-0 flex items-center gap-2.5 text-left"
           >
-            <div className="flex items-center gap-3">
-              <div className="relative bg-blue-50 text-[#1E3A8A] p-2 rounded-xl">
-                <ShoppingCart size={20} />
-                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-[#1E3A8A]">
-                  {mobileCartTotalQty}
-                </span>
-              </div>
-              <div>
-                <p className="text-lg font-black leading-tight text-white">
-                  {formatCurrency(watch('netAmount') || 0)}
-                </p>
-                <p className="text-xs text-blue-200 font-medium">
-                  {validMobileCartItems.length} item{validMobileCartItems.length !== 1 ? 's' : ''}
-                </p>
-              </div>
+            <div className="relative bg-blue-50 text-[#1E3A8A] p-2 rounded-xl shrink-0">
+              <ShoppingCart size={18} />
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
+                {mobileCartTotalQty}
+              </span>
             </div>
-            <div className="flex items-center gap-1 bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl font-bold text-sm text-white">
-              <span>Checkout</span>
-              <ChevronRight size={18} />
+            <div className="min-w-0">
+              <p className="text-base font-black leading-tight text-slate-800 truncate">
+                {formatCurrency(watch('netAmount') || 0)}
+              </p>
+              <p className="text-[11px] text-slate-500 font-semibold truncate">
+                {validMobileCartItems.length} item{validMobileCartItems.length !== 1 ? 's' : ''}
+                {validMobileCartItems.length > 0 ? ' · tap for cart' : ''}
+              </p>
             </div>
-          </div>
-        )}
+          </button>
+          {validMobileCartItems.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsMobileCheckoutOpen(true)}
+              className="h-10 px-3 rounded-xl bg-[#1E3A8A] text-white text-xs font-bold flex items-center gap-0.5 shrink-0 active:scale-[0.98] transition-transform"
+            >
+              <span>Cart</span>
+              <ChevronRight size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={createMutation.isPending}
+            onClick={handleMobileSave}
+            className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 text-white text-sm font-extrabold flex items-center gap-1.5 shadow-md shadow-emerald-600/25 shrink-0 transition-all"
+          >
+            <CheckCircle size={17} />
+            <span>{createMutation.isPending ? 'SAVING...' : editId ? 'UPDATE' : 'SAVE'}</span>
+          </button>
+        </div>
 
         {/* Mobile Checkout Drawer / Modal */}
         {isMobileCheckoutOpen && (
@@ -1862,7 +2017,7 @@ const POS = () => {
                               <p className="text-sm font-extrabold text-emerald-600">
                                 {formatCurrency(item.total)}
                               </p>
-                              <span className="text-[10px] text-slate-400 font-medium">tap to edit</span>
+                              <span className="text-[10px] text-blue-600 font-bold">tap to edit rate</span>
                             </div>
                           </div>
 
@@ -2004,7 +2159,7 @@ const POS = () => {
                   disabled={createMutation.isPending}
                   onClick={() => {
                     setIsMobileCheckoutOpen(false);
-                    handleSubmit(onSubmit as any, onError)();
+                    handleMobileSave();
                   }}
                   className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-50 text-white py-3.5 rounded-xl font-extrabold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
                 >
@@ -2017,9 +2172,9 @@ const POS = () => {
         )}
 
         {/* Customer Picker Modal */}
-        {isMobileCustomerPickerOpen && (
-          <div className="fixed inset-0 z-50 bg-black/60 flex flex-col justify-end animate-in fade-in duration-200">
-            <div className="bg-white rounded-t-3xl max-h-[75vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+        {isMobileCustomerPickerOpen && createPortal(
+          <div className="fixed inset-0 z-[999] bg-black/60 flex flex-col justify-start pt-3 sm:pt-6 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl mx-3 max-h-[75vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-top duration-200">
               <div className="flex justify-between items-center px-4 py-3.5 border-b border-slate-100 bg-slate-50">
                 <h3 className="text-base font-extrabold text-slate-800">Select Customer</h3>
                 <button
@@ -2100,7 +2255,7 @@ const POS = () => {
               </div>
             </div>
           </div>
-        )}
+        , document.body)}
 
         {/* Edit Item Modal */}
         {isMobileEditItemOpen && (
@@ -2132,9 +2287,12 @@ const POS = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
+                    placeholder="Enter rate"
+                    autoFocus
                     value={mobileEditRate}
                     onChange={(e) => setMobileEditRate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-blue-500 text-right"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-base font-bold text-slate-800 outline-none focus:border-blue-500 text-right placeholder:text-slate-300 placeholder:font-normal placeholder:text-sm"
                   />
                 </div>
                 <div>
