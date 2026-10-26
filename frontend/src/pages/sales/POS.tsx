@@ -1740,7 +1740,7 @@ const POS = () => {
         </div>
 
         {/* Scrollable mobile content */}
-        <div className="flex-1 min-h-0 overflow-y-auto pb-24">
+        <div className="flex-1 min-h-0 overflow-y-auto pb-[100px]">
 
         {/* Mobile Entry Details (Entry No / Entry Date / Customer) */}
         <div className="px-3 py-2.5 bg-white border-b border-slate-200 print:hidden">
@@ -1926,7 +1926,7 @@ const POS = () => {
         </div>
 
         {/* Fixed Bottom Action Bar: Total + Cart + Save */}
-        <div className="shrink-0 bg-white border-t border-slate-200 px-3 py-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-3 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2">
           <button
             type="button"
             onClick={() => validMobileCartItems.length > 0 && setIsMobileCheckoutOpen(true)}
@@ -1987,7 +1987,7 @@ const POS = () => {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+             <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
                 {/* Cart Items List */}
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
