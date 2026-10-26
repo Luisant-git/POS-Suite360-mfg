@@ -1926,7 +1926,7 @@ const POS = () => {
         </div>
 
         {/* Fixed Bottom Action Bar: Total + Cart + Save */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 px-3 py-3 shadow-[0_-4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2">
+        <div className="fixed bottom-4 left-3 right-3 z-40 bg-white border border-slate-200 rounded-2xl px-3 py-2.5 shadow-[0_-4px_16px_rgba(15,23,42,0.12)] flex items-center gap-2">
           <button
             type="button"
             onClick={() => validMobileCartItems.length > 0 && setIsMobileCheckoutOpen(true)}
