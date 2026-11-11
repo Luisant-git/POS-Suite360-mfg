@@ -1,4 +1,5 @@
-import { X, Box, Calendar, Package, Tag, ArrowRight } from 'lucide-react';
+import { X, Box, Calendar, Package, Tag, ArrowRight, Hash } from 'lucide-react';
+import { parseBatchWorkName } from '../utils/productionBatch';
 
 interface ProductionViewModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface ProductionViewModalProps {
 
 const ProductionViewModal = ({ isOpen, onClose, production }: ProductionViewModalProps) => {
   if (!isOpen || !production) return null;
+  const { batchCode, workName } = parseBatchWorkName(production.workName);
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -33,16 +35,26 @@ const ProductionViewModal = ({ isOpen, onClose, production }: ProductionViewModa
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             
+            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-start gap-3">
+              <div className="bg-amber-50 p-2 rounded-lg text-amber-600 mt-0.5 shrink-0">
+                <Hash size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Batch Code</p>
+                <p className="text-xs font-bold text-black">{batchCode}</p>
+              </div>
+            </div>
+
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-start gap-3">
               <div className="bg-blue-50 p-2 rounded-lg text-blue-600 mt-0.5 shrink-0">
                 <Tag size={18} />
               </div>
               <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Batch / Work Name</p>
-                <p className="text-sm font-bold text-gray-900">{production.workName}</p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Work Name</p>
+                <p className="text-sm font-bold text-gray-900">{workName}</p>
               </div>
             </div>
 

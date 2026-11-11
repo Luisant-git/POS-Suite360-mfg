@@ -43,6 +43,8 @@ export interface SearchableSelectProps {
   onCreate?: (name: string) => void;
   tabIndex?: number;
   onTabNext?: () => void;
+  onShiftTab?: () => void;
+  onEnterNext?: () => void;
   dataAttr?: Record<string, string>;
 }
 
@@ -63,10 +65,14 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   onCreate,
   tabIndex,
   onTabNext,
+  onShiftTab,
+  onEnterNext,
   dataAttr,
 }) => {
   const activeDisabled = isDisabled || disabled;
   const selectedOption = options.find((opt) => String(opt.value) === String(value)) || null;
+  const menuOpenRef = React.useRef(false);
+  const closedOnEscapeRef = React.useRef(false);
 
   const selectProps: any = {
     options,
@@ -94,9 +100,18 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     captureMenuScroll: false,
     closeMenuOnScroll: false,
     components: { Option: CustomOption },
+    onMenuOpen: () => {
+      menuOpenRef.current = true;
+    },
+    onMenuClose: () => {
+      menuOpenRef.current = false;
+    },
     onKeyDown: (e: React.KeyboardEvent) => {
-      if (e.key === 'Tab' && onTabNext && !e.shiftKey) {
-        onTabNext();
+      if (e.key === 'Escape') {
+        closedOnEscapeRef.current = menuOpenRef.current;
+      } else if (e.key === 'Delete' && e.ctrlKey) {
+        // Prevent react-select from clearing the selected value on Ctrl+Delete row shortcut
+        e.preventDefault();
       }
     },
     styles: {
@@ -151,15 +166,30 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     selectProps.onCreateOption = onCreate;
   }
 
-  if (dataAttr && Object.keys(dataAttr).length > 0) {
-    return (
-      <div {...dataAttr} className="w-full">
-        <Component {...selectProps} />
-      </div>
-    );
-  }
+  const handleWrapperKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && closedOnEscapeRef.current) {
+      closedOnEscapeRef.current = false;
+      e.stopPropagation();
+      e.nativeEvent.stopPropagation();
+      return;
+    }
+    if (e.key === 'Tab' && !e.shiftKey && onTabNext && !e.defaultPrevented) {
+      e.preventDefault();
+      onTabNext();
+    } else if (e.key === 'Tab' && e.shiftKey && onShiftTab && !e.defaultPrevented) {
+      e.preventDefault();
+      onShiftTab();
+    } else if (e.key === 'Enter' && onEnterNext && !e.defaultPrevented && !menuOpenRef.current) {
+      e.preventDefault();
+      onEnterNext();
+    }
+  };
 
-  return <Component {...selectProps} />;
+  return (
+    <div {...(dataAttr || {})} onKeyDown={handleWrapperKeyDown} className="w-full">
+      <Component {...selectProps} />
+    </div>
+  );
 };
 
 export default SearchableSelect;

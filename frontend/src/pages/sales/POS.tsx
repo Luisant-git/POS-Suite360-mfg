@@ -62,6 +62,7 @@ const saleItemSchema = z.object({
   tax: z.coerce.number().optional(),
   total: z.coerce.number(),
   isEstimationItem: z.boolean().optional(),
+  rateEdited: z.boolean().optional(),
   isService: z.boolean().optional(),
   serviceItemId: z.coerce.number().optional(),
   itemName: z.string().optional().nullable(),
@@ -161,6 +162,7 @@ const POS = () => {
   const activeDraftIdRef = useRef<string | null>(null);
   const editPrefilledRef = useRef<string | null>(null);
   const editPrefilledWithProductsRef = useRef(false);
+  const prevRateContextRef = useRef({ rateType: 'Retail Rate', customerId: 0 });
 
   // ── Keyboard navigation helper (Nasa logic) ─────────────────────────────
   // Each interactive cell in the table has data-row and data-col attributes.
@@ -335,6 +337,7 @@ const POS = () => {
       if (editPrefilledRef.current === editId && editPrefilledWithProductsRef.current) return; // never overwrite user edits
       editPrefilledRef.current = editId;
       editPrefilledWithProductsRef.current = products.length > 0;
+      prevRateContextRef.current = { rateType: 'Retail Rate', customerId: Number(editSaleData.customerId) || 0 };
       setValue('invoiceNo', editSaleData.invoiceNo);
       setValue('date', new Date(editSaleData.date).toISOString().split('T')[0]);
       setValue('customerId', Number(editSaleData.customerId) || 0);
@@ -404,6 +407,26 @@ const POS = () => {
   const watchPaymentModeId = watch('paymentModeId');
   const isCashMode = paymentModes.find((p: any) => p.id === Number(watchPaymentModeId))?.name?.toLowerCase() === 'cash';
 
+  const getResolvedProductRate = (product: any, rateType: string) => {
+    if (!product) return 0;
+    let rate = Number(product.sellingRate) || 0;
+    if (!product.isService) {
+      if (rateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
+      else if (rateType === 'MRP') rate = Number(product.mrp) || 0;
+    }
+
+    if ((settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && !product.isService) {
+      let customRate = customerRates?.find((r: any) => r.productId === product.id);
+      if (!customRate && selectedCustomer?.productRates) {
+        customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
+      }
+      if (customRate && Number(customRate.rate) > 0) {
+        rate = Number(customRate.rate);
+      }
+    }
+    return rate;
+  };
+
   // Calculations
   useEffect(() => {
     let grossAmount = 0;
@@ -471,22 +494,10 @@ const POS = () => {
 
       setValue(`items.${index}.stock`, item.currentStock || 0);
       setValue(`items.${index}.unit`, item.unit?.shortCode || item.unit?.name || 'Nos');
+      setValue(`items.${index}.rateEdited`, false, { shouldValidate: false });
 
       const rateType = getValues('rateType');
-      let rate = Number(item.sellingRate) || 0;
-      if (rateType === 'Wholesale Rate') rate = Number(item.wholesaleRate) || 0;
-      else if (rateType === 'MRP') rate = Number(item.mrp) || 0;
-
-      // Override with custom customer rate if enabled
-      if ((settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && !item.isService) {
-        let customRate = customerRates?.find((r: any) => r.productId === item.id);
-        if (!customRate && selectedCustomer?.productRates) {
-          customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === item.id);
-        }
-        if (customRate && Number(customRate.rate) > 0) {
-          rate = Number(customRate.rate);
-        }
-      }
+      const rate = getResolvedProductRate(item, rateType);
 
       setValue(`items.${index}.rate`, rate > 0 ? rate : ('' as any));
     }
@@ -495,25 +506,25 @@ const POS = () => {
   // Recalculate rates if rateType, selectedCustomer, or customerRates changes
   const watchRateType = watch('rateType');
   useEffect(() => {
-    if (editId) return; // In edit mode, preserve the originally billed rates (the Rate Type select recomputes on change)
+    const contextChanged =
+      watchRateType !== prevRateContextRef.current.rateType ||
+      Number(selectedCustomerId || 0) !== prevRateContextRef.current.customerId;
+    prevRateContextRef.current = {
+      rateType: watchRateType,
+      customerId: Number(selectedCustomerId || 0),
+    };
+
+    if (editId && !contextChanged) return; // In edit mode, preserve billed rates unless user changes customer/rateType
     const currentItems = getValues('items');
     currentItems.forEach((item, index) => {
       if (item.isEstimationItem) return; // Preserve original estimation rates
+      if (item.rateEdited && !contextChanged) return; // Preserve user-edited rates across background refetches
 
       const product = products.find((p: any) => p.id === Number(item.productId));
       if (product) {
-        let rate = Number(product.sellingRate) || 0;
-        if (watchRateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
-        else if (watchRateType === 'MRP') rate = Number(product.mrp) || 0;
-
-        if (settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) {
-          let customRate = customerRates?.find((r: any) => r.productId === product.id);
-          if (!customRate && selectedCustomer?.productRates) {
-            customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
-          }
-          if (customRate && Number(customRate.rate) > 0) {
-            rate = Number(customRate.rate);
-          }
+        const rate = getResolvedProductRate(product, watchRateType);
+        if (contextChanged && item.rateEdited) {
+          setValue(`items.${index}.rateEdited`, false, { shouldValidate: false });
         }
         if (Number(item.rate) !== rate) {
           setValue(`items.${index}.rate`, rate > 0 ? rate : ('' as any));
@@ -571,6 +582,9 @@ const POS = () => {
 
         queryClient.invalidateQueries({ queryKey: ['sales'] });
         queryClient.invalidateQueries({ queryKey: ['products'] });
+        queryClient.invalidateQueries({ queryKey: ['service-items'] });
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        queryClient.invalidateQueries({ queryKey: ['customer-rates'] });
 
         if (editId) {
           if (!printAfterSaveRef.current) {
@@ -627,6 +641,7 @@ const POS = () => {
     const payload = {
       ...data,
       customerId: Number(data.customerId),
+      rateType: data.rateType,
       paymentModeId: Number(data.paymentModeId),
       subtotal: Number(data.grossAmount),
       discount: Number(data.totalDiscount),
@@ -648,7 +663,7 @@ const POS = () => {
     const hasLowRate = validItems.some(item => {
       if (item.isService) return false;
       const p = products.find((prod: any) => prod.id === Number(item.productId));
-      return p && Number(item.rate) > 0 && Number(item.rate) <= Number(p.purchaseRate);
+      return p && Number(p.purchaseRate) > 0 && Number(item.rate) > 0 && Number(item.rate) <= Number(p.purchaseRate);
     });
 
     if (hasLowRate) {
@@ -806,6 +821,7 @@ const POS = () => {
       invoiceNo: currentInvoice,
       items: loadedItems.length ? loadedItems : [{ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 }],
     }, { keepDefaultValues: true });
+    prevRateContextRef.current = { rateType: data.rateType || 'Retail Rate', customerId: Number(data.customerId) || 0 };
     setValue('customerId', Number(data.customerId) || 0);
     setValue('paymentModeId', Number(data.paymentModeId) || 0);
     setValue('rateType', data.rateType || 'Retail Rate');
@@ -909,19 +925,7 @@ const POS = () => {
       setValue(`items.${existingIdx}.total`, Number(((newQty * rate) - discAmt).toFixed(2)), { shouldValidate: true });
     } else {
       const rateType = getValues('rateType');
-      let rate = Number(product.sellingRate) || 0;
-      if (rateType === 'Wholesale Rate') rate = Number(product.wholesaleRate) || 0;
-      else if (rateType === 'MRP') rate = Number(product.mrp) || 0;
-
-      if ((settings?.enableCustomerWiseRate || (settings as any)?.enableCustomerRates) && !isSvc) {
-        let customRate = customerRates?.find((r: any) => r.productId === product.id);
-        if (!customRate && selectedCustomer?.productRates) {
-          customRate = selectedCustomer.productRates.find((pr: any) => pr.productId === product.id);
-        }
-        if (customRate && Number(customRate.rate) > 0) {
-          rate = Number(customRate.rate);
-        }
-      }
+      const rate = getResolvedProductRate(product, rateType);
 
       const newItem = {
         productId: isSvc ? 0 : Number(product.id),
@@ -1010,6 +1014,7 @@ const POS = () => {
 
     setValue(`items.${mobileEditingIndex}.quantity`, qty, { shouldValidate: true });
     setValue(`items.${mobileEditingIndex}.rate`, rate, { shouldValidate: true });
+    setValue(`items.${mobileEditingIndex}.rateEdited`, true, { shouldValidate: false });
     setValue(`items.${mobileEditingIndex}.discPercent`, discPct, { shouldValidate: true });
     setValue(`items.${mobileEditingIndex}.discAmt`, discAmt, { shouldValidate: true });
     setValue(`items.${mobileEditingIndex}.total`, total, { shouldValidate: true });
@@ -1165,22 +1170,14 @@ const POS = () => {
                 onChange={(e) => {
                   register('rateType').onChange(e);
                   const newRateType = e.target.value;
-                  const currentItems = watch('items');
+                  const currentItems = getValues('items');
                   currentItems.forEach((item, index) => {
                     if (item.productId > 0) {
                       const p = products.find((prod: any) => prod.id === Number(item.productId));
                       if (p) {
-                        let rate = Number(p.sellingRate) || 0;
-                        if (newRateType === 'Wholesale Rate') rate = Number(p.wholesaleRate) || 0;
-                        else if (newRateType === 'MRP') rate = Number(p.mrp) || 0;
-
-                        const q = Number(item.quantity) || 0;
-                        const total = rate * q;
-
+                        const rate = getResolvedProductRate(p, newRateType);
+                        setValue(`items.${index}.rateEdited`, false, { shouldValidate: false });
                         setValue(`items.${index}.rate`, rate > 0 ? rate : ('' as any));
-                        if (total > 0) {
-                          setValue(`items.${index}.total`, total);
-                        }
                       }
                     }
                   });
@@ -1393,6 +1390,15 @@ const POS = () => {
                         type="number" min="1" placeholder="0"
                         onFocus={(e) => e.target.select()}
                         onKeyDown={(e) => handleCellKey(e, index, 1, totalCols)}
+                        onChange={(e) => {
+                          register(`items.${index}.quantity`).onChange(e);
+                          const q = Number(e.target.value) || 0;
+                          const rate = Number(getValues(`items.${index}.rate`)) || 0;
+                          const discPct = Number(getValues(`items.${index}.discPercent`)) || 0;
+                          if (discPct > 0) {
+                            setValue(`items.${index}.discAmt`, Number(((rate * q * discPct) / 100).toFixed(2)), { shouldValidate: false });
+                          }
+                        }}
                         className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-center transition-colors ${watch(`items.${index}.quantity`) > watch(`items.${index}.stock`) ? 'border-red-500 focus:border-red-500 bg-red-100 text-red-700 font-bold' : 'border-[#D1D5DB] focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50'}`}
                       />
                     </td>
@@ -1401,14 +1407,25 @@ const POS = () => {
                         <input
                           {...register(`items.${index}.rate`)}
                           data-row={index} data-col={2}
-                          type="number" step="0.01" placeholder="0.00"
+                          type="number" step="0.01" min="0" placeholder="0.00"
+                          title="Edit rate (last billed rate becomes future default)"
                           onFocus={(e) => e.target.select()}
                           onKeyDown={(e) => handleCellKey(e, index, 2, totalCols)}
+                          onChange={(e) => {
+                            register(`items.${index}.rate`).onChange(e);
+                            setValue(`items.${index}.rateEdited`, true, { shouldValidate: false });
+                            const enteredRate = Number(e.target.value) || 0;
+                            const q = Number(getValues(`items.${index}.quantity`)) || 0;
+                            const discPct = Number(getValues(`items.${index}.discPercent`)) || 0;
+                            if (discPct > 0) {
+                              setValue(`items.${index}.discAmt`, Number(((enteredRate * q * discPct) / 100).toFixed(2)), { shouldValidate: false });
+                            }
+                          }}
                           className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors ${(() => {
                             const pId = watch(`items.${index}.productId`);
                             const prod = products.find((p: any) => p.id === Number(pId));
                             const currentRate = Number(watch(`items.${index}.rate`)) || 0;
-                            if (prod && currentRate > 0 && currentRate <= Number(prod.purchaseRate)) {
+                            if (prod && Number(prod.purchaseRate) > 0 && currentRate > 0 && currentRate <= Number(prod.purchaseRate)) {
                               return 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500 bg-red-100 text-red-700';
                             }
                             return 'border-[#CBD5E1] bg-white focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 text-black font-bold';
@@ -1417,7 +1434,7 @@ const POS = () => {
                             const enteredRate = Number(e.target.value);
                             const pId = watch(`items.${index}.productId`);
                             const product = products.find((p: any) => p.id === Number(pId));
-                            if (product && enteredRate > 0 && enteredRate <= Number(product.purchaseRate)) {
+                            if (product && Number(product.purchaseRate) > 0 && enteredRate > 0 && enteredRate <= Number(product.purchaseRate)) {
                               toast.error(`Loss Warning: Selling below purchase rate (${formatCurrency(product.purchaseRate)})!`, { duration: 4000 });
                             }
                             register(`items.${index}.rate`).onBlur(e);
@@ -1870,7 +1887,7 @@ const POS = () => {
                 item.isService ? c.serviceItemId === item.originalServiceId : Number(c.productId) === Number(item.id)
               );
               const outOfStock = !item.isService && Number(item.currentStock) <= 0;
-              const rate = Number(item.sellingRate) || 0;
+              const rate = getResolvedProductRate(item, watch('rateType'));
 
               return (
                 <div
@@ -2017,7 +2034,9 @@ const POS = () => {
                               <p className="text-sm font-extrabold text-emerald-600">
                                 {formatCurrency(item.total)}
                               </p>
-                              <span className="text-[10px] text-blue-600 font-bold">tap to edit rate</span>
+                              <span className="inline-block text-[10px] text-blue-700 font-bold bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded mt-0.5">
+                                Edit Qty / Rate
+                              </span>
                             </div>
                           </div>
 

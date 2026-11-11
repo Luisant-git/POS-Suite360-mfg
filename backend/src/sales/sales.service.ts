@@ -7,6 +7,68 @@ import { TransactionType } from '@prisma/client';
 export class SalesService {
   constructor(private prisma: PrismaService) {}
 
+  private getProductRateField(rateType?: string): 'sellingRate' | 'wholesaleRate' | 'mrp' {
+    if (rateType === 'Wholesale Rate') return 'wholesaleRate';
+    if (rateType === 'MRP') return 'mrp';
+    return 'sellingRate';
+  }
+
+  /** Persist the last edited service/product/customer rate so future sales default to it. */
+  private async applyLastEditedRate(
+    tx: any,
+    params: {
+      item: any;
+      rateType?: string;
+      resolvedCustomerId: number;
+      hasExplicitCustomer: boolean;
+      enableCustomerWiseRate: boolean;
+      currentProduct?: any;
+    },
+  ): Promise<Record<string, any>> {
+    const { item, rateType, resolvedCustomerId, hasExplicitCustomer, enableCustomerWiseRate, currentProduct } = params;
+    const editedRate = Number(item.rate);
+    if (!(editedRate > 0)) return {};
+
+    if (item.isService && item.serviceItemId) {
+      const existingService = await tx.serviceItem.findUnique({ where: { id: item.serviceItemId } });
+      if (existingService && editedRate !== Number(existingService.rate)) {
+        await tx.serviceItem.update({
+          where: { id: item.serviceItemId },
+          data: { rate: editedRate },
+        });
+      }
+      return {};
+    }
+
+    if (!currentProduct || !item.productId) return {};
+
+    if (enableCustomerWiseRate && hasExplicitCustomer) {
+      const existingCustomerRate = await tx.customerProductRate.findUnique({
+        where: {
+          customerId_productId: {
+            customerId: resolvedCustomerId,
+            productId: item.productId,
+          },
+        },
+      });
+      if (existingCustomerRate) {
+        if (editedRate !== Number(existingCustomerRate.rate)) {
+          await tx.customerProductRate.update({
+            where: { id: existingCustomerRate.id },
+            data: { rate: editedRate },
+          });
+        }
+        return {};
+      }
+    }
+
+    const rateField = this.getProductRateField(rateType);
+    if (editedRate !== Number(currentProduct[rateField])) {
+      return { [rateField]: editedRate };
+    }
+    return {};
+  }
+
   async create(createSaleDto: CreateSaleDto, userId: number) {
     // Execute in a transaction to guarantee data integrity between sale and stock ledger
     return this.prisma.$transaction(async (tx) => {
@@ -78,8 +140,18 @@ export class SalesService {
       });
 
       // 3. Update stock and ledger for each item
+      const hasExplicitCustomer = Boolean(createSaleDto.customerId && createSaleDto.customerId > 0);
+      const enableCustomerWiseRate = Boolean(settings?.enableCustomerWiseRate);
+
       for (const item of createSaleDto.items) {
         if (item.isService) {
+          await this.applyLastEditedRate(tx, {
+            item,
+            rateType: createSaleDto.rateType,
+            resolvedCustomerId,
+            hasExplicitCustomer,
+            enableCustomerWiseRate,
+          });
           // Skip stock updates for service items
           continue;
         }
@@ -93,13 +165,19 @@ export class SalesService {
           throw new BadRequestException(`Product not found: ${item.productId}`);
         }
 
+        const rateUpdate = await this.applyLastEditedRate(tx, {
+          item,
+          rateType: createSaleDto.rateType,
+          resolvedCustomerId,
+          hasExplicitCustomer,
+          enableCustomerWiseRate,
+          currentProduct,
+        });
+
         const dataToUpdate: any = {
           currentStock: { decrement: item.quantity },
+          ...rateUpdate,
         };
-
-        if (item.rate > Number(currentProduct.sellingRate)) {
-          dataToUpdate.sellingRate = item.rate;
-        }
 
         // Decrement current stock (allow negative stock to let checkout proceed)
         const updatedProduct = await tx.product.update({
@@ -283,16 +361,39 @@ export class SalesService {
       });
 
       // 8. Apply new stock deductions and ledger entries
+      const hasExplicitCustomer = Boolean(updateSaleDto.customerId && updateSaleDto.customerId > 0);
+      const enableCustomerWiseRate = Boolean(settings?.enableCustomerWiseRate);
+
       for (const item of updateSaleDto.items) {
-        if (item.isService || !item.productId) continue;
+        if (item.isService) {
+          await this.applyLastEditedRate(tx, {
+            item,
+            rateType: updateSaleDto.rateType,
+            resolvedCustomerId,
+            hasExplicitCustomer,
+            enableCustomerWiseRate,
+          });
+          continue;
+        }
+
+        if (!item.productId) continue;
 
         const currentProduct = await tx.product.findUnique({ where: { id: item.productId } });
         if (!currentProduct) throw new BadRequestException(`Product not found: ${item.productId}`);
 
-        const dataToUpdate: any = { currentStock: { decrement: item.quantity } };
-        if (item.rate > Number(currentProduct.sellingRate)) {
-          dataToUpdate.sellingRate = item.rate;
-        }
+        const rateUpdate = await this.applyLastEditedRate(tx, {
+          item,
+          rateType: updateSaleDto.rateType,
+          resolvedCustomerId,
+          hasExplicitCustomer,
+          enableCustomerWiseRate,
+          currentProduct,
+        });
+
+        const dataToUpdate: any = {
+          currentStock: { decrement: item.quantity },
+          ...rateUpdate,
+        };
 
         const updatedProduct = await tx.product.update({
           where: { id: item.productId },

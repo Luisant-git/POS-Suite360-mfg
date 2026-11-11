@@ -7,6 +7,7 @@ import { useReactToPrint } from 'react-to-print';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
+import { parseBatchWorkName } from '../../utils/productionBatch';
 
 interface ProductionModalProps {
   productionId: number;
@@ -43,13 +44,15 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
       doc.text('PRODUCTION REPORT DETAILS', 14, 50);
       
       // Info Grid
+      const { batchCode: pdfBatchCode, workName: pdfWorkName } = parseBatchWorkName(production.workName);
       doc.setFontSize(10);
-      doc.text(`Batch / Work Name: ${production.workName}`, 14, 60);
-      doc.text(`Date: ${new Date(production.date).toLocaleDateString()}`, 14, 66);
+      doc.text(`Batch Code: ${pdfBatchCode}`, 14, 60);
+      doc.text(`Work Name: ${pdfWorkName}`, 14, 66);
+      doc.text(`Date: ${new Date(production.date).toLocaleDateString()}`, 14, 72);
       
       // Intake Table
       doc.setFontSize(12);
-      doc.text('Raw Material Intake', 14, 80);
+      doc.text('Raw Material Intake', 14, 84);
       const intakeColumns = ["Raw Material", "Quantity Intake"];
       const intakeRows = [
         [production.rawMaterial?.name, production.intakeQuantity.toString()]
@@ -57,7 +60,7 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
       autoTable(doc, {
         head: [intakeColumns],
         body: intakeRows,
-        startY: 85,
+        startY: 89,
         theme: 'striped',
         headStyles: { fillColor: [180, 83, 9] } // amber-700
       });
@@ -150,36 +153,46 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
             </div>
 
             {/* Info Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 bg-slate-50 border border-gray-200 rounded-xl p-3.5 sm:p-5 mb-4 sm:mb-8">
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                    <FileText size={16} />
+            {(() => {
+              const { batchCode, workName } = parseBatchWorkName(production.workName);
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 bg-slate-50 border border-gray-200 rounded-xl p-3.5 sm:p-5 mb-4 sm:mb-8">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                      <FileText size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Batch Code</p>
+                      <p className="text-xs font-bold text-black">{batchCode}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Batch / Work Name</p>
-                    <p className="font-bold text-gray-800">{production.workName}</p>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                      <FileText size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Work Name</p>
+                      <p className="font-bold text-gray-800">{workName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                      <Calendar size={16} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Production Date</p>
+                      <p className="font-bold text-gray-800">{new Date(production.date).toLocaleDateString()}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                    <Calendar size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Production Date</p>
-                    <p className="font-bold text-gray-800">{new Date(production.date).toLocaleDateString()}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Intake Details */}
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-bold text-amber-800 mb-3 text-sm uppercase tracking-wider bg-amber-50 px-3 py-1.5 rounded-md inline-block">Raw Material Intake</h3>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
                   <table className="w-full text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr className="bg-gray-100 text-gray-600 font-bold">
@@ -198,9 +211,9 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
               </div>
 
               {/* Outcome Details */}
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-bold text-emerald-800 mb-3 text-sm uppercase tracking-wider bg-emerald-50 px-3 py-1.5 rounded-md inline-block">Finished Product Outcome</h3>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
                   <table className="w-full text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr className="bg-gray-100 text-gray-600 font-bold">
@@ -242,14 +255,20 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
               <h2 className="text-center font-bold text-xl mb-6 uppercase tracking-wider">Production Report Details</h2>
 
               {/* Info */}
-              <div className="flex justify-between mb-8 text-sm">
-                <div>
-                  <p className="mb-1"><strong className="inline-block w-32">Batch/Work Name:</strong> {production.workName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="mb-1"><strong className="inline-block w-16">Date:</strong> {new Date(production.date).toLocaleDateString()}</p>
-                </div>
-              </div>
+              {(() => {
+                const { batchCode: printBatchCode, workName: printWorkName } = parseBatchWorkName(production.workName);
+                return (
+                  <div className="flex justify-between mb-8 text-sm">
+                    <div>
+                      <p className="mb-1"><strong className="inline-block w-28">Batch Code:</strong> <span className="text-xs font-bold text-black">{printBatchCode}</span></p>
+                      <p className="mb-1"><strong className="inline-block w-28">Work Name:</strong> {printWorkName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="mb-1"><strong className="inline-block w-16">Date:</strong> {new Date(production.date).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Tables */}
               <div className="mb-8">

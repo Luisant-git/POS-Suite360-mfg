@@ -12,6 +12,7 @@ import ProductionModal from '../production/ProductionModal';
 import Select from 'react-select';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import TableLoader from '../../components/TableLoader';
+import { parseBatchWorkName } from '../../utils/productionBatch';
 const ProductionReport = () => {
   const navigate = useNavigate();
   const { settings } = useSettings();
@@ -35,17 +36,22 @@ const ProductionReport = () => {
           workName: workName || undefined,
         }
       });
-      return data.map((p: any) => ({
-        id: p.id,
-        date: new Date(p.date).toISOString().split('T')[0],
-        workName: p.workName || '-',
-        rawMaterial: p.rawMaterial?.name || '-',
-        rawMaterialId: p.rawMaterialId,
-        intakeQuantity: p.intakeQuantity || 0,
-        finishedProduct: p.finishedProduct?.name || '-',
-        finishedProductId: p.finishedProductId,
-        outcomeQuantity: p.outcomeQuantity || 0,
-      }));
+      return data.map((p: any) => {
+        const { batchCode, workName: displayWorkName } = parseBatchWorkName(p.workName);
+        return {
+          id: p.id,
+          date: new Date(p.date).toISOString().split('T')[0],
+          batchCode,
+          displayWorkName,
+          workName: p.workName || '-',
+          rawMaterial: p.rawMaterial?.name || '-',
+          rawMaterialId: p.rawMaterialId,
+          intakeQuantity: p.intakeQuantity || 0,
+          finishedProduct: p.finishedProduct?.name || '-',
+          finishedProductId: p.finishedProductId,
+          outcomeQuantity: p.outcomeQuantity || 0,
+        };
+      });
     },
   });
 
@@ -77,6 +83,8 @@ const ProductionReport = () => {
     if (!quickSearch) return true;
     const term = quickSearch.toLowerCase();
     return (
+      p.batchCode.toLowerCase().includes(term) ||
+      p.displayWorkName.toLowerCase().includes(term) ||
       p.workName.toLowerCase().includes(term) ||
       p.rawMaterial.toLowerCase().includes(term) ||
       p.finishedProduct.toLowerCase().includes(term)
@@ -303,21 +311,21 @@ const ProductionReport = () => {
       <div className="flex flex-col xl:flex-row gap-4 flex-1 overflow-y-auto xl:overflow-hidden min-h-0">
 
         {/* Report Table Section */}
-        <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col flex-1 xl:w-3/4">
-          <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-3 sm:px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 shrink-0">
-            <div className="flex items-center gap-2 text-[#64748B]">
+        <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col flex-1 min-w-0 xl:w-3/4">
+          <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-3 sm:px-4 py-3 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 text-[#64748B] shrink-0">
               <FileText size={16} />
               <h2 className="font-bold text-[13px] tracking-wide">PRODUCTION REPORT</h2>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
-              <div className="relative flex-1 md:flex-initial">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full lg:w-auto justify-between lg:justify-end">
+              <div className="relative flex-1 min-w-[180px] lg:max-w-xs">
                 <Search size={14} className="absolute left-2.5 top-2.5 text-gray-400" />
                 <input
                   type="text"
                   value={quickSearch}
                   onChange={(e) => setQuickSearch(e.target.value)}
-                  placeholder="Quick search..."
-                  className="w-full pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] md:w-64 focus:border-[#3B82F6]"
+                  placeholder="Quick search batch, work, material..."
+                  className="w-full pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] focus:border-[#3B82F6]"
                 />
               </div>
               <button type="button"
@@ -326,7 +334,8 @@ const ProductionReport = () => {
                   const totalProducedSum = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.outcomeQuantity) || 0), 0);
                   const exportData = filteredProductions.map((p: any) => ({
                     'Date': p.date,
-                    'Batch / Work Name': p.workName,
+                    'Batch Code': p.batchCode,
+                    'Work Name': p.displayWorkName,
                     'Raw Material Used': p.rawMaterial,
                     'Intake Qty': p.intakeQuantity,
                     'Finished Product Output': p.finishedProduct,
@@ -334,7 +343,8 @@ const ProductionReport = () => {
                   }));
                   exportData.push({
                     'Date': '',
-                    'Batch / Work Name': '',
+                    'Batch Code': '',
+                    'Work Name': '',
                     'Raw Material Used': 'TOTAL:',
                     'Intake Qty': totalIntake,
                     'Finished Product Output': 'TOTAL:',
@@ -356,7 +366,8 @@ const ProductionReport = () => {
                   const totalProducedSum = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.outcomeQuantity) || 0), 0);
                   const cols: PdfColumn[] = [
                     { header: 'Date', dataKey: 'date' },
-                    { header: 'Batch / Work Name', dataKey: 'workName' },
+                    { header: 'Batch Code', dataKey: 'batchCode' },
+                    { header: 'Work Name', dataKey: 'displayWorkName' },
                     { header: 'Raw Material', dataKey: 'rawMaterial' },
                     { header: 'Intake Qty', dataKey: 'intakeQuantity' },
                     { header: 'Finished Product', dataKey: 'finishedProduct' },
@@ -364,7 +375,8 @@ const ProductionReport = () => {
                   ];
                   const pdfData = [...filteredProductions, {
                     date: '',
-                    workName: '',
+                    batchCode: '',
+                    displayWorkName: '',
                     rawMaterial: 'TOTAL:',
                     intakeQuantity: totalIntake.toString(),
                     finishedProduct: 'TOTAL:',
@@ -385,7 +397,7 @@ const ProductionReport = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto overflow-x-auto">
+          <div className="flex-1 min-h-0 overflow-auto custom-scrollbar">
             {/* Mobile Card View */}
             <div className="md:hidden divide-y divide-[#E2E8F0]">
               {isLoading ? (
@@ -419,10 +431,14 @@ const ProductionReport = () => {
                     <div key={p.id} className="p-3.5 bg-white hover:bg-[#F8FAFC]">
                       <div className="flex justify-between items-start gap-2 mb-2">
                         <div>
-                          <span className="font-black text-[#1E3A8A] text-[13px]">{p.workName}</span>
-                          <span className="text-[11px] text-gray-500 block">{p.date}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-black text-[11px]">{p.batchCode}</span>
+                            {p.batchCode !== '-' && <span className="text-gray-400">·</span>}
+                            <span className="font-black text-[#1E3A8A] text-[13px]">{p.displayWorkName}</span>
+                          </div>
+                          <span className="text-[11px] text-gray-500 block mt-0.5">{p.date}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
+                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 shrink-0">
                           Wastage: {displayWastage} {displayWastage !== '-' && wastagePercentage !== '-' ? `(${wastagePercentage})` : ''}
                         </span>
                       </div>
@@ -456,25 +472,26 @@ const ProductionReport = () => {
             </div>
 
             {/* Desktop Table View */}
-            <table className="hidden md:table w-full text-left text-[12px] whitespace-nowrap">
-              <thead>
+            <table className="hidden md:table w-full min-w-max text-left text-[12px] whitespace-nowrap">
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-[#0F172A] text-white font-bold">
-                  <th className="px-4 py-3 border-r border-[#1E293B] text-center">S.No</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B]">Batch / Work Name</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B]">Raw Material Used</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Intake Qty</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B]">Finished Product Output</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Produced Qty</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Wastage Qty (%)</th>
-                  <th className="px-4 py-3 border-[#1E293B] text-center">Action</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B] text-center">S.No</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Date</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Batch Code</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Work Name</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Raw Material Used</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B] text-right">Intake Qty</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Finished Product Output</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B] text-right">Produced Qty</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B] text-right">Wastage Qty (%)</th>
+                  <th className="px-3.5 py-3 border-[#1E293B] text-center">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
-                  <TableLoader columns={9} />
+                  <TableLoader columns={10} />
                 ) : filteredProductions.length === 0 ? (
-                  <tr><td colSpan={9} className="text-center p-6 text-gray-500">No production records found.</td></tr>
+                  <tr><td colSpan={10} className="text-center p-6 text-gray-500">No production records found.</td></tr>
                 ) : (
                   paginatedProductions.map((p: any, index: number) => {
                     // Find all rows in this batch
@@ -508,9 +525,10 @@ const ProductionReport = () => {
 
                     return (
                       <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{(currentPage - 1) * entriesPerPage + index + 1}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] text-[#475569]">{p.date}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-[#1E293B]">{p.workName}</td>
+                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{(currentPage - 1) * entriesPerPage + index + 1}</td>
+                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[#475569]">{p.date}</td>
+                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[11px] font-bold text-black">{p.batchCode}</td>
+                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] font-bold text-[#1E293B]">{p.displayWorkName}</td>
                         <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#B91C1C]">{p.rawMaterial}</td>
                         <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-[#B91C1C]">{p.intakeQuantity}</td>
                         <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#15803D]">{p.finishedProduct}</td>
@@ -557,25 +575,27 @@ const ProductionReport = () => {
               <div className="text-gray-400 text-[12px] font-bold text-center bg-gray-50 w-full py-10 rounded border border-gray-100">No completed productions<br />to chart.</div>
             ) : (
               <>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: any) => Number(value).toLocaleString()} />
-                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="w-full h-[230px] sm:h-[260px] xl:flex-1 min-h-[220px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: any) => Number(value).toLocaleString()} />
+                      <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
                 <div className="mt-4 text-center w-full bg-emerald-50 p-3 rounded-lg border border-emerald-100">
                   <div className="text-[11px] font-bold text-emerald-800 uppercase">Total Efficiency</div>
                   <div className="text-[20px] font-black text-emerald-600">

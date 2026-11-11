@@ -10,11 +10,13 @@ const ShortcutHelpButton = () => {
         e.preventDefault();
         setIsOpen(prev => !prev);
       } else if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
         setIsOpen(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen]);
 
   return (

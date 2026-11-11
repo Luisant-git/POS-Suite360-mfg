@@ -47,6 +47,10 @@ export class CreateSaleDto {
   @IsNumber({}, { message: 'customerId must be a number' })
   customerId?: number;
 
+  @IsString()
+  @IsOptional()
+  rateType?: string;
+
   @IsNumber()
   paymentModeId: number;
 
