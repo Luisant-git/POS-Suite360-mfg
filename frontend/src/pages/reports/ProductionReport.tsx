@@ -12,7 +12,14 @@ import ProductionModal from '../production/ProductionModal';
 import Select from 'react-select';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import TableLoader from '../../components/TableLoader';
-import { parseBatchWorkName } from '../../utils/productionBatch';
+import {
+  formatRawMaterialLabel,
+  getEffectiveIntakes,
+  getEffectiveOutcomeEntries,
+  getEffectiveOutcomes,
+  isProductionCompleted,
+  parseBatchWorkName,
+} from '../../utils/productionBatch';
 const ProductionReport = () => {
   const navigate = useNavigate();
   const { settings } = useSettings();
@@ -24,6 +31,7 @@ const ProductionReport = () => {
   const [viewId, setViewId] = useState<number | null>(null);
   const [filterRmId, setFilterRmId] = useState<string>('');
   const [filterProductId, setFilterProductId] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
 
   // Fetch Report Data
   const { data: productions = [], isLoading, refetch } = useQuery({
@@ -38,18 +46,45 @@ const ProductionReport = () => {
       });
       return data.map((p: any) => {
         const { batchCode, workName: displayWorkName } = parseBatchWorkName(p.workName);
+        const intakes = getEffectiveIntakes(p);
+        const outcomes = getEffectiveOutcomes(p);
+        const outcomeEntries = getEffectiveOutcomeEntries(p);
+        const completed = isProductionCompleted(p);
+        const rawMaterialLabel = intakes
+          .map((i: any) =>
+            `${formatRawMaterialLabel(i.rawMaterial, i.materialBatchCode, i.materialCode)}${intakes.length > 1 ? ` (${i.intakeQuantity})` : ''}`
+          )
+          .join(', ') || '-';
+        const finishedProductLabel = outcomes
+          .map((o: any) =>
+            `${o.finishedProduct?.name || '-'}${outcomes.length > 1 ? ` (${o.outcomeQuantity})` : ''}`
+          )
+          .filter(Boolean)
+          .join(', ') || '-';
+        const totalIn = intakes.reduce((s: number, i: any) => s + Number(i.intakeQuantity || 0), 0);
+        const totalOut = outcomes.reduce((s: number, o: any) => s + Number(o.outcomeQuantity || 0), 0);
         return {
           id: p.id,
           date: new Date(p.date).toISOString().split('T')[0],
+          completedDate: p.completedAt ? new Date(p.completedAt).toISOString().split('T')[0] : '-',
           batchCode,
           displayWorkName,
           workName: p.workName || '-',
-          rawMaterial: p.rawMaterial?.name || '-',
+          status: p.status,
+          statusLabel: completed ? 'Completed' : 'Pending',
+          completed,
+          intakes,
+          outcomes,
+          outcomeEntries,
+          hasStructuredRows: (Array.isArray(p.intakes) && p.intakes.length > 0) || (Array.isArray(p.outcomes) && p.outcomes.length > 0),
+          rawMaterial: rawMaterialLabel,
           rawMaterialId: p.rawMaterialId,
-          intakeQuantity: p.intakeQuantity || 0,
-          finishedProduct: p.finishedProduct?.name || '-',
+          rawMaterialIds: intakes.map((i: any) => String(i.rawMaterialId)),
+          intakeQuantity: totalIn,
+          finishedProduct: finishedProductLabel,
           finishedProductId: p.finishedProductId,
-          outcomeQuantity: p.outcomeQuantity || 0,
+          finishedProductIds: outcomes.map((o: any) => String(o.finishedProductId)),
+          outcomeQuantity: totalOut,
         };
       });
     },
@@ -73,12 +108,95 @@ const ProductionReport = () => {
     },
   });
 
+  const computeRowWastage = (p: any) => {
+    if (p.hasStructuredRows) {
+      const totalBatchRawSqM = (p.intakes || []).reduce((sum: number, bp: any) => {
+        if (Number(bp.sqM || 0) > 0) return sum + Number(bp.sqM);
+        const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId) || bp.rawMaterial;
+        const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        return sum + Number(bp.intakeQuantity || 0) * sqMPerRoll;
+      }, 0);
+
+      const outcomes = p.outcomes || [];
+      const totalOutcomeSqM = outcomes.reduce((sum: number, o: any) => {
+        const prod = products.find((pr: any) => pr.id === o.finishedProductId) || o.finishedProduct;
+        return sum + Number(o.outcomeQuantity || 0) * Number(prod?.sqM || 0);
+      }, 0);
+
+      const batchOutcome = p.outcomeQuantity || 0;
+      const singleProd =
+        outcomes.length === 1
+          ? products.find((pr: any) => pr.id === outcomes[0].finishedProductId) || outcomes[0].finishedProduct
+          : null;
+      const singleProdSqM = Number(singleProd?.sqM || 0);
+
+      if (!p.completed && batchOutcome <= 0) {
+        return { batchOutcome, displayWastage: '-', wastagePercentage: '-', wastageNum: 0 };
+      }
+
+      if (singleProd && singleProdSqM > 0) {
+        const theoreticalYield = totalBatchRawSqM / singleProdSqM;
+        const maxWastage = Math.max(0, theoreticalYield - batchOutcome);
+        const pct = theoreticalYield > 0 ? ((maxWastage / theoreticalYield) * 100).toFixed(2) + '%' : '-';
+        return { batchOutcome, displayWastage: maxWastage.toFixed(2), wastagePercentage: pct, wastageNum: maxWastage };
+      }
+
+      const wastageSqM = totalBatchRawSqM > 0 ? Math.max(0, totalBatchRawSqM - totalOutcomeSqM) : 0;
+      const pct = totalBatchRawSqM > 0 ? ((wastageSqM / totalBatchRawSqM) * 100).toFixed(2) + '%' : '-';
+      return {
+        batchOutcome,
+        displayWastage: totalBatchRawSqM > 0 ? `${wastageSqM.toFixed(2)} m²` : '-',
+        wastagePercentage: pct,
+        wastageNum: wastageSqM,
+        totalBatchRawSqM,
+        totalOutcomeSqM,
+        wastageSqM,
+      };
+    }
+
+    // Legacy single-row grouping fallback
+    const batchRows = productions.filter((bp: any) => !bp.hasStructuredRows && bp.workName === p.workName && bp.finishedProductId === p.finishedProductId);
+    const totalBatchRawSqM = batchRows.reduce((sum: number, bp: any) => {
+      const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId);
+      const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+      return sum + (bp.intakeQuantity * sqMPerRoll);
+    }, 0);
+    const prod = products.find((prod: any) => prod.id === p.finishedProductId);
+    const productSqM = Number(prod?.sqM || 0);
+    const batchOutcome = batchRows.find((bp: any) => bp.outcomeQuantity > 0)?.outcomeQuantity || p.outcomeQuantity;
+    const totalTheoreticalYield = productSqM > 0 ? (totalBatchRawSqM / productSqM) : 0;
+    let displayWastage = '-';
+    let wastagePercentage = '-';
+    let wastageNum = 0;
+    if (batchOutcome && batchOutcome > 0) {
+      const wastage = totalTheoreticalYield > 0 ? (totalTheoreticalYield - batchOutcome) : 0;
+      wastageNum = Math.max(0, wastage);
+      displayWastage = wastageNum.toFixed(2);
+      if (totalTheoreticalYield > 0) {
+        wastagePercentage = ((wastageNum / totalTheoreticalYield) * 100).toFixed(2) + '%';
+      }
+    }
+    const totalOutcomeSqM = (Number(batchOutcome) || 0) * productSqM;
+    const wastageSqM = totalBatchRawSqM > 0 ? Math.max(0, totalBatchRawSqM - totalOutcomeSqM) : 0;
+    return {
+      batchOutcome,
+      displayWastage,
+      wastagePercentage,
+      wastageNum,
+      totalBatchRawSqM,
+      totalOutcomeSqM,
+      wastageSqM,
+    };
+  };
+
   const filteredProductions = productions.filter((p: any) => {
     if (fromDate && p.date < fromDate) return false;
     if (toDate && p.date > toDate) return false;
     if (workName && p.workName !== workName) return false;
-    if (filterRmId && p.rawMaterialId?.toString() !== filterRmId) return false;
-    if (filterProductId && p.finishedProductId?.toString() !== filterProductId) return false;
+    if (filterRmId && !(p.rawMaterialIds || []).includes(filterRmId)) return false;
+    if (filterProductId && !(p.finishedProductIds || []).includes(filterProductId)) return false;
+    if (filterStatus === 'pending' && p.completed) return false;
+    if (filterStatus === 'completed' && !p.completed) return false;
 
     if (!quickSearch) return true;
     const term = quickSearch.toLowerCase();
@@ -87,15 +205,49 @@ const ProductionReport = () => {
       p.displayWorkName.toLowerCase().includes(term) ||
       p.workName.toLowerCase().includes(term) ||
       p.rawMaterial.toLowerCase().includes(term) ||
-      p.finishedProduct.toLowerCase().includes(term)
+      p.finishedProduct.toLowerCase().includes(term) ||
+      p.statusLabel.toLowerCase().includes(term)
     );
+  });
+
+  const reportRows = filteredProductions.flatMap((p: any, prodIdx: number) => {
+    const entries = Array.isArray(p.outcomeEntries) && p.outcomeEntries.length > 0
+      ? p.outcomeEntries
+      : [{ key: `fallback-${p.id}`, finishedProduct: { name: p.finishedProduct }, outcomeQuantity: p.outcomeQuantity, date: p.date }];
+    const { displayWastage, wastagePercentage } = computeRowWastage(p);
+    const wastageDisplay = displayWastage !== '-' && wastagePercentage !== '-' ? `${displayWastage} (${wastagePercentage})` : '-';
+
+    return entries.map((entry: any, entryIdx: number) => {
+      const isPrimaryRow = entryIdx === 0;
+      const entryDate = new Date(entry.date || p.date).toISOString().split('T')[0];
+      return {
+        rowKey: `${p.id}-${entry.key || entryIdx}`,
+        id: p.id,
+        sNo: isPrimaryRow ? String(prodIdx + 1) : `${prodIdx + 1}.${entryIdx + 1}`,
+        isPrimaryRow,
+        date: entryDate,
+        completedDate: p.completedDate,
+        batchCode: p.batchCode,
+        displayWorkName: p.displayWorkName,
+        statusLabel: p.statusLabel,
+        completed: p.completed,
+        rawMaterial: p.rawMaterial,
+        intakeQuantityDisplay: isPrimaryRow ? String(p.intakeQuantity) : '-',
+        intakeQuantityNum: isPrimaryRow ? Number(p.intakeQuantity || 0) : 0,
+        productName: entry.finishedProduct?.name || '-',
+        outcomeQuantity: Number(entry.outcomeQuantity || 0),
+        displayWastage: isPrimaryRow ? displayWastage : '-',
+        wastagePercentage: isPrimaryRow ? wastagePercentage : '-',
+        wastageDisplay: isPrimaryRow ? wastageDisplay : '-',
+      };
+    });
   });
 
   const entriesPerPage = 25;
   const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.ceil(filteredProductions.length / entriesPerPage);
-  const paginatedProductions = filteredProductions.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
+  const totalPages = Math.ceil(reportRows.length / entriesPerPage);
+  const paginatedRows = reportRows.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage);
 
   let totalProduced = 0;
   let totalWastage = 0;
@@ -103,33 +255,23 @@ const ProductionReport = () => {
   const processedBatches = new Set();
 
   filteredProductions.forEach((p: any) => {
-    if (processedBatches.has(p.workName)) return;
-
-    const batchRows = productions.filter((bp: any) => bp.workName === p.workName && bp.finishedProductId === p.finishedProductId);
-
-    const totalBatchRawSqM = batchRows.reduce((sum: number, bp: any) => {
-      const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId);
-      const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      return sum + (bp.intakeQuantity * sqMPerRoll);
-    }, 0);
-
-    const prod = products.find((prod: any) => prod.id === p.finishedProductId);
-    const productSqM = Number(prod?.sqM || 0);
-
-    const batchOutcome = batchRows.find((bp: any) => bp.outcomeQuantity > 0)?.outcomeQuantity || p.outcomeQuantity;
-
-    const totalTheoreticalYield = productSqM > 0 ? (totalBatchRawSqM / productSqM) : 0;
-
-    if (batchOutcome && batchOutcome > 0) {
-      totalProduced += batchOutcome;
-      totalWastage += Math.max(0, totalTheoreticalYield - batchOutcome);
-      processedBatches.add(p.workName);
+    const key = p.hasStructuredRows ? `id-${p.id}` : p.workName;
+    if (processedBatches.has(key)) return;
+    const { batchOutcome, totalOutcomeSqM = 0, wastageSqM = 0 } = computeRowWastage(p);
+    if (batchOutcome > 0) {
+      if (totalOutcomeSqM > 0) {
+        totalProduced += totalOutcomeSqM;
+        totalWastage += wastageSqM;
+      } else {
+        totalProduced += batchOutcome;
+      }
+      processedBatches.add(key);
     }
   });
 
   const pieData = [
-    { name: 'Produced', value: parseFloat(totalProduced.toFixed(2)) },
-    { name: 'Wastage', value: parseFloat(totalWastage.toFixed(2)) }
+    { name: 'Produced (m²)', value: parseFloat(totalProduced.toFixed(2)) },
+    { name: 'Wastage (m²)', value: parseFloat(totalWastage.toFixed(2)) }
   ];
 
   const COLORS = ['#10B981', '#EF4444'];
@@ -213,7 +355,7 @@ const ProductionReport = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 items-end mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 items-end mb-4">
 
           <div>
             <label className="flex items-center gap-1 text-[12px] text-[#64748B] mb-1 font-bold"><Calendar size={12} /> From Date</label>
@@ -249,11 +391,18 @@ const ProductionReport = () => {
           </div>
 
           <div>
-            <label className="flex items-center gap-1 text-[12px] text-[#3B82F6] mb-1 font-bold"><Box size={12} /> Raw Material</label>
+            <label className="flex items-center gap-1 text-[12px] text-[#3B82F6] mb-1 font-bold"><Box size={12} /> Material (Name-Code-Batch)</label>
             <Select
-              value={filterRmId ? { value: filterRmId, label: rawMaterials.find((rm: any) => rm.id.toString() === filterRmId)?.name || 'Unknown' } : null}
+              value={
+                filterRmId
+                  ? {
+                      value: filterRmId,
+                      label: formatRawMaterialLabel(rawMaterials.find((rm: any) => rm.id.toString() === filterRmId)) || 'Unknown',
+                    }
+                  : null
+              }
               onChange={(selected: any) => setFilterRmId(selected ? selected.value : '')}
-              options={rawMaterials.map((rm: any) => ({ value: rm.id.toString(), label: rm.name }))}
+              options={rawMaterials.map((rm: any) => ({ value: rm.id.toString(), label: formatRawMaterialLabel(rm) }))}
               isClearable
               placeholder="All Raw Materials"
               styles={selectStyles}
@@ -272,6 +421,19 @@ const ProductionReport = () => {
               styles={selectStyles}
               menuPortalTarget={document.body}
             />
+          </div>
+
+          <div>
+            <label className="flex items-center gap-1 text-[12px] text-[#64748B] mb-1 font-bold">Status</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'pending' | 'completed')}
+              className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[13px] text-[#334155] bg-white focus:border-[#3B82F6]"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+            </select>
           </div>
 
         </div>
@@ -296,6 +458,7 @@ const ProductionReport = () => {
                 setWorkName('');
                 setFilterRmId('');
                 setFilterProductId('');
+                setFilterStatus('all');
                 setQuickSearch('');
                 setIsFilterOpen(false);
               }}
@@ -330,25 +493,31 @@ const ProductionReport = () => {
               </div>
               <button type="button"
                 onClick={() => {
-                  const totalIntake = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.intakeQuantity) || 0), 0);
-                  const totalProducedSum = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.outcomeQuantity) || 0), 0);
-                  const exportData = filteredProductions.map((p: any) => ({
-                    'Date': p.date,
-                    'Batch Code': p.batchCode,
-                    'Work Name': p.displayWorkName,
-                    'Raw Material Used': p.rawMaterial,
-                    'Intake Qty': p.intakeQuantity,
-                    'Finished Product Output': p.finishedProduct,
-                    'Produced Qty': p.outcomeQuantity,
+                  const totalIntake = reportRows.reduce((sum: number, r: any) => sum + (Number(r.intakeQuantityNum) || 0), 0);
+                  const totalProducedSum = reportRows.reduce((sum: number, r: any) => sum + (Number(r.outcomeQuantity) || 0), 0);
+                  const exportData = reportRows.map((r: any) => ({
+                    'S.No': r.sNo,
+                    'Date': r.date,
+                    'Batch Code': r.batchCode,
+                    'Work Name': r.displayWorkName,
+                    'Status': r.statusLabel,
+                    'Material (Name-Code-Batch)': r.rawMaterial,
+                    'Intake Qty': r.intakeQuantityDisplay,
+                    'Product (Outcome)': r.productName,
+                    'Produced Qty': r.outcomeQuantity,
+                    'Wastage': r.wastageDisplay,
                   }));
                   exportData.push({
+                    'S.No': '',
                     'Date': '',
                     'Batch Code': '',
                     'Work Name': '',
-                    'Raw Material Used': 'TOTAL:',
-                    'Intake Qty': totalIntake,
-                    'Finished Product Output': 'TOTAL:',
+                    'Status': '',
+                    'Material (Name-Code-Batch)': 'TOTAL:',
+                    'Intake Qty': String(totalIntake),
+                    'Product (Outcome)': 'TOTAL:',
                     'Produced Qty': totalProducedSum,
+                    'Wastage': '',
                   });
                   exportToExcel(exportData, `Production_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
                     shopName: settings?.shopName || 'MY SHOP',
@@ -362,25 +531,31 @@ const ProductionReport = () => {
               </button>
               <button type="button"
                 onClick={() => {
-                  const totalIntake = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.intakeQuantity) || 0), 0);
-                  const totalProducedSum = filteredProductions.reduce((sum: number, p: any) => sum + (Number(p.outcomeQuantity) || 0), 0);
+                  const totalIntake = reportRows.reduce((sum: number, r: any) => sum + (Number(r.intakeQuantityNum) || 0), 0);
+                  const totalProducedSum = reportRows.reduce((sum: number, r: any) => sum + (Number(r.outcomeQuantity) || 0), 0);
                   const cols: PdfColumn[] = [
+                    { header: 'S.No', dataKey: 'sNo' },
                     { header: 'Date', dataKey: 'date' },
                     { header: 'Batch Code', dataKey: 'batchCode' },
                     { header: 'Work Name', dataKey: 'displayWorkName' },
-                    { header: 'Raw Material', dataKey: 'rawMaterial' },
-                    { header: 'Intake Qty', dataKey: 'intakeQuantity' },
-                    { header: 'Finished Product', dataKey: 'finishedProduct' },
+                    { header: 'Status', dataKey: 'statusLabel' },
+                    { header: 'Material (Name-Code-Batch)', dataKey: 'rawMaterial' },
+                    { header: 'Intake Qty', dataKey: 'intakeQuantityDisplay' },
+                    { header: 'Product (Outcome)', dataKey: 'productName' },
                     { header: 'Produced Qty', dataKey: 'outcomeQuantity' },
+                    { header: 'Wastage', dataKey: 'wastageDisplay' },
                   ];
-                  const pdfData = [...filteredProductions, {
+                  const pdfData = [...reportRows, {
+                    sNo: '',
                     date: '',
                     batchCode: '',
                     displayWorkName: '',
+                    statusLabel: '',
                     rawMaterial: 'TOTAL:',
-                    intakeQuantity: totalIntake.toString(),
-                    finishedProduct: 'TOTAL:',
-                    outcomeQuantity: totalProducedSum.toString()
+                    intakeQuantityDisplay: totalIntake.toString(),
+                    productName: 'TOTAL:',
+                    outcomeQuantity: totalProducedSum.toString(),
+                    wastageDisplay: '',
                   }];
                   exportTableToPdf(cols, pdfData, `Production_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Production Report', settings?.shopName, filteredProductions.length);
                 }}
@@ -402,72 +577,57 @@ const ProductionReport = () => {
             <div className="md:hidden divide-y divide-[#E2E8F0]">
               {isLoading ? (
                 <div className="p-6 text-center text-gray-500 font-bold">Loading production records...</div>
-              ) : filteredProductions.length === 0 ? (
+              ) : reportRows.length === 0 ? (
                 <div className="text-center p-6 text-gray-500">No production records found.</div>
               ) : (
-                paginatedProductions.map((p: any) => {
-                  const batchRows = productions.filter((bp: any) => bp.workName === p.workName && bp.finishedProductId === p.finishedProductId);
-                  const totalBatchRawSqM = batchRows.reduce((sum: number, bp: any) => {
-                    const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId);
-                    const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-                    return sum + (bp.intakeQuantity * sqMPerRoll);
-                  }, 0);
-                  const prod = products.find((prod: any) => prod.id === p.finishedProductId);
-                  const productSqM = Number(prod?.sqM || 0);
-                  const batchOutcome = batchRows.find((bp: any) => bp.outcomeQuantity > 0)?.outcomeQuantity || p.outcomeQuantity;
-                  const totalTheoreticalYield = productSqM > 0 ? (totalBatchRawSqM / productSqM) : 0;
-                  let displayWastage = '-';
-                  let wastagePercentage = '-';
-                  if (batchOutcome && batchOutcome > 0) {
-                    const wastage = totalTheoreticalYield > 0 ? (totalTheoreticalYield - batchOutcome) : 0;
-                    const maxWastage = Math.max(0, wastage);
-                    displayWastage = maxWastage.toFixed(2);
-                    if (totalTheoreticalYield > 0) {
-                      wastagePercentage = ((maxWastage / totalTheoreticalYield) * 100).toFixed(2) + '%';
-                    }
-                  }
-
-                  return (
-                    <div key={p.id} className="p-3.5 bg-white hover:bg-[#F8FAFC]">
+                paginatedRows.map((r: any) => (
+                    <div key={r.rowKey} className={`p-3.5 hover:bg-[#F8FAFC] ${r.isPrimaryRow ? 'bg-white' : 'bg-blue-50/20'}`}>
                       <div className="flex justify-between items-start gap-2 mb-2">
                         <div>
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-black text-[11px]">{p.batchCode}</span>
-                            {p.batchCode !== '-' && <span className="text-gray-400">·</span>}
-                            <span className="font-black text-[#1E3A8A] text-[13px]">{p.displayWorkName}</span>
+                            <span className="text-[10px] font-bold text-gray-500">#{r.sNo}</span>
+                            <span className="font-bold text-black text-[11px]">{r.batchCode}</span>
+                            {r.batchCode !== '-' && <span className="text-gray-400">·</span>}
+                            <span className="font-black text-[#1E3A8A] text-[13px]">{r.displayWorkName}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                              {r.statusLabel}
+                            </span>
                           </div>
-                          <span className="text-[11px] text-gray-500 block mt-0.5">{p.date}</span>
+                          <span className="text-[11px] text-gray-500 block mt-0.5">
+                            {r.date}{r.completedDate !== '-' ? ` • Completed: ${r.completedDate}` : ''}
+                          </span>
                         </div>
-                        <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 shrink-0">
-                          Wastage: {displayWastage} {displayWastage !== '-' && wastagePercentage !== '-' ? `(${wastagePercentage})` : ''}
-                        </span>
+                        {r.isPrimaryRow && (
+                          <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100 shrink-0">
+                            Wastage: {r.wastageDisplay}
+                          </span>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-lg text-[12px] mb-2 border border-slate-100">
                         <div>
                           <span className="text-[10px] text-gray-400 font-bold block uppercase">Raw Material</span>
-                          <span className="font-bold text-[#B91C1C] block text-[13px]">{p.rawMaterial}</span>
-                          <span className="text-[11px] font-medium text-gray-600">Intake: {p.intakeQuantity}</span>
+                          <span className="font-bold text-[#B91C1C] block text-[13px]">{r.rawMaterial}</span>
+                          <span className="text-[11px] font-medium text-gray-600">Intake: {r.intakeQuantityDisplay}</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-gray-400 font-bold block uppercase">Finished Output</span>
-                          <span className="font-bold text-[#15803D] block text-[13px]">{p.finishedProduct}</span>
-                          <span className="text-[11px] font-medium text-gray-600">Produced: {batchOutcome > 0 ? batchOutcome : '-'}</span>
+                          <span className="font-bold text-[#15803D] block text-[13px]">{r.productName}</span>
+                          <span className="text-[11px] font-medium text-gray-600">Produced: {r.outcomeQuantity}</span>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-end pt-1">
                         <button
                           type="button"
-                          onClick={() => setViewId(p.id)}
+                          onClick={() => setViewId(r.id)}
                           className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded"
                         >
                           <Eye size={13} /> View Details
                         </button>
                       </div>
                     </div>
-                  );
-                })
+                  ))
               )}
             </div>
 
@@ -479,9 +639,10 @@ const ProductionReport = () => {
                   <th className="px-3.5 py-3 border-r border-[#1E293B]">Date</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B]">Batch Code</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B]">Work Name</th>
-                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Raw Material Used</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B] text-center">Status</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Material (Name-Code-Batch)</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B] text-right">Intake Qty</th>
-                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Finished Product Output</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Product (Outcome)</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B] text-right">Produced Qty</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B] text-right">Wastage Qty (%)</th>
                   <th className="px-3.5 py-3 border-[#1E293B] text-center">Action</th>
@@ -489,65 +650,44 @@ const ProductionReport = () => {
               </thead>
               <tbody>
                 {isLoading ? (
-                  <TableLoader columns={10} />
-                ) : filteredProductions.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center p-6 text-gray-500">No production records found.</td></tr>
+                  <TableLoader columns={11} />
+                ) : reportRows.length === 0 ? (
+                  <tr><td colSpan={11} className="text-center p-6 text-gray-500">No production records found.</td></tr>
                 ) : (
-                  paginatedProductions.map((p: any, index: number) => {
-                    // Find all rows in this batch
-                    const batchRows = productions.filter((bp: any) => bp.workName === p.workName && bp.finishedProductId === p.finishedProductId);
-
-                    // Calculate total raw SqM for the entire batch
-                    const totalBatchRawSqM = batchRows.reduce((sum: number, bp: any) => {
-                      const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId);
-                      const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-                      return sum + (bp.intakeQuantity * sqMPerRoll);
-                    }, 0);
-
-                    const prod = products.find((prod: any) => prod.id === p.finishedProductId);
-                    const productSqM = Number(prod?.sqM || 0);
-
-                    // Find the total outcome quantity for this batch
-                    const batchOutcome = batchRows.find((bp: any) => bp.outcomeQuantity > 0)?.outcomeQuantity || p.outcomeQuantity;
-
-                    const totalTheoreticalYield = productSqM > 0 ? (totalBatchRawSqM / productSqM) : 0;
-
-                    let displayWastage = '-';
-                    let wastagePercentage = '-';
-                    if (batchOutcome && batchOutcome > 0) {
-                      const wastage = totalTheoreticalYield > 0 ? (totalTheoreticalYield - batchOutcome) : 0;
-                      const maxWastage = Math.max(0, wastage);
-                      displayWastage = maxWastage.toFixed(2);
-                      if (totalTheoreticalYield > 0) {
-                        wastagePercentage = ((maxWastage / totalTheoreticalYield) * 100).toFixed(2) + '%';
-                      }
-                    }
-
-                    return (
-                      <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
-                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{(currentPage - 1) * entriesPerPage + index + 1}</td>
-                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[#475569]">{p.date}</td>
-                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[11px] font-bold text-black">{p.batchCode}</td>
-                        <td className="px-3.5 py-3 border-r border-[#E2E8F0] font-bold text-[#1E293B]">{p.displayWorkName}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#B91C1C]">{p.rawMaterial}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-[#B91C1C]">{p.intakeQuantity}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#15803D]">{p.finishedProduct}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-[#15803D]">{batchOutcome > 0 ? batchOutcome : '-'}</td>
-                        <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-orange-600">
-                          {displayWastage} {displayWastage !== '-' && wastagePercentage !== '-' ? `(${wastagePercentage})` : ''}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => setViewId(p.id)}
-                            className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
-                            title="View Details"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  paginatedRows.map((r: any, index: number) => (
+                    <tr
+                      key={r.rowKey}
+                      className={`border-b border-[#E2E8F0] ${
+                        r.isPrimaryRow ? (index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]') : 'bg-blue-50/20'
+                      } hover:bg-[#EFF6FF]`}
+                    >
+                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-center text-[#64748B] font-bold">{r.sNo}</td>
+                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[#475569]">{r.date}</td>
+                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[11px] font-bold text-black">{r.batchCode}</td>
+                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] font-bold text-[#1E293B]">{r.displayWorkName}</td>
+                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-center">
+                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${r.completed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                          {r.statusLabel}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-3 border-r border-[#E2E8F0] font-medium ${r.isPrimaryRow ? 'text-[#B91C1C]' : 'text-gray-500'}`}>{r.rawMaterial}</td>
+                      <td className={`px-4 py-3 border-r border-[#E2E8F0] text-right font-bold ${r.isPrimaryRow ? 'text-[#B91C1C]' : 'text-gray-400'}`}>{r.intakeQuantityDisplay}</td>
+                      <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#15803D]">{r.productName}</td>
+                      <td className={`px-4 py-3 border-r border-[#E2E8F0] text-right font-bold ${r.outcomeQuantity < 0 ? 'text-amber-600' : 'text-[#15803D]'}`}>{r.outcomeQuantity}</td>
+                      <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-orange-600">
+                        {r.wastageDisplay}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => setViewId(r.id)}
+                          className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -556,7 +696,7 @@ const ProductionReport = () => {
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
-              totalEntries={filteredProductions.length}
+              totalEntries={reportRows.length}
               entriesPerPage={entriesPerPage}
               onPageChange={setCurrentPage}
             />

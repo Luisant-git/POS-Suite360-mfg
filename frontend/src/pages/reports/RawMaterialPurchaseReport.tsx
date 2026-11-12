@@ -10,6 +10,7 @@ import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import PaginationControls from '../../components/PaginationControls';
 import RawMaterialPurchaseModal from '../raw-materials/RawMaterialPurchaseModal';
 import TableLoader from '../../components/TableLoader';
+import { formatRawMaterialLabel } from '../../utils/productionBatch';
 
 const RawMaterialPurchaseReport = () => {
   const navigate = useNavigate();
@@ -40,19 +41,52 @@ const RawMaterialPurchaseReport = () => {
           invoiceNo: invoiceNo || undefined,
         }
       });
-      return data.map((p: any) => ({
-        id: p.id,
-        entryNo: `RM-PUR-${p.id.toString().padStart(5, '0')}`,
-        invoiceNo: p.invoiceNo || '-',
-        date: new Date(p.date).toISOString().split('T')[0],
-        supplierName: p.supplier?.name || '-',
-        rawInvoiceValue: Number(p.subtotal) || 0,
-        rawNetAmount: Number(p.grandTotal) || 0,
-        invoiceValue: formatCurrency(p.subtotal),
-        transportCharge: p.transportCharge ? formatCurrency(p.transportCharge) : '-',
-        wages: p.wages ? formatCurrency(p.wages) : '-',
-        netAmount: formatCurrency(p.grandTotal),
-      }));
+      return data.map((p: any) => {
+        const items = Array.isArray(p.items) ? p.items : [];
+        const normalizedItems = items.map((item: any) => ({
+          id: item.id,
+          materialName: item.rawMaterial?.name || '-',
+          materialCode: String(item.materialCode || item.rawMaterial?.code || '').trim() || '-',
+          batchCode: String(item.batchCode || item.rawMaterial?.batchCode || '').trim() || '-',
+          label: formatRawMaterialLabel(item.rawMaterial, item.batchCode, item.materialCode),
+        }));
+        const materialsSummary = normalizedItems
+          .map((item: any) => item.label)
+          .filter(Boolean)
+          .join(', ') || '-';
+        const materialNames = normalizedItems.map((item: any) => item.materialName).join(', ') || '-';
+        const materialCodes = normalizedItems.map((item: any) => item.materialCode).join(', ') || '-';
+        const materialBatchCodes = normalizedItems.map((item: any) => item.batchCode).join(', ') || '-';
+        const taxRates = Array.from(
+          new Set(
+            items.map((item: any) => `${Number(item.taxPercent ?? item.rawMaterial?.taxPercent ?? 0)}%`)
+          )
+        ).join(', ') || '0%';
+
+        return {
+          id: p.id,
+          entryNo: `RM-PUR-${p.id.toString().padStart(5, '0')}`,
+          invoiceNo: p.invoiceNo || '-',
+          date: new Date(p.date).toISOString().split('T')[0],
+          supplierName: p.supplier?.name || '-',
+          paymentMode: p.paymentMode,
+          paymentModeName: p.paymentMode?.name || 'Cash',
+          normalizedItems,
+          materialNames,
+          materialCodes,
+          materialBatchCodes,
+          materialsSummary,
+          taxRates,
+          rawInvoiceValue: Number(p.subtotal) || 0,
+          rawTaxAmount: Number(p.tax) || 0,
+          rawNetAmount: Number(p.grandTotal) || 0,
+          invoiceValue: formatCurrency(p.subtotal),
+          taxAmount: formatCurrency(p.tax || 0),
+          transportCharge: p.transportCharge ? formatCurrency(p.transportCharge) : '-',
+          wages: p.wages ? formatCurrency(p.wages) : '-',
+          netAmount: formatCurrency(p.grandTotal),
+        };
+      });
     },
   });
 
@@ -63,11 +97,13 @@ const RawMaterialPurchaseReport = () => {
       p.entryNo.toLowerCase().includes(term) ||
       p.invoiceNo.toLowerCase().includes(term) ||
       p.supplierName.toLowerCase().includes(term) ||
+      p.materialsSummary.toLowerCase().includes(term) ||
       p.netAmount.toLowerCase().includes(term)
     );
   });
 
   const totalInvoiceValue = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawInvoiceValue) || 0), 0);
+  const totalTaxAmount = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawTaxAmount) || 0), 0);
   const totalNetAmount = filteredPurchases.reduce((sum: number, p: any) => sum + (Number(p.rawNetAmount) || 0), 0);
 
   const [entriesPerPage, setEntriesPerPage] = useState(25);
@@ -257,7 +293,13 @@ const RawMaterialPurchaseReport = () => {
                   'Supplier Invoice No': p.invoiceNo,
                   'Date': p.date,
                   'Supplier Name': p.supplierName,
+                  'Material Name': p.materialNames,
+                  'Material Code': p.materialCodes,
+                  'Material Batch Code': p.materialBatchCodes,
+                  'Payment Mode': p.paymentModeName,
                   'Invoice Value': p.invoiceValue,
+                  'Tax %': p.taxRates,
+                  'Tax Amt': p.taxAmount,
                   'Transport': p.transportCharge,
                   'Wages': p.wages,
                   'Net Amount': p.netAmount,
@@ -267,7 +309,13 @@ const RawMaterialPurchaseReport = () => {
                   'Supplier Invoice No': '',
                   'Date': '',
                   'Supplier Name': 'TOTAL:',
+                  'Material Name': '',
+                  'Material Code': '',
+                  'Material Batch Code': '',
+                  'Payment Mode': '',
                   'Invoice Value': formatCurrency(totalInvoiceValue),
+                  'Tax %': '',
+                  'Tax Amt': formatCurrency(totalTaxAmount),
                   'Transport': '',
                   'Wages': '',
                   'Net Amount': formatCurrency(totalNetAmount),
@@ -289,7 +337,12 @@ const RawMaterialPurchaseReport = () => {
                   { header: 'Supp. Inv. No', dataKey: 'invoiceNo' },
                   { header: 'Date', dataKey: 'date' },
                   { header: 'Supplier Name', dataKey: 'supplierName' },
+                  { header: 'Material Name', dataKey: 'materialNames' },
+                  { header: 'Material Code', dataKey: 'materialCodes' },
+                  { header: 'Material Batch Code', dataKey: 'materialBatchCodes' },
                   { header: 'Invoice Value', dataKey: 'invoiceValue' },
+                  { header: 'Tax %', dataKey: 'taxRates' },
+                  { header: 'Tax Amt', dataKey: 'taxAmount' },
                   { header: 'Transport', dataKey: 'transportCharge' },
                   { header: 'Wages', dataKey: 'wages' },
                   { header: 'Net Amount', dataKey: 'netAmount' },
@@ -299,7 +352,12 @@ const RawMaterialPurchaseReport = () => {
                   invoiceNo: '',
                   date: '',
                   supplierName: 'TOTAL:',
+                  materialNames: '',
+                  materialCodes: '',
+                  materialBatchCodes: '',
                   invoiceValue: formatCurrency(totalInvoiceValue),
+                  taxRates: '',
+                  taxAmount: formatCurrency(totalTaxAmount),
                   transportCharge: '',
                   wages: '',
                   netAmount: formatCurrency(totalNetAmount)
@@ -337,17 +395,40 @@ const RawMaterialPurchaseReport = () => {
                     <span className="font-black text-[15px] text-[#2563EB]">{p.netAmount}</span>
                   </div>
 
-                  <div className="flex justify-between items-center text-[12px] text-gray-700 mb-2">
+                  <div className="flex justify-between items-center text-[12px] text-gray-700 mb-1.5">
                     <span className="font-bold">{p.supplierName}</span>
                     <span className="inline-block px-2 py-0.5 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase">
-                      {p.paymentMode?.name || 'Cash'}
+                      {p.paymentModeName}
                     </span>
                   </div>
+                  {(p.normalizedItems || []).length > 0 ? (
+                    <div className="space-y-1 mb-2">
+                      {p.normalizedItems.map((item: any, idx: number) => (
+                        <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2 py-1 flex flex-wrap gap-x-2">
+                          <span className="font-bold text-slate-800">{item.materialName}</span>
+                          <span className="text-slate-600">Code: {item.materialCode}</span>
+                          <span className="text-slate-600">Batch: {item.batchCode}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] font-semibold text-slate-700 mb-2 break-words">
+                      {p.materialsSummary}
+                    </p>
+                  )}
 
-                  <div className="grid grid-cols-3 gap-1 bg-slate-50 p-2 rounded text-[11px] text-gray-600 mb-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50 p-2 rounded text-[11px] text-gray-600 mb-2">
                     <div>
                       <span className="text-gray-400 block text-[10px]">Inv Value</span>
                       <span className="font-bold text-gray-800">{p.invoiceValue}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Tax %</span>
+                      <span className="font-bold text-gray-800">{p.taxRates}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Tax Amt</span>
+                      <span className="font-bold text-gray-800">{p.taxAmount}</span>
                     </div>
                     <div>
                       <span className="text-gray-400 block text-[10px]">Transport</span>
@@ -382,8 +463,13 @@ const RawMaterialPurchaseReport = () => {
                 <th className="px-4 py-3 border-r border-[#1E293B]">Invoice No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Supplier Name</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Name</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Code</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Batch Code</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Payment Mode</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Invoice Value</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-center">Tax %</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-right">Tax Amt</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Transport</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Wages</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Net Amount</th>
@@ -392,9 +478,9 @@ const RawMaterialPurchaseReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <TableLoader columns={11} />
+                <TableLoader columns={16} />
               ) : filteredPurchases.length === 0 ? (
-                <tr><td colSpan={11} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
+                <tr><td colSpan={16} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
               ) : (
                 paginatedPurchases.map((p: any, index: number) => (
                   <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
@@ -403,12 +489,41 @@ const RawMaterialPurchaseReport = () => {
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.invoiceNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.date}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-black">{p.supplierName}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#1E3A8A]">
+                      {(p.normalizedItems || []).length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {p.normalizedItems.map((item: any, idx: number) => (
+                            <span key={item.id || idx}>{item.materialName}</span>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-normal">
+                      {(p.normalizedItems || []).length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {p.normalizedItems.map((item: any, idx: number) => (
+                            <span key={item.id || idx}>{item.materialCode}</span>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-normal">
+                      {(p.normalizedItems || []).length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {p.normalizedItems.map((item: any, idx: number) => (
+                            <span key={item.id || idx}>{item.batchCode}</span>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0]">
                       <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
-                        {p.paymentMode?.name || 'Cash'}
+                        {p.paymentModeName}
                       </span>
                     </td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.invoiceValue}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center font-semibold text-gray-700">{p.taxRates}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-semibold">{p.taxAmount}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.transportCharge}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.wages}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-black">{p.netAmount}</td>

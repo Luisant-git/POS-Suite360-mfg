@@ -8,6 +8,7 @@ import { exportToExcel } from '../../utils/exportExcel';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import Select from 'react-select';
 import TableLoader from '../../components/TableLoader';
+import { getEffectiveOutcomes } from '../../utils/productionBatch';
 
 const BatchPnlReport = () => {
   const { formatCurrency, settings } = useSettings();
@@ -31,7 +32,9 @@ const BatchPnlReport = () => {
 
   // Filter products based on selected batch
   const batchProductions = productions.filter((p: any) => p.workName === workName);
-  const batchProductIds = Array.from(new Set(batchProductions.map((p: any) => p.finishedProductId)));
+  const batchProductIds = Array.from(
+    new Set(batchProductions.flatMap((p: any) => getEffectiveOutcomes(p).map((o: any) => o.finishedProductId)))
+  );
   const availableProducts = workName
     ? products.filter((p: any) => batchProductIds.includes(p.id))
     : products.filter((p: any) => p.isManufacturingProduct);
@@ -168,9 +171,11 @@ const BatchPnlReport = () => {
 
           {/* Row 1/Col 6 */}
           <div className="bg-white p-4 rounded-md border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
-            <p className="text-[#64748B] text-[12px] font-bold mb-1 uppercase">Wastage Qty</p>
+            <p className="text-[#64748B] text-[12px] font-bold mb-1 uppercase">
+              {reportData.isSingleProductBatch ? 'Wastage Qty' : 'Wastage Sq.M'}
+            </p>
             <p className="text-[20px] font-bold text-orange-600">
-              {Number(reportData.wastageQty).toFixed(2)} <span className="text-[12px] font-normal">({Number(reportData.wastagePercentage).toFixed(2)}%)</span>
+              {Number(reportData.wastageQty).toFixed(2)}{!reportData.isSingleProductBatch ? ' m²' : ''} <span className="text-[12px] font-normal">({Number(reportData.wastagePercentage).toFixed(2)}%)</span>
             </p>
           </div>
 
@@ -182,12 +187,18 @@ const BatchPnlReport = () => {
         </div>
       )}
 
-      {/* Report Table Section */}
-      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col flex-1">
+      {/* Report Tables Section */}
+      <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-auto">
+      <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col shrink-0">
         <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-4 py-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 shrink-0">
           <div className="flex items-center gap-2 text-[#64748B]">
             <FileText size={16} />
-            <h2 className="font-bold text-[13px] tracking-wide">RAW MATERIALS CONSUMED</h2>
+            <h2 className="font-bold text-[13px] tracking-wide">RAW MATERIALS CONSUMED (NAME-CODE-BATCH)</h2>
+            {reportData?.status && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${reportData.isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                {reportData.isCompleted ? 'Completed' : 'Pending'}
+              </span>
+            )}
           </div>
           {reportData && (
             <div className="flex flex-wrap items-center gap-2">
@@ -200,22 +211,34 @@ const BatchPnlReport = () => {
               <button type="button"
                 onClick={() => {
                   const exportData = reportData.materialsUsed.map((m: any) => ({
-                    'Material Name': m.name,
+                    'Material Name': m.materialName || m.name,
+                    'Material Code': m.materialCode || '-',
+                    'Material Batch Code': m.batchCode || '-',
+                    'Sq.M': Number(m.sqM || 0).toFixed(3),
                     'Quantity Consumed': m.quantity,
                     'Total Cost': m.cost,
                   }));
                   exportData.push({
                     'Material Name': 'TOTAL COST',
+                    'Material Code': '',
+                    'Material Batch Code': '',
+                    'Sq.M': Number(reportData.totalIntakeSqM || 0).toFixed(3),
                     'Quantity Consumed': '',
                     'Total Cost': reportData.totalCost
                   });
                   exportData.push({
                     'Material Name': 'POTENTIAL REVENUE',
-                    'Quantity Consumed': '',
+                    'Material Code': '',
+                    'Material Batch Code': '',
+                    'Sq.M': Number(reportData.totalOutcomeSqM || 0).toFixed(3),
+                    'Quantity Consumed': reportData.totalProducedQty,
                     'Total Cost': reportData.totalRevenue
                   });
                   exportData.push({
                     'Material Name': 'NET PROFIT',
+                    'Material Code': '',
+                    'Material Batch Code': '',
+                    'Sq.M': '',
                     'Quantity Consumed': '',
                     'Total Cost': reportData.profit
                   });
@@ -232,23 +255,39 @@ const BatchPnlReport = () => {
               <button type="button"
                 onClick={() => {
                   const cols: PdfColumn[] = [
-                    { header: 'Raw Material Name', dataKey: 'name' },
+                    { header: 'Material Name', dataKey: 'materialName' },
+                    { header: 'Material Code', dataKey: 'materialCode' },
+                    { header: 'Material Batch Code', dataKey: 'batchCode' },
+                    { header: 'Sq.M', dataKey: 'sqMDisplay' },
                     { header: 'Quantity Consumed', dataKey: 'quantity' },
                     { header: 'Total Cost', dataKey: 'cost' },
                   ];
                   const pdfData = [...reportData.materialsUsed.map((m: any) => ({
                     ...m,
+                    materialName: m.materialName || m.name,
+                    materialCode: m.materialCode || '-',
+                    batchCode: m.batchCode || '-',
+                    sqMDisplay: Number(m.sqM || 0).toFixed(3),
                     cost: formatCurrency(m.cost)
                   })), {
-                    name: 'TOTAL COST',
+                    materialName: 'TOTAL COST',
+                    materialCode: '',
+                    batchCode: '',
+                    sqMDisplay: Number(reportData.totalIntakeSqM || 0).toFixed(3),
                     quantity: '',
                     cost: formatCurrency(reportData.totalCost)
                   }, {
-                    name: 'POTENTIAL REVENUE',
-                    quantity: '',
+                    materialName: 'POTENTIAL REVENUE',
+                    materialCode: '',
+                    batchCode: '',
+                    sqMDisplay: Number(reportData.totalOutcomeSqM || 0).toFixed(3),
+                    quantity: String(reportData.totalProducedQty || 0),
                     cost: formatCurrency(reportData.totalRevenue)
                   }, {
-                    name: 'NET PROFIT',
+                    materialName: 'NET PROFIT',
+                    materialCode: '',
+                    batchCode: '',
+                    sqMDisplay: '',
                     quantity: '',
                     cost: formatCurrency(reportData.profit)
                   }];
@@ -262,26 +301,32 @@ const BatchPnlReport = () => {
           )}
         </div>
 
-        <div className="flex-1 overflow-auto overflow-x-auto">
+        <div className="overflow-auto overflow-x-auto">
           <table className="w-full text-left text-[12px] whitespace-nowrap">
             <thead>
               <tr className="bg-[#0F172A] text-white font-bold">
-                <th className="px-4 py-3 border-r border-[#1E293B]">Raw Material Name</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Name</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Code</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Batch Code</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-right">Sq.M</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Quantity Consumed</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Total Cost</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <TableLoader columns={3} />
+                <TableLoader columns={6} />
               ) : !reportData ? (
-                <tr><td colSpan={3} className="text-center p-6 text-gray-500">Select a batch or product and click Calculate P&L</td></tr>
+                <tr><td colSpan={6} className="text-center p-6 text-gray-500">Select a batch or product and click Calculate P&L</td></tr>
               ) : reportData.materialsUsed.length === 0 ? (
-                <tr><td colSpan={3} className="text-center p-6 text-gray-500">No raw materials consumed for this batch.</td></tr>
+                <tr><td colSpan={6} className="text-center p-6 text-gray-500">No raw materials consumed for this batch.</td></tr>
               ) : (
                 reportData.materialsUsed.map((m: any, index: number) => (
                   <tr key={index} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#334155]">{m.name}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#334155]">{m.materialName || m.name}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-[#334155] font-normal">{m.materialCode || '-'}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-[#334155] font-normal">{m.batchCode || '-'}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#475569]">{Number(m.sqM || 0).toFixed(3)}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#475569]">{m.quantity}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#475569] font-bold">{formatCurrency(m.cost)}</td>
                   </tr>
@@ -291,13 +336,88 @@ const BatchPnlReport = () => {
             {reportData && reportData.materialsUsed.length > 0 && (
               <tfoot>
                 <tr className="bg-[#F1F5F9] font-bold">
-                  <td colSpan={2} className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#334155]">Total Cost</td>
+                  <td colSpan={3} className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#334155]">Total Intake</td>
+                  <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-blue-700">{Number(reportData.totalIntakeSqM || 0).toFixed(3)}</td>
+                  <td className="px-4 py-3 border-r border-[#E2E8F0]"></td>
                   <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-red-600">{formatCurrency(reportData.totalCost)}</td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
+      </div>
+
+      {reportData && Array.isArray(reportData.productsProduced) && reportData.productsProduced.length > 0 && (
+        <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col shrink-0">
+          <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-4 py-3 flex items-center gap-2 text-[#64748B]">
+            <Package size={16} />
+            <h2 className="font-bold text-[13px] tracking-wide">FINISHED PRODUCTS PRODUCED</h2>
+          </div>
+          <div className="overflow-auto overflow-x-auto">
+            <table className="w-full text-left text-[12px] whitespace-nowrap">
+              <thead>
+                <tr className="bg-[#0F172A] text-white font-bold">
+                  <th className="px-4 py-3 border-r border-[#1E293B]">Finished Product</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Produced Qty</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Outcome Sq.M</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Potential Revenue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportData.productsProduced.map((prod: any, index: number) => (
+                  <tr key={index} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#334155]">{prod.name}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-[#1A63A8]">{prod.quantity}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#475569]">{Number(prod.sqM || 0).toFixed(3)}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-green-700">{formatCurrency(prod.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-[#F1F5F9] font-bold">
+                  <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#334155]">Total Outcome</td>
+                  <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#1A63A8]">{reportData.totalProducedQty}</td>
+                  <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-emerald-700">{Number(reportData.totalOutcomeSqM || 0).toFixed(3)}</td>
+                  <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-green-700">{formatCurrency(reportData.totalRevenue)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {reportData && Array.isArray(reportData.outcomeEntries) && reportData.outcomeEntries.length > 0 && (
+        <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-md overflow-hidden flex flex-col shrink-0">
+          <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-4 py-3 flex items-center gap-2 text-[#64748B]">
+            <Package size={16} />
+            <h2 className="font-bold text-[13px] tracking-wide">OUTCOME UPDATE ENTRIES ({reportData.outcomeEntries.length})</h2>
+          </div>
+          <div className="overflow-auto overflow-x-auto">
+            <table className="w-full text-left text-[12px] whitespace-nowrap">
+              <thead>
+                <tr className="bg-[#0F172A] text-white font-bold">
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-center w-14">S.No</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B]">Finished Product</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Outcome Sq.M</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B] text-right">Produced Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportData.outcomeEntries.map((entry: any, idx: number) => (
+                  <tr key={idx} className={`border-b border-[#E2E8F0] ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{idx + 1}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-[#475569]">{new Date(entry.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#334155]">{entry.productName}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#475569]">{Number(entry.sqM || 0).toFixed(3)}</td>
+                    <td className={`px-4 py-3 border-r border-[#E2E8F0] text-right font-bold ${Number(entry.quantity || 0) < 0 ? 'text-amber-600' : 'text-[#1A63A8]'}`}>{entry.quantity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

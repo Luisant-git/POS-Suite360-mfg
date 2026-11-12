@@ -99,75 +99,173 @@ export class ReportsService {
       whereClause.workName = workName;
     }
     if (productId) {
-      whereClause.finishedProductId = Number(productId);
+      whereClause.OR = [
+        { finishedProductId: Number(productId) },
+        { outcomes: { some: { finishedProductId: Number(productId) } } },
+      ];
     }
 
     const productions = await this.prisma.production.findMany({
       where: whereClause,
       include: {
         rawMaterial: {
-          include: { rawMaterialPurchaseItems: true }
+          include: { rawMaterialPurchaseItems: { orderBy: { id: 'desc' }, take: 25 } }
         },
         finishedProduct: true,
+        intakes: {
+          include: {
+            rawMaterial: {
+              include: { rawMaterialPurchaseItems: { orderBy: { id: 'desc' }, take: 25 } }
+            },
+          },
+        },
+        outcomes: {
+          include: { finishedProduct: true },
+        },
+        outcomeLogs: {
+          include: { finishedProduct: true },
+          orderBy: [{ date: 'asc' }, { id: 'asc' }],
+        },
       },
     });
 
     let totalCost = 0;
     let totalRevenue = 0;
 
-    const materialsUsed: Record<string, { quantity: number; cost: number; name: string }> = {};
+    const materialsUsed: Record<string, { quantity: number; cost: number; sqM: number; name: string; materialName: string; materialCode: string; batchCode: string }> = {};
+    const productsProduced: Record<string, { name: string; quantity: number; sqM: number; revenue: number }> = {};
+    const outcomeEntries: { date: Date; productName: string; quantity: number; sqM: number }[] = [];
 
     let totalProducedQty = 0;
-    let totalTheoreticalYield = 0;
+    let totalRawSqM = 0;
+    let totalOutcomeSqM = 0;
+    let singleProductSqM: number | null = null;
+    let isSingleProductBatch = true;
+    const allCompleted = productions.length > 0 && productions.every((p: any) => p.status === 'COMPLETED');
 
     productions.forEach(prod => {
-      const intakeQty = Number(prod.intakeQuantity || 0);
-      const purchaseRate = Number(prod.rawMaterial?.purchaseRate || 0);
-      const cost = intakeQty * purchaseRate;
-      
-      const outcomeQty = Number(prod.outcomeQuantity || 0);
-      const sellingRate = Number(prod.finishedProduct?.sellingRate || 0);
-      const revenue = outcomeQty * sellingRate;
+      const intakes = prod.intakes?.length
+        ? prod.intakes
+        : prod.rawMaterial
+          ? [{ rawMaterial: prod.rawMaterial, materialCode: prod.materialCode, materialBatchCode: prod.materialBatchCode, intakeQuantity: prod.intakeQuantity, sqM: 0 }]
+          : [];
 
-      totalCost += cost;
-      totalRevenue += revenue;
-      totalProducedQty += outcomeQty;
+      const rawOutcomes = prod.outcomes?.length
+        ? prod.outcomes
+        : prod.finishedProduct
+          ? [{ finishedProduct: prod.finishedProduct, finishedProductId: prod.finishedProductId, outcomeQuantity: prod.outcomeQuantity, sqM: 0 }]
+          : [];
 
-      // theoretical yield calculation
-      const rmSqM = Number(prod.rawMaterial?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      const productSqM = Number(prod.finishedProduct?.sqM || 0);
-      const rawSqMUsed = intakeQty * rmSqM;
-      if (productSqM > 0) {
-        totalTheoreticalYield += (rawSqMUsed / productSqM);
-      }
+      const outcomes = productId
+        ? rawOutcomes.filter((o: any) => Number(o.finishedProductId || o.finishedProduct?.id) === Number(productId))
+        : rawOutcomes;
 
-      const matName = prod.rawMaterial?.name || 'Unknown';
-      if (!materialsUsed[matName]) {
-        materialsUsed[matName] = { quantity: 0, cost: 0, name: matName };
-      }
-      materialsUsed[matName].quantity += intakeQty;
-      materialsUsed[matName].cost += cost;
+      intakes.forEach((intake: any) => {
+        const intakeQty = Number(intake.intakeQuantity || 0);
+        const purchaseRate = Number(intake.rawMaterial?.purchaseRate || 0);
+        const cost = intakeQty * purchaseRate;
+        totalCost += cost;
+
+        const fallbackSqM = Number(intake.rawMaterial?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        const intakeSqM = Number(intake.sqM) > 0 ? Number(intake.sqM) : intakeQty * fallbackSqM;
+        totalRawSqM += intakeSqM;
+
+        const batchVal = intake.materialBatchCode || intake.rawMaterial?.batchCode || '';
+        const matchedPi = (intake.rawMaterial?.rawMaterialPurchaseItems || []).find(
+          (pi: any) => pi.batchCode && batchVal && String(pi.batchCode).trim() === String(batchVal).trim()
+        );
+        const codeVal = intake.materialCode || matchedPi?.materialCode || intake.rawMaterial?.rawMaterialPurchaseItems?.[0]?.materialCode || intake.rawMaterial?.code || '';
+        const matName = intake.rawMaterial?.name || 'Unknown';
+        const matLabel = [matName, codeVal, batchVal]
+          .filter(Boolean)
+          .join('-') || 'Unknown';
+        if (!materialsUsed[matLabel]) {
+          materialsUsed[matLabel] = {
+            quantity: 0,
+            cost: 0,
+            sqM: 0,
+            name: matLabel,
+            materialName: matName,
+            materialCode: codeVal || '-',
+            batchCode: batchVal || '-',
+          };
+        }
+        materialsUsed[matLabel].quantity += intakeQty;
+        materialsUsed[matLabel].cost += cost;
+        materialsUsed[matLabel].sqM += intakeSqM;
+      });
+
+      const filteredLogs = Array.isArray((prod as any).outcomeLogs)
+        ? (productId
+            ? (prod as any).outcomeLogs.filter((l: any) => Number(l.finishedProductId || l.finishedProduct?.id) === Number(productId))
+            : (prod as any).outcomeLogs)
+        : [];
+      filteredLogs.forEach((log: any) => {
+        outcomeEntries.push({
+          date: log.date || prod.date,
+          productName: log.finishedProduct?.name || 'Unknown',
+          quantity: Number(log.outcomeQuantity || 0),
+          sqM: Number(log.sqM || 0) || Number(log.outcomeQuantity || 0) * Number(log.finishedProduct?.sqM || 0),
+        });
+      });
+
+      outcomes.forEach((outcome: any) => {
+        const outcomeQty = Number(outcome.outcomeQuantity || 0);
+        const sellingRate = Number(outcome.finishedProduct?.sellingRate || 0);
+        const revenue = outcomeQty * sellingRate;
+        totalRevenue += revenue;
+        totalProducedQty += outcomeQty;
+
+        const prodSqM = Number(outcome.finishedProduct?.sqM || 0);
+        const outSqM = outcomeQty * prodSqM;
+        totalOutcomeSqM += outSqM;
+
+        const prodName = outcome.finishedProduct?.name || 'Unknown';
+        if (!productsProduced[prodName]) {
+          productsProduced[prodName] = { name: prodName, quantity: 0, sqM: 0, revenue: 0 };
+        }
+        productsProduced[prodName].quantity += outcomeQty;
+        productsProduced[prodName].sqM += outSqM;
+        productsProduced[prodName].revenue += revenue;
+
+        if (prodSqM > 0) {
+          if (singleProductSqM === null) singleProductSqM = prodSqM;
+          else if (singleProductSqM !== prodSqM) isSingleProductBatch = false;
+        }
+      });
     });
 
     const profit = totalRevenue - totalCost;
-    
-    const wastageQty = totalTheoreticalYield > 0 ? Math.max(0, totalTheoreticalYield - totalProducedQty) : 0;
-    const wastagePercentage = totalTheoreticalYield > 0 ? (wastageQty / totalTheoreticalYield) * 100 : 0;
-    
+
+    const wastageSqM = Math.max(0, totalRawSqM - totalOutcomeSqM);
+    const wastagePercentage = totalRawSqM > 0 ? (wastageSqM / totalRawSqM) * 100 : 0;
+    const wastageQty =
+      isSingleProductBatch && singleProductSqM && singleProductSqM > 0
+        ? wastageSqM / singleProductSqM
+        : wastageSqM;
+
     const wastageCost = totalCost * (wastagePercentage / 100);
     const costPerUnit = totalProducedQty > 0 ? (totalCost / totalProducedQty) : 0;
 
     return {
       workName,
+      status: productions.length > 0 ? (allCompleted ? 'COMPLETED' : 'PENDING') : null,
+      isCompleted: allCompleted,
       totalCost,
       totalRevenue,
       profit,
       totalProducedQty,
+      totalIntakeSqM: totalRawSqM,
+      totalOutcomeSqM,
+      isSingleProductBatch: isSingleProductBatch && singleProductSqM !== null,
       wastageQty,
+      wastageSqM,
       wastagePercentage,
       wastageCost,
       costPerUnit,
       materialsUsed: Object.values(materialsUsed),
+      productsProduced: Object.values(productsProduced),
+      outcomeEntries,
     };
   }
 
