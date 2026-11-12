@@ -1,8 +1,17 @@
-import { IsArray, IsDateString, IsInt, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class RawMaterialPurchaseItemDto {
   @IsInt()
   rawMaterialId: number;
+
+  @IsString()
+  @IsOptional()
+  materialCode?: string;
+
+  @IsString()
+  @IsOptional()
+  batchCode?: string;
 
   @IsNumber()
   widthMm: number;
@@ -18,6 +27,14 @@ export class RawMaterialPurchaseItemDto {
 
   @IsNumber()
   price: number;
+
+  @IsNumber()
+  @IsOptional()
+  taxPercent?: number;
+
+  @IsNumber()
+  @IsOptional()
+  tax?: number;
 
   @IsNumber()
   amount: number;
@@ -54,5 +71,7 @@ export class CreateRawMaterialPurchaseDto {
   paymentModeId: number;
 
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RawMaterialPurchaseItemDto)
   items: RawMaterialPurchaseItemDto[];
 }

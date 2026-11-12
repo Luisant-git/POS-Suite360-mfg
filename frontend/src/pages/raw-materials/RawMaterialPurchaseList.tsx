@@ -26,12 +26,23 @@ const RawMaterialPurchaseList = () => {
   const [entriesPerPage, setEntriesPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const getItemMaterialCode = (item: any) =>
+    String(item?.materialCode || item?.rawMaterial?.code || '').trim() || '-';
+
+  const getItemBatchCode = (item: any) =>
+    String(item?.batchCode || item?.rawMaterial?.batchCode || '').trim() || '-';
+
   const filteredPurchases = purchases.filter((purchase: any) => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       const invoiceMatch = purchase.invoiceNo?.toLowerCase().includes(term);
       const supplierMatch = purchase.supplier?.name?.toLowerCase().includes(term);
-      return invoiceMatch || supplierMatch;
+      const itemMatch = (purchase.items || []).some((item: any) =>
+        item.rawMaterial?.name?.toLowerCase().includes(term) ||
+        getItemMaterialCode(item).toLowerCase().includes(term) ||
+        getItemBatchCode(item).toLowerCase().includes(term)
+      );
+      return invoiceMatch || supplierMatch || itemMatch;
     }
     return true;
   });
@@ -103,6 +114,9 @@ const RawMaterialPurchaseList = () => {
                 <th className="px-3 py-2.5 border-r border-[#334155] relative">Date</th>
                 <th className="px-3 py-2.5 border-r border-[#334155] relative">Invoice No</th>
                 <th className="px-3 py-2.5 border-r border-[#334155] relative">Supplier</th>
+                <th className="px-3 py-2.5 border-r border-[#334155] relative">Material Name</th>
+                <th className="px-3 py-2.5 border-r border-[#334155] relative">Material Code</th>
+                <th className="px-3 py-2.5 border-r border-[#334155] relative">Material Batch Code</th>
                 <th className="px-3 py-2.5 border-r border-[#334155] relative">Payment Mode</th>
                 <th className="px-3 py-2.5 border-r border-[#334155] relative text-right">Total Amount (₹)</th>
                 <th className="px-3 py-2.5 border-[#334155] relative text-center">Action</th>
@@ -111,35 +125,71 @@ const RawMaterialPurchaseList = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-[#73879C]">Loading...</td>
+                  <td colSpan={9} className="px-3 py-4 text-center text-[#73879C]">Loading...</td>
                 </tr>
               ) : filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-[#73879C]">No purchase invoices found matching your criteria.</td>
+                  <td colSpan={9} className="px-3 py-4 text-center text-[#73879C]">No purchase invoices found matching your criteria.</td>
                 </tr>
               ) : (
-                paginatedPurchases.map((purchase: any, index: number) => (
-                  <tr key={purchase.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-[#F9F9F9]' : 'bg-white'} hover:bg-slate-50`}>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.date ? new Date(purchase.date).toISOString().split('T')[0] : '-'}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#3B82F6] font-bold">{purchase.invoiceNo}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.supplier?.name || 'Unknown Supplier'}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB]">
-                      <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
-                        {purchase.paymentMode?.name || 'Cash'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#059669] font-bold text-right">{formatCurrency(purchase.grandTotal)}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      <button 
-                        onClick={() => setViewId(purchase.id)}
-                        className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
-                        title="View Details"
-                      >
-                        <Eye size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                paginatedPurchases.map((purchase: any, index: number) => {
+                  const purchaseItems = Array.isArray(purchase.items) ? purchase.items : [];
+                  return (
+                    <tr key={purchase.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-[#F9F9F9]' : 'bg-white'} hover:bg-slate-50`}>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.date ? new Date(purchase.date).toISOString().split('T')[0] : '-'}</td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#3B82F6] font-bold">{purchase.invoiceNo}</td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.supplier?.name || 'Unknown Supplier'}</td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">
+                        {purchaseItems.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {purchaseItems.map((item: any, idx: number) => (
+                              <span key={item.id || idx}>{item.rawMaterial?.name || '-'}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-normal">
+                        {purchaseItems.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {purchaseItems.map((item: any, idx: number) => (
+                              <span key={item.id || idx}>{getItemMaterialCode(item)}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-normal">
+                        {purchaseItems.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            {purchaseItems.map((item: any, idx: number) => (
+                              <span key={item.id || idx}>{getItemBatchCode(item)}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB]">
+                        <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
+                          {purchase.paymentMode?.name || 'Cash'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#059669] font-bold text-right">{formatCurrency(purchase.grandTotal)}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <button 
+                          onClick={() => setViewId(purchase.id)}
+                          className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

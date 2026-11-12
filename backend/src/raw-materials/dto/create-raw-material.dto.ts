@@ -6,12 +6,21 @@ export class CreateRawMaterialDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
-  code: string;
+  @IsOptional()
+  code?: string;
+
+  @IsString()
+  @IsOptional()
+  batchCode?: string;
 
   @IsString()
   @IsOptional()
   hsnCode?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  taxPercent?: number;
 
   @IsInt()
   unitId: number;

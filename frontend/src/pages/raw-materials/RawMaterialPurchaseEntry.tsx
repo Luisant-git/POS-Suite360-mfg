@@ -21,11 +21,68 @@ const indianStates = [
   "35 - Andaman & Nicobar Islands", "36 - Telangana", "37 - Andhra Pradesh", "38 - Ladakh"
 ];
 
+const createEmptyItem = () => ({
+  rawMaterialId: 0,
+  materialCode: '',
+  batchCode: '',
+  widthMm: '',
+  lengthM: '',
+  sqM: 0,
+  quantity: '',
+  price: '',
+  taxPercent: '',
+  tax: '',
+  baseAmount: 0,
+  amount: 0,
+});
+
+const calculateRmItemAmounts = (
+  sqM: number,
+  quantity: number,
+  price: number,
+  taxPercent: number,
+  isInclusive: boolean,
+  manualTaxAmt?: number
+) => {
+  const gross = sqM * quantity * price;
+  let taxAmt = 0;
+  let taxableAmount = gross;
+  let totalAmount = gross;
+
+  if (manualTaxAmt !== undefined) {
+    taxAmt = Math.max(0, manualTaxAmt);
+    if (isInclusive) {
+      taxableAmount = Math.max(0, gross - taxAmt);
+      totalAmount = gross;
+    } else {
+      taxableAmount = gross;
+      totalAmount = gross + taxAmt;
+    }
+  } else if (taxPercent > 0) {
+    if (isInclusive) {
+      taxAmt = gross - gross / (1 + taxPercent / 100);
+      taxableAmount = gross - taxAmt;
+      totalAmount = gross;
+    } else {
+      taxAmt = (gross * taxPercent) / 100;
+      taxableAmount = gross;
+      totalAmount = gross + taxAmt;
+    }
+  }
+
+  return {
+    tax: Number(taxAmt.toFixed(2)),
+    baseAmount: Number(taxableAmount.toFixed(2)),
+    amount: Number(totalAmount.toFixed(2)),
+  };
+};
+
 const RawMaterialPurchaseEntry = () => {
   const navigate = useNavigate();
   const { formatCurrency, settings } = useSettings();
   const queryClient = useQueryClient();
-  
+  const isTaxInclusive = settings?.taxType === 'inclusive';
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [supplierId, setSupplierId] = useState(0);
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -36,8 +93,8 @@ const RawMaterialPurchaseEntry = () => {
 
   const [transportCharge, setTransportCharge] = useState<number | ''>('');
   const [wages, setwages] = useState<number | ''>('');
-  
-  const [items, setItems] = useState<any[]>([{ rawMaterialId: 0, widthMm: '', lengthM: '', sqM: 0, quantity: '', price: '', amount: 0 }]);
+
+  const [items, setItems] = useState<any[]>([createEmptyItem()]);
 
   // Mobile-specific state
   const [mobileSearch, setMobileSearch] = useState('');
@@ -46,27 +103,54 @@ const RawMaterialPurchaseEntry = () => {
   const [isMobileEditItemOpen, setIsMobileEditItemOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
   const [editForm, setEditForm] = useState({
+    materialCode: '',
+    batchCode: '',
     widthMm: '',
     lengthM: '',
     sqM: 0,
     quantity: '1',
-    price: ''
+    price: '',
+    taxPercent: '',
+    tax: '',
   });
 
-  const { data: suppliers = [] } = useQuery({ 
-    queryKey: ['suppliers'], 
-    queryFn: async () => (await api.get('/suppliers')).data 
-  });
-  
-  const { data: rawMaterials = [] } = useQuery({ 
-    queryKey: ['rawMaterials'], 
-    queryFn: async () => (await api.get('/raw-materials')).data 
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => (await api.get('/suppliers')).data
   });
 
-  const { data: paymentModes = [] } = useQuery({ 
-    queryKey: ['paymentModes'], 
-    queryFn: async () => (await api.get('/payment-modes')).data 
+  const { data: rawMaterials = [] } = useQuery({
+    queryKey: ['rawMaterials'],
+    queryFn: async () => (await api.get('/raw-materials')).data
   });
+
+  const { data: paymentModes = [] } = useQuery({
+    queryKey: ['paymentModes'],
+    queryFn: async () => (await api.get('/payment-modes')).data
+  });
+
+  const { data: taxes = [], isLoading: taxesLoading } = useQuery({
+    queryKey: ['taxes'],
+    queryFn: async () => (await api.get('/taxes')).data
+  });
+
+  const activeTaxes = taxes.filter((t: any) => t.isActive !== false);
+
+  const isValidMasterTaxPercent = (rawValue: any) => {
+    if (taxesLoading) return true;
+    const str = String(rawValue ?? '').trim();
+    if (str === '' || Number(str) === 0) return true;
+    const num = Number(str);
+    if (Number.isNaN(num)) return false;
+    return activeTaxes.some((t: any) => Number(t.rate) === num);
+  };
+
+  const getFallbackTaxPercent = (material: any) => {
+    if (material && Number(material.taxPercent) > 0 && isValidMasterTaxPercent(material.taxPercent)) {
+      return String(Number(material.taxPercent));
+    }
+    return '';
+  };
 
   const generateNextCode = () => {
     const rmCodes = rawMaterials
@@ -144,7 +228,7 @@ const RawMaterialPurchaseEntry = () => {
   };
 
   const addItem = () => {
-    setItems([...items, { rawMaterialId: 0, widthMm: '', lengthM: '', sqM: 0, quantity: '', price: '', amount: 0 }]);
+    setItems([...items, createEmptyItem()]);
   };
 
   const removeItem = (index: number) => {
@@ -157,12 +241,23 @@ const RawMaterialPurchaseEntry = () => {
     setSupplierId(0);
     setTransportCharge('');
     setwages('');
-    setItems([{ rawMaterialId: 0, widthMm: '', lengthM: '', sqM: 0, quantity: '', price: '', amount: 0 }]);
+    setItems([createEmptyItem()]);
   };
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items];
-    newItems[index][field] = value;
+    newItems[index] = { ...newItems[index], [field]: value };
+
+    if (field === 'rawMaterialId') {
+      const material = rawMaterials.find((m: any) => m.id === Number(value));
+      newItems[index].materialCode = '';
+      newItems[index].batchCode = '';
+      if (material && Number(material.taxPercent) > 0) {
+        newItems[index].taxPercent = String(Number(material.taxPercent));
+      } else {
+        newItems[index].taxPercent = '';
+      }
+    }
 
     if (field === 'widthMm' || field === 'lengthM') {
       const width = parseFloat(newItems[index].widthMm || '0');
@@ -170,21 +265,38 @@ const RawMaterialPurchaseEntry = () => {
       newItems[index].sqM = (width / 1000) * length;
     }
 
-    if (field === 'widthMm' || field === 'lengthM' || field === 'quantity' || field === 'price') {
-      const sqM = newItems[index].sqM || 0;
-      const qty = parseFloat(newItems[index].quantity || '0');
-      const price = parseFloat(newItems[index].price || '0');
-      newItems[index].amount = sqM * qty * price;
+    const sqM = newItems[index].sqM || 0;
+    const qty = parseFloat(newItems[index].quantity || '0');
+    const price = parseFloat(newItems[index].price || '0');
+
+    if (field === 'tax') {
+      const manualTax = parseFloat(String(value || '0')) || 0;
+      const calc = calculateRmItemAmounts(sqM, qty, price, 0, isTaxInclusive, manualTax);
+      newItems[index].baseAmount = calc.baseAmount;
+      newItems[index].amount = calc.amount;
+    } else if (
+      field === 'rawMaterialId' ||
+      field === 'widthMm' ||
+      field === 'lengthM' ||
+      field === 'quantity' ||
+      field === 'price' ||
+      field === 'taxPercent'
+    ) {
+      const taxPct = parseFloat(String(newItems[index].taxPercent || '0')) || 0;
+      const calc = calculateRmItemAmounts(sqM, qty, price, taxPct, isTaxInclusive);
+      newItems[index].baseAmount = calc.baseAmount;
+      newItems[index].amount = calc.amount;
+      newItems[index].tax = calc.tax > 0 ? calc.tax.toFixed(2) : (String(newItems[index].taxPercent || '') !== '' ? '0.00' : '');
     }
 
     setItems(newItems);
   };
 
-  const subtotal = items.reduce((sum, item) => sum + (item.amount || 0), 0);
-  const tax = 0;
+  const subtotal = Number(items.reduce((sum, item) => sum + (Number(item.baseAmount) || 0), 0).toFixed(2));
+  const tax = Number(items.reduce((sum, item) => sum + (parseFloat(String(item.tax || '0')) || 0), 0).toFixed(2));
   const transportAmt = Number(transportCharge) || 0;
   const wagesAmt = Number(wages) || 0;
-  const grandTotal = subtotal + tax + transportAmt + wagesAmt;
+  const grandTotal = Number((subtotal + tax + transportAmt + wagesAmt).toFixed(2));
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -201,11 +313,15 @@ const RawMaterialPurchaseEntry = () => {
         paymentModeId: paymentModeId,
         items: validItems.map(item => ({
           rawMaterialId: parseInt(item.rawMaterialId),
+          materialCode: item.materialCode ? String(item.materialCode).trim() : '',
+          batchCode: item.batchCode ? String(item.batchCode).trim() : '',
           widthMm: parseFloat(item.widthMm || '0'),
           lengthM: parseFloat(item.lengthM || '0'),
           sqM: parseFloat(item.sqM || '0'),
           quantity: parseInt(item.quantity || '0'),
           price: parseFloat(item.price || '0'),
+          taxPercent: parseFloat(String(item.taxPercent || '0')) || 0,
+          tax: parseFloat(String(item.tax || '0')) || 0,
           amount: parseFloat(item.amount || '0')
         }))
       };
@@ -232,9 +348,17 @@ const RawMaterialPurchaseEntry = () => {
       toast.error('Please add at least one material.');
       return;
     }
+    if (validItems.some(i => !String(i.materialCode || '').trim() || !String(i.batchCode || '').trim())) {
+      toast.error('Please enter Material Code and Material Batch Code for all items.');
+      return;
+    }
     const invalidItems = validItems.some(i => i.amount <= 0);
     if (invalidItems) {
       toast.error('Please ensure all items have valid amounts.');
+      return;
+    }
+    if (validItems.some(i => !isValidMasterTaxPercent(i.taxPercent))) {
+      toast.error('Invalid Tax %. Please select a valid rate from Tax Master.');
       return;
     }
     mutation.mutate();
@@ -287,7 +411,7 @@ const RawMaterialPurchaseEntry = () => {
     }
     addSupplierMutation.mutate(newSupplier);
   };
-  
+
   // Auto-focus first row product on mount
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -307,42 +431,84 @@ const RawMaterialPurchaseEntry = () => {
     if (existingIndex >= 0) {
       const item = items[existingIndex];
       setEditForm({
+        materialCode: item.materialCode ? String(item.materialCode) : '',
+        batchCode: item.batchCode ? String(item.batchCode) : '',
         widthMm: item.widthMm ? String(item.widthMm) : '',
         lengthM: item.lengthM ? String(item.lengthM) : '',
         sqM: item.sqM || 0,
         quantity: item.quantity ? String(item.quantity) : '1',
-        price: item.price ? String(item.price) : (material.purchaseRate ? String(material.purchaseRate) : '')
+        price: item.price ? String(item.price) : (material.purchaseRate ? String(material.purchaseRate) : ''),
+        taxPercent: item.taxPercent !== undefined && item.taxPercent !== '' ? String(item.taxPercent) : '',
+        tax: item.tax !== undefined && item.tax !== '' ? String(item.tax) : '',
       });
     } else {
+      const defaultTaxPct = Number(material.taxPercent) > 0 ? String(Number(material.taxPercent)) : '';
       setEditForm({
+        materialCode: '',
+        batchCode: '',
         widthMm: '',
         lengthM: '',
         sqM: 0,
         quantity: '1',
-        price: material.purchaseRate ? String(material.purchaseRate) : ''
+        price: material.purchaseRate ? String(material.purchaseRate) : '',
+        taxPercent: defaultTaxPct,
+        tax: '',
       });
     }
     setIsMobileEditItemOpen(true);
   };
 
+  const handleEditFormChange = (field: string, value: string) => {
+    const next = { ...editForm, [field]: value };
+    const width = parseFloat(next.widthMm || '0');
+    const length = parseFloat(next.lengthM || '0');
+    const sqM = (width / 1000) * length;
+    next.sqM = parseFloat(sqM.toFixed(4));
+    const qty = parseFloat(next.quantity || '0');
+    const price = parseFloat(next.price || '0');
+
+    if (field !== 'tax') {
+      const taxPct = parseFloat(next.taxPercent || '0') || 0;
+      const calc = calculateRmItemAmounts(sqM, qty, price, taxPct, isTaxInclusive);
+      next.tax = calc.tax > 0 ? calc.tax.toFixed(2) : (next.taxPercent !== '' ? '0.00' : '');
+    }
+
+    setEditForm(next);
+  };
+
   const handleMobileSaveEdit = () => {
     if (!editingMaterial) return;
+    if (!editForm.materialCode.trim() || !editForm.batchCode.trim()) {
+      toast.error('Please enter Material Code * and Material Batch Code *.');
+      return;
+    }
+    if (!isValidMasterTaxPercent(editForm.taxPercent)) {
+      toast.error('Invalid Tax %. Please select a valid rate from Tax Master.');
+      return;
+    }
     const width = parseFloat(editForm.widthMm || '0');
     const length = parseFloat(editForm.lengthM || '0');
     const sqM = (width / 1000) * length;
     const qty = parseFloat(editForm.quantity || '0');
     const price = parseFloat(editForm.price || '0');
-    const amount = sqM * qty * price;
+    const taxPct = parseFloat(editForm.taxPercent || '0') || 0;
+    const manualTax = editForm.tax !== '' ? parseFloat(editForm.tax || '0') : undefined;
+    const calc = calculateRmItemAmounts(sqM, qty, price, taxPct, isTaxInclusive, manualTax);
 
     const existingIndex = items.findIndex(i => Number(i.rawMaterialId) === Number(editingMaterial.id));
     const newItem = {
       rawMaterialId: editingMaterial.id,
+      materialCode: editForm.materialCode.trim(),
+      batchCode: editForm.batchCode.trim(),
       widthMm: editForm.widthMm,
       lengthM: editForm.lengthM,
       sqM: parseFloat(sqM.toFixed(4)),
       quantity: editForm.quantity,
       price: editForm.price,
-      amount: parseFloat(amount.toFixed(2))
+      taxPercent: editForm.taxPercent,
+      tax: calc.tax.toFixed(2),
+      baseAmount: calc.baseAmount,
+      amount: calc.amount
     };
 
     if (existingIndex >= 0) {
@@ -363,7 +529,7 @@ const RawMaterialPurchaseEntry = () => {
   const handleMobileRemoveItem = (materialId: number) => {
     const updated = items.filter(i => Number(i.rawMaterialId) !== Number(materialId));
     if (updated.length === 0) {
-      setItems([{ rawMaterialId: 0, widthMm: '', lengthM: '', sqM: 0, quantity: '', price: '', amount: 0 }]);
+      setItems([createEmptyItem()]);
     } else {
       setItems(updated);
     }
@@ -377,7 +543,7 @@ const RawMaterialPurchaseEntry = () => {
 
   return (
     <div className="absolute inset-0 bg-[#F3F4F6] flex flex-col font-sans overflow-hidden z-10">
-      
+
       {/* Top Bar - Differentiated color for Manufacturing - Desktop only */}
       <div className="hidden md:flex bg-[#475569] text-white px-2 sm:px-4 py-2 flex-wrap gap-2 justify-between items-center shrink-0">
         <div className="flex flex-wrap items-center gap-4">
@@ -385,7 +551,7 @@ const RawMaterialPurchaseEntry = () => {
             <span className="bg-[#334155] p-1 rounded"><Package size={16} /></span>
             Raw Material Purchase
           </h1>
-          <button 
+          <button
             type="button"
             onClick={() => handleSubmit()}
             className="bg-[#10B981] hover:bg-[#059669] text-white px-4 py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors shadow-sm"
@@ -393,7 +559,7 @@ const RawMaterialPurchaseEntry = () => {
             <CheckCircle size={16} /> SAVE PURCHASE (F10)
           </button>
         </div>
-        <button 
+        <button
           onClick={() => setIsLeaveModalOpen(true)}
           className="text-white hover:text-white/80 transition-colors flex items-center gap-1.5 font-medium text-[13px]"
         >
@@ -402,11 +568,11 @@ const RawMaterialPurchaseEntry = () => {
       </div>
 
       <form className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit}>
-        
+
         {/* Header Section */}
         <div className="bg-white p-4 sm:p-5 border-b border-[#E5E7EB] shrink-0 shadow-sm">
           <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
-            
+
             <div className="w-full lg:max-w-[300px]">
               <label className="block text-[12px] font-bold text-[#374151] mb-1.5 uppercase tracking-wide">Supplier Invoice No *</label>
               <input
@@ -472,14 +638,14 @@ const RawMaterialPurchaseEntry = () => {
         {/* Action Buttons */}
         <div className="shrink-0 flex flex-wrap justify-between gap-2 p-2 bg-white border-b border-[#E5E7EB]">
           <div className="flex gap-2">
-            <button 
+            <button
               type="button"
               onClick={() => navigate('/raw-materials/purchase-list')}
               className="border border-[#10B981] text-[#10B981] hover:bg-[#10B981] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
             >
               <List size={14} /> List
             </button>
-            <button 
+            <button
               type="button"
               onClick={() => navigate('/reports/raw-material-purchase')}
               className="border border-[#8B5CF6] text-[#8B5CF6] hover:bg-[#8B5CF6] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
@@ -488,14 +654,14 @@ const RawMaterialPurchaseEntry = () => {
             </button>
           </div>
           <div className="flex gap-2">
-            <button 
+            <button
               type="button"
               onClick={addItem}
               className="border border-[#0B355B] text-[#0B355B] hover:bg-[#0B355B] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
             >
               <PlusCircle size={14} /> Add Row
             </button>
-            <button 
+            <button
               type="button"
               onClick={handleClear}
               className="border border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
@@ -513,11 +679,15 @@ const RawMaterialPurchaseEntry = () => {
               <tr className="bg-[#1E293B] text-white">
                 <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-10">#</th>
                 <th className="px-3 py-2.5 text-left text-[12px] font-medium border border-[#334155]">Raw Material (Searchable)</th>
+                <th className="px-2 py-2.5 text-left text-[12px] font-medium border border-[#334155] w-32">Material Code *</th>
+                <th className="px-2 py-2.5 text-left text-[12px] font-medium border border-[#334155] w-40">Material Batch Code *</th>
                 <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-24">Width (MM)</th>
                 <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-24">Length (M)</th>
                 <th className="px-2 py-2.5 text-center text-[12px] font-bold border border-[#334155] w-28 bg-[#334155] text-green-300 tracking-wide">SQ.M</th>
                 <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-20">Qty (Rolls)</th>
                 <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-28">Price / Sq.M</th>
+                <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-20">Tax %</th>
+                <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-24">Tax Amt</th>
                 <th className="px-3 py-2.5 text-right text-[12px] font-bold border border-[#334155] w-32 tracking-wide">AMOUNT</th>
                 <th className="px-2 py-2.5 text-center text-[12px] font-medium border border-[#334155] w-16">Action</th>
               </tr>
@@ -538,61 +708,104 @@ const RawMaterialPurchaseEntry = () => {
                       }}
                       onCreate={(name) => handleCreateNewMaterial(index, name)}
                       options={[
-                        { label: 'Type material name / code...', value: 0 },
-                        ...rawMaterials.map((p: any) => ({ label: `${p.code} - ${p.name}`, value: p.id }))
+                        { label: 'Type material name...', value: 0 },
+                        ...rawMaterials.map((p: any) => ({ label: p.name, value: p.id }))
                       ]}
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
-                      type="number" value={item.widthMm} onChange={e => updateItem(index, 'widthMm', e.target.value)}
-                      placeholder="0" onFocus={e => e.target.select()}
-                      data-row={index} data-col={1} onKeyDown={e => handleCellKey(e, index, 1, 5)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                    <input
+                      type="text" value={item.materialCode || ''} onChange={e => updateItem(index, 'materialCode', e.target.value)}
+                      placeholder="e.g. MLJ1019" onFocus={e => e.target.select()}
+                      data-row={index} data-col={1} onKeyDown={e => handleCellKey(e, index, 1, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[12px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors"
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
+                      type="text" value={item.batchCode || ''} onChange={e => updateItem(index, 'batchCode', e.target.value)}
+                      placeholder="e.g. L2609250315/4/6" onFocus={e => e.target.select()}
+                      data-row={index} data-col={2} onKeyDown={e => handleCellKey(e, index, 2, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[12px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors"
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
+                    <input
+                      type="number" value={item.widthMm} onChange={e => updateItem(index, 'widthMm', e.target.value)}
+                      placeholder="0" onFocus={e => e.target.select()}
+                      data-row={index} data-col={3} onKeyDown={e => handleCellKey(e, index, 3, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
+                    <input
                       type="number" value={item.lengthM} onChange={e => updateItem(index, 'lengthM', e.target.value)}
                       placeholder="0" onFocus={e => e.target.select()}
-                      data-row={index} data-col={2} onKeyDown={e => handleCellKey(e, index, 2, 5)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      data-row={index} data-col={4} onKeyDown={e => handleCellKey(e, index, 4, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB] bg-blue-50 text-center font-bold text-blue-700">
                     {item.sqM.toFixed(3)}
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       type="number" value={item.quantity} onChange={e => updateItem(index, 'quantity', e.target.value)}
                       placeholder="0" onFocus={e => e.target.select()}
-                      data-row={index} data-col={3} onKeyDown={e => handleCellKey(e, index, 3, 5)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      data-row={index} data-col={5} onKeyDown={e => handleCellKey(e, index, 5, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
+                    <input
                       type="number" step="0.01" value={item.price} onChange={e => updateItem(index, 'price', e.target.value)}
                       placeholder="0.00" onFocus={e => e.target.select()}
-                      data-row={index} data-col={4} onKeyDown={e => handleCellKey(e, index, 4, 5)}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right" 
+                      data-row={index} data-col={6} onKeyDown={e => handleCellKey(e, index, 6, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right"
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input type="number" readOnly tabIndex={-1} value={item.amount.toFixed(2)} className="w-full px-2 py-1 bg-transparent text-[13px] outline-none text-right font-bold" />
+                    <input
+                      type="number" step="0.01" min="0" list="rm-tax-slabs"
+                      value={item.taxPercent ?? ''}
+                      onChange={e => updateItem(index, 'taxPercent', e.target.value)}
+                      onBlur={e => {
+                        if (!isValidMasterTaxPercent(e.target.value)) {
+                          toast.error('Invalid Tax %. Please select a rate from Tax Master.');
+                          const mat = rawMaterials.find((m: any) => m.id === Number(item.rawMaterialId));
+                          updateItem(index, 'taxPercent', getFallbackTaxPercent(mat));
+                        }
+                      }}
+                      placeholder="0" onFocus={e => e.target.select()}
+                      data-row={index} data-col={7} onKeyDown={e => handleCellKey(e, index, 7, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-center font-semibold"
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
+                    <input
+                      type="number" step="0.01" min="0"
+                      value={item.tax ?? ''}
+                      onChange={e => updateItem(index, 'tax', e.target.value)}
+                      placeholder="0.00" onFocus={e => e.target.select()}
+                      data-row={index} data-col={8} onKeyDown={e => handleCellKey(e, index, 8, 9)}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6] focus:bg-blue-50 transition-colors text-right font-semibold text-gray-800"
+                    />
+                  </td>
+                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
+                    <input type="number" readOnly tabIndex={-1} value={Number(item.amount || 0).toFixed(2)} className="w-full px-2 py-1 bg-transparent text-[13px] outline-none text-right font-bold" />
                   </td>
                   <td className="px-2 py-1 text-center">
                     <div className="flex justify-center gap-2">
-                      <button 
-                        type="button" onClick={addItem} 
+                      <button
+                        type="button" onClick={addItem}
                         className="bg-[#10B981] text-white p-1.5 rounded hover:bg-[#059669] transition-colors shadow-sm"
                         title="Add Row"
                       >
                         <Plus size={14} strokeWidth={3} />
                       </button>
-                      <button 
-                        type="button" onClick={() => removeItem(index)} 
-                        disabled={items.length === 1} 
+                      <button
+                        type="button" onClick={() => removeItem(index)}
+                        disabled={items.length === 1}
                         className="bg-red-50 text-red-500 p-1.5 rounded hover:bg-red-500 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-red-50 disabled:hover:text-red-500"
                         title="Remove Row"
                       >
@@ -604,51 +817,75 @@ const RawMaterialPurchaseEntry = () => {
               ))}
             </tbody>
           </table>
+          <datalist id="rm-tax-slabs">
+            {activeTaxes.map((t: any) => (
+              <option key={t.id} value={Number(t.rate)}>
+                {t.name} ({Number(t.rate)}%)
+              </option>
+            ))}
+          </datalist>
         </div>
 
         {/* Footer Calculation Area */}
         <div className="bg-white border-t border-[#E5E7EB] p-3 sm:p-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 md:gap-6">
-            
-            <div className="w-full md:flex-1 flex flex-col gap-1">
-              <label className="text-[14px] font-extrabold text-[#1F2937] uppercase">Total Quantity:</label>
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 items-end">
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total Quantity:</label>
               <input
                 value={items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0)}
                 readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[20px] outline-none text-right font-black text-[#1F2937]"
+                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
               />
             </div>
 
-            <div className="w-full md:flex-1 flex flex-col gap-1">
-              <label className="text-[14px] font-extrabold text-[#1F2937] uppercase">Total SQ.M:</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total SQ.M:</label>
               <input
                 value={items.reduce((acc, item) => acc + ((Number(item.sqM) || 0) * (Number(item.quantity) || 0)), 0).toFixed(3)}
                 readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[20px] outline-none text-right font-black text-[#1F2937]"
+                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
               />
             </div>
-            
-            <div className="w-full md:flex-[2] flex flex-col sm:flex-row gap-4 sm:gap-6 justify-end items-end">
-              <div className="w-full sm:w-32 flex flex-col gap-1">
-                <label className="text-[13px] font-extrabold text-[#1F2937] uppercase">Transport Chg.</label>
-                <input
-                  type="number"
-                  value={transportCharge}
-                  onChange={(e) => setTransportCharge(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[16px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]"
-                />
-              </div>
-              <div className="w-full sm:w-32 flex flex-col gap-1">
-                <label className="text-[13px] font-extrabold text-[#1F2937] uppercase">Wages</label>
-                <input
-                  type="number"
-                  value={wages}
-                  onChange={(e) => setwages(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0.00"
-                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[16px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]"
-                />
-              </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Subtotal:</label>
+              <input
+                value={subtotal.toFixed(2)}
+                readOnly
+                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total GST (Tax):</label>
+              <input
+                value={tax.toFixed(2)}
+                readOnly
+                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1E3A8A]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Transport Chg.</label>
+              <input
+                type="number"
+                value={transportCharge}
+                onChange={(e) => setTransportCharge(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[16px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Wages</label>
+              <input
+                type="number"
+                value={wages}
+                onChange={(e) => setwages(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[16px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]"
+              />
             </div>
 
           </div>
@@ -657,22 +894,22 @@ const RawMaterialPurchaseEntry = () => {
         {/* Bottom Actions Bar */}
         <div className="bg-[#F8FAFC] border-t border-[#CBD5E1] px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 mt-auto shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex flex-nowrap justify-between sm:justify-center gap-2 w-full md:w-auto">
-            <button 
+            <button
               type="button" onClick={addItem}
               className="bg-[#334155] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#1E293B] shadow-sm transition-colors"
             >
               <span className="opacity-60 border-r border-[#64748B] pr-1.5">F2</span> Add Material
             </button>
 
-            <button 
+            <button
               type="button" disabled={mutation.isPending} onClick={() => handleSubmit()}
-              className="bg-[#10B981] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#059669] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+              className="bg-[#10B981] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#059669] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span className="opacity-60 border-r border-[#6EE7B7] pr-1.5">F10</span> 
+              <span className="opacity-60 border-r border-[#6EE7B7] pr-1.5">F10</span>
               {mutation.isPending ? 'Saving...' : 'Save Record'}
             </button>
           </div>
-          
+
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end border-t border-gray-200 md:border-none pt-3 md:pt-0">
             <span className="text-[16px] sm:text-[18px] font-bold text-[#475569] uppercase">Total Purchase Amount:</span>
             <span className="text-[24px] sm:text-[32px] font-black text-[#10B981]">
@@ -690,8 +927,8 @@ const RawMaterialPurchaseEntry = () => {
       {/* Mobile Top Header Bar */}
       <div className="md:hidden bg-[#475569] text-white px-3 py-2.5 flex items-center justify-between shrink-0 shadow-sm z-20">
         <div className="flex items-center gap-2">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => setIsLeaveModalOpen(true)}
             className="p-1 rounded hover:bg-white/10 active:scale-95 transition-all text-white/90"
           >
@@ -709,8 +946,8 @@ const RawMaterialPurchaseEntry = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => navigate('/raw-materials/purchase-list')}
             className="p-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold flex items-center gap-1"
             title="Purchase List"
@@ -719,7 +956,7 @@ const RawMaterialPurchaseEntry = () => {
             <span>List</span>
           </button>
           {validItems.length > 0 && (
-            <button 
+            <button
               type="button"
               onClick={() => setIsMobileCheckoutOpen(true)}
               className="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 shadow-sm"
@@ -737,7 +974,7 @@ const RawMaterialPurchaseEntry = () => {
         <div className="bg-white px-3 py-2.5 border-b border-slate-200 shrink-0 flex flex-col gap-2">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
+            <input
               type="text"
               value={mobileSearch}
               onChange={e => setMobileSearch(e.target.value)}
@@ -745,7 +982,7 @@ const RawMaterialPurchaseEntry = () => {
               className="w-full pl-9 pr-8 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-slate-500 transition-all font-medium"
             />
             {mobileSearch && (
-              <button 
+              <button
                 type="button"
                 onClick={() => setMobileSearch('')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
@@ -756,7 +993,7 @@ const RawMaterialPurchaseEntry = () => {
           </div>
 
           <div className="flex items-center justify-between text-[11px] gap-2">
-            <button 
+            <button
               type="button"
               onClick={() => setIsMobileSupplierPickerOpen(true)}
               className="flex items-center gap-1.5 text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md max-w-[55%] truncate border border-slate-200 font-medium"
@@ -767,7 +1004,7 @@ const RawMaterialPurchaseEntry = () => {
 
             <div className="flex items-center gap-1.5 text-slate-500 font-medium">
               <span>Inv:</span>
-              <input 
+              <input
                 type="text"
                 value={invoiceNo}
                 onChange={e => setInvoiceNo(e.target.value)}
@@ -791,11 +1028,10 @@ const RawMaterialPurchaseEntry = () => {
               const hasInCart = !!inCartItem && Number(inCartItem.rawMaterialId) > 0;
 
               return (
-                <div 
+                <div
                   key={mat.id}
-                  className={`bg-white rounded-xl p-3 border transition-all shadow-sm ${
-                    hasInCart ? 'border-emerald-400 ring-1 ring-emerald-400/40 bg-emerald-50/20' : 'border-slate-200'
-                  }`}
+                  className={`bg-white rounded-xl p-3 border transition-all shadow-sm ${hasInCart ? 'border-emerald-400 ring-1 ring-emerald-400/40 bg-emerald-50/20' : 'border-slate-200'
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -815,14 +1051,13 @@ const RawMaterialPurchaseEntry = () => {
                       </div>
                     </div>
 
-                    <button 
+                    <button
                       type="button"
                       onClick={() => handleMobileOpenEdit(mat)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-all ${
-                        hasInCart 
-                          ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 active:scale-95' 
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-all ${hasInCart
+                          ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 active:scale-95'
                           : 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95'
-                      }`}
+                        }`}
                     >
                       {hasInCart ? (
                         <>
@@ -847,11 +1082,17 @@ const RawMaterialPurchaseEntry = () => {
                         <span>{inCartItem.widthMm || 0}mm × {inCartItem.lengthM || 0}m</span>
                         <span className="text-slate-400 mx-1">•</span>
                         <span className="font-mono text-[10px] text-slate-500">{inCartItem.sqM || 0} m²</span>
+                        {Number(inCartItem.tax || 0) > 0 && (
+                          <>
+                            <span className="text-slate-400 mx-1">•</span>
+                            <span className="text-[10px] font-bold text-blue-700">GST {inCartItem.taxPercent || 0}% ({formatCurrency(Number(inCartItem.tax))})</span>
+                          </>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-bold text-slate-900">{formatCurrency(inCartItem.amount || 0)}</span>
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => handleMobileRemoveItem(mat.id)}
                           className="text-rose-500 hover:text-rose-700 p-0.5"
                           title="Remove item"
@@ -876,7 +1117,7 @@ const RawMaterialPurchaseEntry = () => {
               <p className="text-[10px] text-slate-500 mt-0.5">{validItems.length} material{validItems.length !== 1 ? 's' : ''}</p>
             </div>
 
-            <button 
+            <button
               type="button"
               onClick={() => setIsMobileCheckoutOpen(true)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
@@ -904,8 +1145,8 @@ const RawMaterialPurchaseEntry = () => {
                   </p>
                 </div>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsMobileEditItemOpen(false)}
                 className="text-slate-300 hover:text-white p-1"
               >
@@ -914,33 +1155,45 @@ const RawMaterialPurchaseEntry = () => {
             </div>
 
             <div className="p-4 overflow-y-auto space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Material Code *</label>
+                  <input
+                    type="text"
+                    value={editForm.materialCode}
+                    onChange={e => handleEditFormChange('materialCode', e.target.value)}
+                    placeholder="e.g. MLJ1019"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Material Batch Code *</label>
+                  <input
+                    type="text"
+                    value={editForm.batchCode}
+                    onChange={e => handleEditFormChange('batchCode', e.target.value)}
+                    placeholder="e.g. L2609250315/4/6"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">Width (mm) *</label>
-                  <input 
+                  <input
                     type="number"
                     value={editForm.widthMm}
-                    onChange={e => {
-                      const w = e.target.value;
-                      const l = editForm.lengthM;
-                      const sqM = (parseFloat(w || '0') / 1000) * parseFloat(l || '0');
-                      setEditForm({ ...editForm, widthMm: w, sqM: parseFloat(sqM.toFixed(4)) });
-                    }}
+                    onChange={e => handleEditFormChange('widthMm', e.target.value)}
                     placeholder="e.g. 1000"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">Length (m) *</label>
-                  <input 
+                  <input
                     type="number"
                     value={editForm.lengthM}
-                    onChange={e => {
-                      const l = e.target.value;
-                      const w = editForm.widthMm;
-                      const sqM = (parseFloat(w || '0') / 1000) * parseFloat(l || '0');
-                      setEditForm({ ...editForm, lengthM: l, sqM: parseFloat(sqM.toFixed(4)) });
-                    }}
+                    onChange={e => handleEditFormChange('lengthM', e.target.value)}
                     placeholder="e.g. 50"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
@@ -958,47 +1211,89 @@ const RawMaterialPurchaseEntry = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">Quantity (Rolls) *</label>
-                  <input 
+                  <input
                     type="number"
                     value={editForm.quantity}
-                    onChange={e => setEditForm({ ...editForm, quantity: e.target.value })}
+                    onChange={e => handleEditFormChange('quantity', e.target.value)}
                     placeholder="1"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate / Sq.M (₹) *</label>
-                  <input 
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Rate / Sq.M ({settings?.currencySymbol || '₹'}) *</label>
+                  <input
                     type="number"
                     value={editForm.price}
-                    onChange={e => setEditForm({ ...editForm, price: e.target.value })}
+                    onChange={e => handleEditFormChange('price', e.target.value)}
                     placeholder="0.00"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
               </div>
 
-              {/* Total preview for this item */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-[10px] uppercase font-bold text-emerald-800">Item Total Amount</p>
-                  <p className="text-xs text-emerald-600">Sq.M × Qty × Rate</p>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Tax %</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    list="rm-tax-slabs"
+                    value={editForm.taxPercent}
+                    onChange={e => handleEditFormChange('taxPercent', e.target.value)}
+                    onBlur={e => {
+                      if (!isValidMasterTaxPercent(e.target.value)) {
+                        toast.error('Invalid Tax %. Please select a rate from Tax Master.');
+                        handleEditFormChange('taxPercent', getFallbackTaxPercent(editingMaterial));
+                      }
+                    }}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
                 </div>
-                <div className="text-right">
-                  <span className="text-lg font-black text-emerald-700">
-                    {formatCurrency(
-                      ((parseFloat(editForm.widthMm || '0') / 1000) * parseFloat(editForm.lengthM || '0')) *
-                      parseFloat(editForm.quantity || '0') *
-                      parseFloat(editForm.price || '0')
-                    )}
-                  </span>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Tax Amt ({settings?.currencySymbol || '₹'})</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.tax}
+                    onChange={e => handleEditFormChange('tax', e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right"
+                  />
                 </div>
               </div>
+
+              {/* Total preview for this item */}
+              {(() => {
+                const sqM = (parseFloat(editForm.widthMm || '0') / 1000) * parseFloat(editForm.lengthM || '0');
+                const qty = parseFloat(editForm.quantity || '0');
+                const price = parseFloat(editForm.price || '0');
+                const taxPct = parseFloat(editForm.taxPercent || '0') || 0;
+                const manualTax = editForm.tax !== '' ? parseFloat(editForm.tax || '0') : undefined;
+                const preview = calculateRmItemAmounts(sqM, qty, price, taxPct, isTaxInclusive, manualTax);
+                return (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-emerald-800">Item Total Amount</p>
+                      <p className="text-xs text-emerald-600">
+                        Base {formatCurrency(preview.baseAmount)} + Tax {formatCurrency(preview.tax)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-black text-emerald-700">
+                        {formatCurrency(preview.amount)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center gap-2">
               {items.some(i => Number(i.rawMaterialId) === Number(editingMaterial.id)) && (
-                <button 
+                <button
                   type="button"
                   onClick={() => {
                     handleMobileRemoveItem(editingMaterial.id);
@@ -1009,7 +1304,7 @@ const RawMaterialPurchaseEntry = () => {
                   Remove
                 </button>
               )}
-              <button 
+              <button
                 type="button"
                 onClick={handleMobileSaveEdit}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
@@ -1033,8 +1328,8 @@ const RawMaterialPurchaseEntry = () => {
                 <ShoppingCart size={17} className="text-emerald-400" />
                 <h3 className="font-bold text-sm">Review & Confirm Purchase</h3>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsMobileCheckoutOpen(false)}
                 className="text-slate-300 hover:text-white p-1"
               >
@@ -1053,7 +1348,7 @@ const RawMaterialPurchaseEntry = () => {
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Invoice No *</label>
-                    <input 
+                    <input
                       type="text"
                       value={invoiceNo}
                       onChange={e => setInvoiceNo(e.target.value)}
@@ -1063,7 +1358,7 @@ const RawMaterialPurchaseEntry = () => {
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Date *</label>
-                    <input 
+                    <input
                       type="date"
                       value={date}
                       onChange={e => setDate(e.target.value)}
@@ -1076,7 +1371,7 @@ const RawMaterialPurchaseEntry = () => {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[11px] font-bold text-slate-600">Supplier *</label>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setIsSupplierModalOpen(true)}
                       className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5"
@@ -1085,7 +1380,7 @@ const RawMaterialPurchaseEntry = () => {
                       <span>New</span>
                     </button>
                   </div>
-                  <div 
+                  <div
                     onClick={() => setIsMobileSupplierPickerOpen(true)}
                     className="p-2.5 bg-white border border-slate-300 rounded-lg cursor-pointer hover:border-slate-400 flex items-center justify-between text-xs"
                   >
@@ -1104,15 +1399,14 @@ const RawMaterialPurchaseEntry = () => {
                   <label className="block text-[11px] font-bold text-slate-600 mb-1.5">Payment Mode *</label>
                   <div className="flex flex-wrap gap-1.5">
                     {paymentModes.map((pm: any) => (
-                      <button 
+                      <button
                         key={pm.id}
                         type="button"
                         onClick={() => setPaymentModeId(pm.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          paymentModeId === pm.id 
-                            ? 'bg-slate-900 text-white shadow-sm' 
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${paymentModeId === pm.id
+                            ? 'bg-slate-900 text-white shadow-sm'
                             : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                        }`}
+                          }`}
                       >
                         {pm.name}
                       </button>
@@ -1127,7 +1421,7 @@ const RawMaterialPurchaseEntry = () => {
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     Materials ({validItems.length})
                   </h4>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => setIsMobileCheckoutOpen(false)}
                     className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700"
@@ -1145,13 +1439,14 @@ const RawMaterialPurchaseEntry = () => {
                           <p className="font-bold text-slate-800 truncate">{mat?.name || 'Raw Material'}</p>
                           <p className="text-[10px] text-slate-500 mt-0.5">
                             {item.quantity} rolls • {item.widthMm}mm × {item.lengthM}m ({item.sqM} m²) @ {formatCurrency(item.price)}
+                            {Number(item.tax || 0) > 0 && ` • GST ${item.taxPercent || 0}% (${formatCurrency(Number(item.tax))})`}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="font-bold text-slate-900">{formatCurrency(item.amount || 0)}</p>
                           <div className="flex items-center justify-end gap-1.5 mt-1">
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => {
                                 setIsMobileCheckoutOpen(false);
                                 if (mat) handleMobileOpenEdit(mat);
@@ -1160,8 +1455,8 @@ const RawMaterialPurchaseEntry = () => {
                             >
                               <Edit3 size={12} />
                             </button>
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               onClick={() => handleMobileRemoveItem(item.rawMaterialId)}
                               className="text-rose-500 hover:text-rose-700 p-0.5"
                             >
@@ -1185,7 +1480,7 @@ const RawMaterialPurchaseEntry = () => {
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Transport (₹)</label>
-                    <input 
+                    <input
                       type="number"
                       value={transportCharge}
                       onChange={e => setTransportCharge(e.target.value === '' ? '' : Number(e.target.value))}
@@ -1195,7 +1490,7 @@ const RawMaterialPurchaseEntry = () => {
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Wages (₹)</label>
-                    <input 
+                    <input
                       type="number"
                       value={wages}
                       onChange={e => setwages(e.target.value === '' ? '' : Number(e.target.value))}
@@ -1212,6 +1507,12 @@ const RawMaterialPurchaseEntry = () => {
                   <span>Materials Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                 </div>
+                {tax > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>GST / Tax Amount</span>
+                    <span>+{formatCurrency(tax)}</span>
+                  </div>
+                )}
                 {transportAmt > 0 && (
                   <div className="flex justify-between text-slate-600">
                     <span>Transport Charges</span>
@@ -1232,7 +1533,7 @@ const RawMaterialPurchaseEntry = () => {
             </div>
 
             <div className="p-4 bg-slate-50 border-t border-slate-200 shrink-0">
-              <button 
+              <button
                 type="button"
                 disabled={mutation.isPending}
                 onClick={() => handleSubmit()}
@@ -1257,8 +1558,8 @@ const RawMaterialPurchaseEntry = () => {
                 <User size={16} className="text-emerald-400" />
                 <span>Select Supplier</span>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setIsMobileSupplierPickerOpen(false)}
                 className="text-slate-300 hover:text-white p-1"
               >
@@ -1267,7 +1568,7 @@ const RawMaterialPurchaseEntry = () => {
             </div>
 
             <div className="p-3 border-b border-slate-200 shrink-0 flex items-center gap-2">
-              <input 
+              <input
                 type="text"
                 placeholder="Search supplier..."
                 className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs outline-none focus:bg-white focus:border-slate-400"
@@ -1281,7 +1582,7 @@ const RawMaterialPurchaseEntry = () => {
                   });
                 }}
               />
-              <button 
+              <button
                 type="button"
                 onClick={() => {
                   setIsMobileSupplierPickerOpen(false);
@@ -1296,18 +1597,17 @@ const RawMaterialPurchaseEntry = () => {
 
             <div className="p-3 overflow-y-auto space-y-1.5 flex-1 min-h-0">
               {suppliers.map((s: any) => (
-                <div 
+                <div
                   key={s.id}
                   data-name={`${s.name} ${s.phone || ''}`}
                   onClick={() => {
                     setSupplierId(s.id);
                     setIsMobileSupplierPickerOpen(false);
                   }}
-                  className={`supplier-item p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                    supplierId === s.id 
-                      ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500' 
+                  className={`supplier-item p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${supplierId === s.id
+                      ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500'
                       : 'border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   <div>
                     <p className="font-bold text-xs text-slate-800">{s.name}</p>
@@ -1338,27 +1638,27 @@ const RawMaterialPurchaseEntry = () => {
             <div className="p-4 flex flex-col gap-4">
               <div>
                 <label className="block text-[13px] font-bold text-[#1F2937] mb-1">Supplier Name *</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newSupplier.name}
-                  onChange={(e) => setNewSupplier({...newSupplier, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]" 
+                  onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]"
                 />
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">Mobile Number</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newSupplier.phone}
-                  onChange={(e) => setNewSupplier({...newSupplier, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]" 
+                  onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6]"
                 />
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">State {settings?.enableTax && <span className="text-red-500">*</span>}</label>
-                <Select 
+                <Select
                   value={newSupplier.state ? { value: newSupplier.state, label: newSupplier.state } : null}
-                  onChange={(val: any) => setNewSupplier({...newSupplier, state: val?.value || ''})}
+                  onChange={(val: any) => setNewSupplier({ ...newSupplier, state: val?.value || '' })}
                   options={[
                     { value: '', label: '-- Select State --' },
                     ...indianStates.map(s => ({ value: s, label: s }))
@@ -1379,15 +1679,15 @@ const RawMaterialPurchaseEntry = () => {
               </div>
               <div>
                 <label className="block text-[13px] text-[#4B5563] mb-1">Billing Address</label>
-                <textarea 
+                <textarea
                   value={newSupplier.address}
-                  onChange={(e) => setNewSupplier({...newSupplier, address: e.target.value})}
-                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] min-h-[80px]" 
+                  onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#3B82F6] min-h-[80px]"
                 />
               </div>
             </div>
             <div className="p-4 bg-white pt-2 border-none pb-5">
-              <button 
+              <button
                 type="button"
                 onClick={handleQuickAddSupplier}
                 disabled={!newSupplier.name || addSupplierMutation.isPending}
@@ -1399,11 +1699,11 @@ const RawMaterialPurchaseEntry = () => {
           </div>
         </div>
       )}
-      
-      <LeaveConfirmModal 
-        isOpen={isLeaveModalOpen} 
-        onClose={() => setIsLeaveModalOpen(false)} 
-        onConfirm={() => navigate('/dashboard')} 
+
+      <LeaveConfirmModal
+        isOpen={isLeaveModalOpen}
+        onClose={() => setIsLeaveModalOpen(false)}
+        onConfirm={() => navigate('/dashboard')}
       />
     </div>
   );

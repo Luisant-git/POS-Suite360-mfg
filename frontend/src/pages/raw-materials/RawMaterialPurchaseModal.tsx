@@ -7,6 +7,7 @@ import { useReactToPrint } from 'react-to-print';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
+import { formatRawMaterialLabel } from '../../utils/productionBatch';
 
 interface RawMaterialPurchaseModalProps {
   purchaseId: number;
@@ -52,15 +53,17 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
       if (purchase.supplier?.phone) doc.text(`Phone: ${purchase.supplier.phone}`, 120, 66);
       
       // Items Table
-      const tableColumn = ["#", "Material", "Width (mm)", "Length (m)", "Sq.M", "Qty", "Price", "Amount"];
+      const tableColumn = ["#", "Material", "Width (mm)", "Length (m)", "Sq.M", "Qty", "Price", "Tax %", "Tax Amt", "Amount"];
       const tableRows = purchase.items.map((item: any, index: number) => [
         index + 1,
-        item.rawMaterial?.name,
+        formatRawMaterialLabel(item.rawMaterial, item.batchCode, item.materialCode),
         item.widthMm,
         item.lengthM,
         Number(item.sqM).toFixed(3),
         item.quantity,
         formatCurrency(item.price).replace(/[^0-9.-]+/g, ""),
+        `${Number(item.taxPercent || 0)}%`,
+        formatCurrency(item.tax || 0).replace(/[^0-9.-]+/g, ""),
         formatCurrency(item.amount).replace(/[^0-9.-]+/g, "")
       ]);
       
@@ -231,6 +234,10 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                         <span>Qty: <strong className="text-gray-800">{item.quantity} Rolls</strong></span>
                         <span>Price: <strong className="text-gray-800">{formatCurrency(item.price)}/Sq.M</strong></span>
                       </div>
+                      <div className="flex justify-between">
+                        <span>Tax %: <strong className="text-gray-800">{Number(item.taxPercent || 0)}%</strong></span>
+                        <span>Tax Amt: <strong className="text-gray-800">{formatCurrency(item.tax || 0)}</strong></span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -248,6 +255,8 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                       <th className="px-4 py-3 border-b text-center">Sq.M</th>
                       <th className="px-4 py-3 border-b text-center">Qty (Rolls)</th>
                       <th className="px-4 py-3 border-b text-right">Price / Sq.M</th>
+                      <th className="px-4 py-3 border-b text-center">Tax %</th>
+                      <th className="px-4 py-3 border-b text-right">Tax Amt</th>
                       <th className="px-4 py-3 border-b text-right">Amount</th>
                     </tr>
                   </thead>
@@ -255,12 +264,21 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                     {purchase.items?.map((item: any, index: number) => (
                       <tr key={index} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 text-gray-500 font-medium">{index + 1}</td>
-                        <td className="px-4 py-3 font-bold text-gray-800">{item.rawMaterial?.name}</td>
+                        <td className="px-4 py-3 font-bold text-gray-800">
+                          <div>{item.rawMaterial?.name}</div>
+                          {(item.materialCode || item.batchCode || item.rawMaterial?.code) && (
+                            <div className="text-[11px] text-gray-500">
+                              {formatRawMaterialLabel(item.rawMaterial, item.batchCode, item.materialCode)}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-center">{item.widthMm}</td>
                         <td className="px-4 py-3 text-center">{item.lengthM}</td>
                         <td className="px-4 py-3 text-center font-medium">{Number(item.sqM).toFixed(3)}</td>
                         <td className="px-4 py-3 text-center font-bold text-blue-600">{item.quantity}</td>
                         <td className="px-4 py-3 text-right">{formatCurrency(item.price)}</td>
+                        <td className="px-4 py-3 text-center font-semibold text-gray-700">{Number(item.taxPercent || 0)}%</td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-700">{formatCurrency(item.tax || 0)}</td>
                         <td className="px-4 py-3 text-right font-bold text-gray-800">{formatCurrency(item.amount)}</td>
                       </tr>
                     ))}
@@ -336,6 +354,8 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                     <th className="border border-black px-2 py-2 text-center font-bold">Sq.M</th>
                     <th className="border border-black px-2 py-2 text-center font-bold">Qty</th>
                     <th className="border border-black px-2 py-2 text-right font-bold">Price</th>
+                    <th className="border border-black px-2 py-2 text-center font-bold">Tax %</th>
+                    <th className="border border-black px-2 py-2 text-right font-bold">Tax Amt</th>
                     <th className="border border-black px-2 py-2 text-right font-bold">Amount</th>
                   </tr>
                 </thead>
@@ -343,12 +363,14 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                   {purchase.items?.map((item: any, index: number) => (
                     <tr key={index}>
                       <td className="border border-black px-2 py-2">{index + 1}</td>
-                      <td className="border border-black px-2 py-2">{item.rawMaterial?.name}</td>
+                      <td className="border border-black px-2 py-2">{formatRawMaterialLabel(item.rawMaterial, item.batchCode)}</td>
                       <td className="border border-black px-2 py-2 text-center">{item.widthMm}</td>
                       <td className="border border-black px-2 py-2 text-center">{item.lengthM}</td>
                       <td className="border border-black px-2 py-2 text-center">{Number(item.sqM).toFixed(3)}</td>
                       <td className="border border-black px-2 py-2 text-center font-bold">{item.quantity}</td>
                       <td className="border border-black px-2 py-2 text-right">{formatCurrency(item.price)}</td>
+                      <td className="border border-black px-2 py-2 text-center">{Number(item.taxPercent || 0)}%</td>
+                      <td className="border border-black px-2 py-2 text-right">{formatCurrency(item.tax || 0)}</td>
                       <td className="border border-black px-2 py-2 text-right font-bold">{formatCurrency(item.amount)}</td>
                     </tr>
                   ))}

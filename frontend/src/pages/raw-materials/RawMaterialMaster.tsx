@@ -12,10 +12,10 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { useNavigate } from 'react-router-dom';
 
 const rawMaterialSchema = z.object({
-  code: z.string().min(1, 'Code is required'),
   name: z.string().min(1, 'Name is required'),
   unitId: z.string().min(1, 'Unit is required'),
   hsnCode: z.string().optional(),
+  taxPercent: z.coerce.number().min(0).default(0),
   currentStock: z.coerce.number().min(0).default(0),
   purchaseRate: z.coerce.number().min(0).default(0),
 });
@@ -30,13 +30,13 @@ const RawMaterialMaster = () => {
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
 
-  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<RawMaterialFormValues>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<RawMaterialFormValues>({
     resolver: zodResolver(rawMaterialSchema) as any,
     defaultValues: {
-      code: '',
       name: '',
       unitId: '',
       hsnCode: '',
+      taxPercent: 0,
       currentStock: '' as any,
       purchaseRate: '' as any,
     }
@@ -47,6 +47,7 @@ const RawMaterialMaster = () => {
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
 
   const { data: units = [] } = useQuery({ queryKey: ['units'], queryFn: async () => (await api.get('/units')).data });
+  const { data: taxes = [] } = useQuery({ queryKey: ['taxes'], queryFn: async () => (await api.get('/taxes')).data });
 
   const { data: rawMaterials = [], isLoading } = useQuery({ 
     queryKey: ['rawMaterials'], 
@@ -70,7 +71,6 @@ const RawMaterialMaster = () => {
           setIsMobileDrawerOpen(false);
           setEditingId(null);
           reset();
-          setValue('code', generateNextCode());
         } else if (itemToDelete) {
           setItemToDelete(null);
         } else if (isLeaveModalOpen) {
@@ -82,10 +82,16 @@ const RawMaterialMaster = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [itemToDelete, isLeaveModalOpen, isMobileDrawerOpen, navigate, rawMaterials]);
+  }, [itemToDelete, isLeaveModalOpen, isMobileDrawerOpen, navigate]);
 
   const filteredMaterials = rawMaterials.filter((m: any) => {
-    if (searchTerm && !m.name.toLowerCase().includes(searchTerm.toLowerCase()) && !m.code.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const matches =
+        m.name?.toLowerCase().includes(q) ||
+        m.hsnCode?.toLowerCase().includes(q);
+      if (!matches) return false;
+    }
     return true;
   });
 
@@ -93,6 +99,7 @@ const RawMaterialMaster = () => {
     mutationFn: async (data: RawMaterialFormValues) => {
       const payload = {
         ...data,
+        ...(editingId ? {} : { code: generateNextCode() }),
         unitId: parseInt(data.unitId || '0'),
       };
       
@@ -128,12 +135,6 @@ const RawMaterialMaster = () => {
     }
   });
 
-  useEffect(() => {
-    if (rawMaterials && !editingId && !getValues('code')) {
-      setValue('code', generateNextCode());
-    }
-  }, [rawMaterials, editingId, setValue, getValues]);
-
   const onSubmit = (data: RawMaterialFormValues) => {
     mutation.mutate(data);
   };
@@ -142,10 +143,10 @@ const RawMaterialMaster = () => {
     setIsFullTable(false);
     setEditingId(null);
     reset({
-      code: generateNextCode(),
       name: '',
       unitId: '',
       hsnCode: '',
+      taxPercent: 0,
       currentStock: '' as any,
       purchaseRate: '' as any,
     });
@@ -155,10 +156,10 @@ const RawMaterialMaster = () => {
   const handleEdit = (material: any) => {
     setIsFullTable(false);
     setEditingId(material.id);
-    setValue('code', material.code);
     setValue('name', material.name);
     setValue('unitId', material.unitId ? material.unitId.toString() : '');
     setValue('hsnCode', material.hsnCode || '');
+    setValue('taxPercent', Number(material.taxPercent || 0));
     setValue('currentStock', Number(material.currentStock));
     setValue('purchaseRate', Number(material.purchaseRate));
     setIsMobileDrawerOpen(true);
@@ -171,7 +172,7 @@ const RawMaterialMaster = () => {
       {isMobileDrawerOpen && (
         <div 
           className="xl:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-xs transition-opacity duration-200"
-          onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); setValue('code', generateNextCode()); }}
+          onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); }}
         />
       )}
 
@@ -192,7 +193,7 @@ const RawMaterialMaster = () => {
           </div>
           <button
             type="button"
-            onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); setValue('code', generateNextCode()); }}
+            onClick={() => { setIsMobileDrawerOpen(false); setEditingId(null); reset(); }}
             className="xl:hidden p-1 rounded hover:bg-white/20 text-white"
           >
             <X size={18} />
@@ -201,35 +202,40 @@ const RawMaterialMaster = () => {
         
         <form onSubmit={handleSubmit(onSubmit)} className="p-4 flex flex-col gap-3 overflow-y-auto custom-scrollbar flex-1">
           <div>
-            <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Material Code *</label>
-            <input 
-              {...register('code')}
-              type="text" 
-              placeholder="Code"
-              className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
-            />
-            {errors.code && <span className="text-red-500 text-xs mt-1 block">{errors.code.message}</span>}
-          </div>
-
-          <div>
             <label className="block text-[12px] font-bold text-[#1F2937] mb-1">Material Name *</label>
             <input 
               {...register('name')}
               type="text" 
-              placeholder="Material name"
+              placeholder="e.g. CHROMO"
               className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
             />
             {errors.name && <span className="text-red-500 text-xs mt-1 block">{errors.name.message}</span>}
           </div>
 
-          <div>
-            <label className="block text-[12px] font-bold text-[#1F2937] mb-1">HSN Code <span className="text-gray-400 font-normal">(Optional)</span></label>
-            <input
-              {...register('hsnCode')}
-              type="text"
-              placeholder="e.g. 6403"
-              className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">HSN Code <span className="text-gray-400 font-normal">(Optional)</span></label>
+              <input
+                {...register('hsnCode')}
+                type="text"
+                placeholder="e.g. 6403"
+                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px]"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-bold text-[#1F2937] mb-1">GST % (Tax)</label>
+              <select
+                {...register('taxPercent')}
+                className="w-full px-3 py-1.5 border border-[#ccc] rounded shadow-inner focus:border-[#3B82F6] outline-none text-[13px] bg-white"
+              >
+                <option value="0">None (0%)</option>
+                {taxes
+                  .filter((t: any) => t.isActive !== false)
+                  .map((t: any) => (
+                    <option key={t.id} value={Number(t.rate)}>{t.name} ({Number(t.rate)}%)</option>
+                  ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -277,7 +283,7 @@ const RawMaterialMaster = () => {
           {editingId && (
             <button 
               type="button" 
-              onClick={() => { reset(); setEditingId(null); setValue('code', generateNextCode()); setIsMobileDrawerOpen(false); }}
+              onClick={() => { reset(); setEditingId(null); setIsMobileDrawerOpen(false); }}
               className="w-full bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 rounded flex justify-center items-center gap-2 transition-colors"
             >
               CANCEL EDIT
@@ -337,9 +343,9 @@ const RawMaterialMaster = () => {
             <thead>
               <tr className="bg-[#2A2A2A] text-white font-bold">
                 <th className="px-3 py-2 border-r border-[#444] text-center w-8">#</th>
-                <th className="px-3 py-2 border-r border-[#444]">Code</th>
                 <th className="px-3 py-2 border-r border-[#444]">Material Name</th>
                 <th className="px-3 py-2 border-r border-[#444]">HSN Code</th>
+                <th className="px-3 py-2 border-r border-[#444] text-center">Tax %</th>
                 <th className="px-3 py-2 border-r border-[#444] text-center">Unit</th>
                 <th className="px-3 py-2 border-r border-[#444] text-center">Stock</th>
                 <th className="px-3 py-2 border-r border-[#444] text-right">Pur Rate</th>
@@ -348,16 +354,18 @@ const RawMaterialMaster = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="text-center p-4">Loading...</td></tr>
+                <tr><td colSpan={8} className="text-center p-4">Loading...</td></tr>
               ) : filteredMaterials.length === 0 ? (
-                <tr><td colSpan={7} className="text-center p-4">No materials found.</td></tr>
+                <tr><td colSpan={8} className="text-center p-4">No materials found.</td></tr>
               ) : (
                 filteredMaterials.map((material: any, index: number) => (
                   <tr key={material.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F9F9F9]'} hover:bg-blue-50`}>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-gray-700">{index + 1}</td>
-                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] font-bold text-[#3B82F6]">{material.code}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] font-bold text-[#1F2937]">{material.name}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-gray-500">{material.hsnCode || '-'}</td>
+                    <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-gray-700">
+                      {material.taxPercent ? `${Number(material.taxPercent)}%` : '0%'}
+                    </td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-center">{material.unit?.name || '-'}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-green-700">{material.currentStock}</td>
                     <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-right font-medium">{formatCurrency(material.purchaseRate)}</td>

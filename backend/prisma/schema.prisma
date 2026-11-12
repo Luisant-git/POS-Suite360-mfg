@@ -215,6 +215,8 @@ model Product {
   salesReturnItems           SalesReturnItem[]
   stockLedger                StockTransaction[]
   productionFinishedProducts Production[]          @relation("ProductionFinishedProduct")
+  productionOutcomes         ProductionOutcome[]
+  productionOutcomeLogs      ProductionOutcomeLog[]
   customerRates              CustomerProductRate[]
 
   createdAt DateTime @default(now())
@@ -613,16 +615,19 @@ model RawMaterial {
   id   Int    @id @default(autoincrement())
   name String
   code String @unique
+  batchCode String?
 
   unitId Int
   unit   Unit @relation(fields: [unitId], references: [id])
 
   hsnCode      String?
+  taxPercent   Decimal @default(0)
   currentStock Int     @default(0)
   purchaseRate Decimal @default(0)
 
   rawMaterialPurchaseItems RawMaterialPurchaseItem[]
   productionRawMaterials   Production[]              @relation("ProductionRawMaterial")
+  productionIntakes        ProductionIntake[]
   productRawMaterials      ProductRawMaterial[]
 
   createdAt DateTime @default(now())
@@ -646,29 +651,75 @@ model RawMaterialPurchaseItem {
   rawMaterialId Int
   rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
 
-  widthMm  Decimal
-  lengthM  Decimal
-  sqM      Decimal
-  quantity Int
-  price    Decimal
-  amount   Decimal
+  materialCode String?
+  batchCode    String?
+  widthMm      Decimal
+  lengthM    Decimal
+  sqM        Decimal
+  quantity   Int
+  price      Decimal
+  taxPercent Decimal @default(0)
+  tax        Decimal @default(0)
+  amount     Decimal
 }
 
 model Production {
-  id       Int      @id @default(autoincrement())
-  date     DateTime @default(now())
-  workName String
+  id          Int       @id @default(autoincrement())
+  date        DateTime  @default(now())
+  workName    String
+  status      String    @default("PENDING") // PENDING | COMPLETED
+  completedAt DateTime?
 
-  rawMaterialId  Int
-  rawMaterial    RawMaterial @relation("ProductionRawMaterial", fields: [rawMaterialId], references: [id])
-  intakeQuantity Int
+  rawMaterialId     Int?
+  rawMaterial       RawMaterial? @relation("ProductionRawMaterial", fields: [rawMaterialId], references: [id])
+  materialCode      String?
+  materialBatchCode String?
+  intakeQuantity    Int          @default(0)
 
-  finishedProductId Int
-  finishedProduct   Product @relation("ProductionFinishedProduct", fields: [finishedProductId], references: [id])
-  outcomeQuantity   Int
+  finishedProductId Int?
+  finishedProduct   Product? @relation("ProductionFinishedProduct", fields: [finishedProductId], references: [id])
+  outcomeQuantity   Int      @default(0)
+
+  intakes     ProductionIntake[]
+  outcomes    ProductionOutcome[]
+  outcomeLogs ProductionOutcomeLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ProductionIntake {
+  id                Int         @id @default(autoincrement())
+  productionId      Int
+  production        Production  @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  rawMaterialId     Int
+  rawMaterial       RawMaterial @relation(fields: [rawMaterialId], references: [id])
+  materialCode      String?
+  materialBatchCode String?
+  intakeQuantity    Int         @default(0)
+  sqM               Decimal     @default(0)
+}
+
+model ProductionOutcome {
+  id                Int        @id @default(autoincrement())
+  productionId      Int
+  production        Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  finishedProductId Int
+  finishedProduct   Product    @relation(fields: [finishedProductId], references: [id])
+  outcomeQuantity   Int        @default(0)
+  sqM               Decimal    @default(0)
+}
+
+model ProductionOutcomeLog {
+  id                Int        @id @default(autoincrement())
+  productionId      Int
+  production        Production @relation(fields: [productionId], references: [id], onDelete: Cascade)
+  finishedProductId Int
+  finishedProduct   Product    @relation(fields: [finishedProductId], references: [id])
+  outcomeQuantity   Int        @default(0)
+  sqM               Decimal    @default(0)
+  date              DateTime   @default(now())
+  createdAt         DateTime   @default(now())
 }
 
 // ------------------------------------------------------

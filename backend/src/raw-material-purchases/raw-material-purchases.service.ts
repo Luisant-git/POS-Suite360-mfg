@@ -33,11 +33,15 @@ export class RawMaterialPurchasesService {
           items: {
             create: items.map(item => ({
               rawMaterialId: item.rawMaterialId,
+              materialCode: item.materialCode?.trim() || null,
+              batchCode: item.batchCode?.trim() || null,
               widthMm: item.widthMm,
               lengthM: item.lengthM,
               sqM: item.sqM,
               quantity: item.quantity,
               price: item.price,
+              taxPercent: item.taxPercent || 0,
+              tax: item.tax || 0,
               amount: item.amount,
             }))
           }
@@ -45,12 +49,15 @@ export class RawMaterialPurchasesService {
         include: { items: true }
       });
 
-      // 2. Update Stock
+      // 2. Update Stock (and latest batchCode if provided)
       for (const item of items) {
-        // Find existing product to calculate balance
+        const trimmedBatch = item.batchCode?.trim();
         await tx.rawMaterial.update({
           where: { id: item.rawMaterialId },
-          data: { currentStock: { increment: item.quantity } },
+          data: {
+            currentStock: { increment: item.quantity },
+            ...(trimmedBatch ? { batchCode: trimmedBatch } : {}),
+          },
         });
       }
 
