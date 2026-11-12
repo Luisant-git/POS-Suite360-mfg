@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText, Search, Calendar, FileDigit, Users, CreditCard, RotateCcw, Plus, Printer, Eye, Pencil, Filter, X } from 'lucide-react';
+import { Download, FileText, Search, Calendar, FileDigit, Users, CreditCard, RotateCcw, Plus, Printer, Eye, Pencil, Filter, X, Layers } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
@@ -12,6 +12,7 @@ import ViewSalesModal from '../sales/ViewSalesModal';
 import PaginationControls from '../../components/PaginationControls';
 import SearchableSelect from '../../components/SearchableSelect';
 import TableLoader from '../../components/TableLoader';
+import { getEffectiveOutcomes, parseBatchWorkName } from '../../utils/productionBatch';
 
 
 
@@ -24,6 +25,7 @@ const SalesReport = () => {
   const [toDate, setToDate] = useState('');
   const [customerId, setCustomerId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState(() => searchParams.get('invoiceNo') || '');
+  const [batchCode, setBatchCode] = useState(() => searchParams.get('batchCode') || '');
   const [paymentMode, setPaymentMode] = useState('');
   const [quickSearch, setQuickSearch] = useState('');
   const [selectedSale, setSelectedSale] = useState<any>(null);
@@ -44,9 +46,46 @@ const SalesReport = () => {
     queryFn: async () => (await api.get('/payment-modes')).data
   });
 
+  const { data: productions = [] } = useQuery({
+    queryKey: ['productionsForSalesFilter'],
+    queryFn: async () => (await api.get('/production')).data
+  });
+
+  const { batchOptions, productToBatchCodes } = useMemo(() => {
+    const batchMap = new Map<string, string>();
+    const prodToBatch = new Map<number, string[]>();
+
+    for (const prod of productions as any[]) {
+      const parsed = parseBatchWorkName(prod?.workName);
+      if (parsed.batchCode === '-') continue;
+
+      if (!batchMap.has(parsed.batchCode)) {
+        const label = parsed.workName !== '-' ? `${parsed.batchCode} - ${parsed.workName}` : parsed.batchCode;
+        batchMap.set(parsed.batchCode, label);
+      }
+
+      const outcomes = getEffectiveOutcomes(prod);
+      for (const outcome of outcomes) {
+        const pid = Number(outcome?.finishedProductId);
+        if (!pid) continue;
+        const list = prodToBatch.get(pid) || [];
+        if (!list.includes(parsed.batchCode)) {
+          list.push(parsed.batchCode);
+          prodToBatch.set(pid, list);
+        }
+      }
+    }
+
+    const options = Array.from(batchMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => b.value.localeCompare(a.value));
+
+    return { batchOptions: options, productToBatchCodes: prodToBatch };
+  }, [productions]);
+
   // Fetch Report Data
   const { data: sales = [], isLoading, refetch } = useQuery({
-    queryKey: ['salesReport', fromDate, toDate, customerId, invoiceNo, paymentMode],
+    queryKey: ['salesReport', fromDate, toDate, customerId, invoiceNo, paymentMode, batchCode],
     queryFn: async () => {
       const { data } = await api.get(`/sales`, {
         params: {
@@ -55,6 +94,7 @@ const SalesReport = () => {
           customerId: customerId || undefined,
           invoiceNo: invoiceNo || undefined,
           paymentModeId: paymentMode || undefined,
+          productionBatchCode: batchCode || undefined,
         }
       });
       return data.map((s: any) => ({
@@ -70,13 +110,34 @@ const SalesReport = () => {
     },
   });
 
+  const enrichedSales = useMemo(() => {
+    return sales.map((s: any) => {
+      const matchedBatches = new Set<string>();
+      for (const item of s.items || []) {
+        const pid = Number(item?.productId);
+        if (!pid) continue;
+        const codes = productToBatchCodes.get(pid) || [];
+        for (const code of codes) {
+          matchedBatches.add(code);
+        }
+      }
+      const batchCodes = Array.from(matchedBatches).sort();
+      return {
+        ...s,
+        batchCodes,
+        batchCodesText: batchCodes.length > 0 ? batchCodes.join(', ') : '-',
+      };
+    });
+  }, [sales, productToBatchCodes]);
+
   const filteredSales = quickSearch
-    ? sales.filter((s: any) =>
+    ? enrichedSales.filter((s: any) =>
       s.invoiceNo.toLowerCase().includes(quickSearch.toLowerCase()) ||
       s.customerName.toLowerCase().includes(quickSearch.toLowerCase()) ||
-      s.paymentMode.toLowerCase().includes(quickSearch.toLowerCase())
+      s.paymentMode.toLowerCase().includes(quickSearch.toLowerCase()) ||
+      s.batchCodesText.toLowerCase().includes(quickSearch.toLowerCase())
     )
-    : sales;
+    : enrichedSales;
 
   const totalSalesAmount = filteredSales.reduce((sum: number, sale: any) => sum + (Number(sale.rawTotalAmount) || 0), 0);
 
@@ -88,7 +149,7 @@ const SalesReport = () => {
 
   const isToday = fromDate === todayStr && toDate === todayStr;
   const isMonth = fromDate === startOfMonthStr && toDate === todayStr;
-  const isReset = !fromDate && !toDate && !customerId && !invoiceNo && !paymentMode && !quickSearch;
+  const isReset = !fromDate && !toDate && !customerId && !invoiceNo && !batchCode && !paymentMode && !quickSearch;
 
   return (
     <div className="absolute inset-0 bg-[#F8FAFC] flex flex-col font-sans overflow-y-auto lg:overflow-hidden z-10">
@@ -114,7 +175,7 @@ const SalesReport = () => {
             <h3 className="font-bold text-[15px] text-[#1E3A8A]">Advanced Filters</h3>
             <button onClick={() => setIsFilterOpen(false)} className="p-1.5 bg-red-50 text-red-600 rounded-full"><X size={16} /></button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3 items-end mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end mb-3">
 
             <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-2">
               <div>
@@ -122,7 +183,7 @@ const SalesReport = () => {
                 <input
                   type="date"
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
+                  onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1); }}
                   className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[13px] text-black font-bold focus:border-[#3B82F6]"
                 />
               </div>
@@ -131,7 +192,7 @@ const SalesReport = () => {
                 <input
                   type="date"
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
+                  onChange={(e) => { setToDate(e.target.value); setCurrentPage(1); }}
                   className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[13px] text-black font-bold focus:border-[#3B82F6]"
                 />
               </div>
@@ -144,7 +205,7 @@ const SalesReport = () => {
                 <input
                   type="text"
                   value={invoiceNo}
-                  onChange={(e) => setInvoiceNo(e.target.value)}
+                  onChange={(e) => { setInvoiceNo(e.target.value); setCurrentPage(1); }}
                   placeholder="Type or select invoice..."
                   className="w-full pl-8 pr-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[13px] text-black font-bold focus:border-[#3B82F6]"
                 />
@@ -152,11 +213,24 @@ const SalesReport = () => {
             </div>
 
             <div>
+              <label className="flex items-center gap-1 text-[12px] text-[#1E3A8A] font-bold mb-1"><Layers size={12} /> Batch Code (Auto)</label>
+              <SearchableSelect
+                options={[{ value: '', label: 'All Batches' }, ...batchOptions]}
+                value={batchCode}
+                onChange={(val) => {
+                  setBatchCode(val || '');
+                  setCurrentPage(1);
+                }}
+                placeholder="All Batches"
+              />
+            </div>
+
+            <div>
               <label className="flex items-center gap-1 text-[12px] text-black font-bold mb-1"><Users size={12} /> Customer Name</label>
               <SearchableSelect
                 options={[{ value: '', label: 'All Customers' }, ...customers.map((c: any) => ({ value: c.id, label: `${c.name} - ${c.phone || ''}` }))]}
                 value={customerId}
-                onChange={(val) => setCustomerId(val || '')}
+                onChange={(val) => { setCustomerId(val || ''); setCurrentPage(1); }}
                 placeholder="All Customers"
               />
             </div>
@@ -165,7 +239,7 @@ const SalesReport = () => {
               <label className="flex items-center gap-1 text-[12px] text-black font-bold mb-1"><CreditCard size={12} /> Payment Mode</label>
               <select
                 value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
+                onChange={(e) => { setPaymentMode(e.target.value); setCurrentPage(1); }}
                 className="w-full px-2 py-1.5 border border-[#CBD5E1] rounded outline-none text-[12px] text-black font-bold bg-white focus:border-[#3B82F6]"
               >
                 <option value="">All Payment Modes</option>
@@ -204,8 +278,10 @@ const SalesReport = () => {
                 setToDate('');
                 setCustomerId('');
                 setInvoiceNo('');
+                setBatchCode('');
                 setPaymentMode('');
                 setQuickSearch('');
+                setCurrentPage(1);
               }} className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-[12px] font-bold transition-colors shadow-sm border ${!isReset ? 'bg-white text-red-600 border-red-200 hover:bg-red-50' : 'bg-white text-black border-gray-200 hover:bg-gray-50'}`}>
                 <RotateCcw size={14} /> Reset Filters
               </button>
@@ -246,6 +322,7 @@ const SalesReport = () => {
                   const exportData = filteredSales.map((s: any) => ({
                     'Invoice No': s.invoiceNo,
                     'Date': s.date,
+                    'Batch Code': s.batchCodesText,
                     'Customer Name': s.customerName,
                     'Payment Mode': s.paymentMode,
                     'Total Amount': s.netPayable
@@ -253,13 +330,14 @@ const SalesReport = () => {
                   exportData.push({
                     'Invoice No': '',
                     'Date': '',
+                    'Batch Code': '',
                     'Customer Name': '',
                     'Payment Mode': 'TOTAL:',
                     'Total Amount': formatCurrency(totalSalesAmount)
                   });
                   exportToExcel(exportData, `Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, {
                     shopName: settings?.shopName || 'MY SHOP',
-                    title: 'Sales Report',
+                    title: batchCode ? `Sales Report (Batch: ${batchCode})` : 'Sales Report',
                     totalCount: filteredSales.length
                   });
                 }}
@@ -272,6 +350,7 @@ const SalesReport = () => {
                   const cols: PdfColumn[] = [
                     { header: 'Invoice No', dataKey: 'invoiceNo' },
                     { header: 'Date', dataKey: 'date' },
+                    { header: 'Batch Code', dataKey: 'batchCodesText' },
                     { header: 'Customer Name', dataKey: 'customerName' },
                     { header: 'Payment Mode', dataKey: 'paymentMode' },
                     { header: 'Total Amount', dataKey: 'netPayable' },
@@ -279,11 +358,19 @@ const SalesReport = () => {
                   const pdfData = [...filteredSales, {
                     invoiceNo: '',
                     date: '',
+                    batchCodesText: '',
                     customerName: '',
                     paymentMode: 'TOTAL:',
                     netPayable: formatCurrency(totalSalesAmount)
                   }];
-                  exportTableToPdf(cols, pdfData, `Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Sales Report', settings?.shopName, filteredSales.length);
+                  exportTableToPdf(
+                    cols,
+                    pdfData,
+                    `Sales_Report_${fromDate || 'all'}_to_${toDate || 'all'}`,
+                    batchCode ? `Sales Report (Batch: ${batchCode})` : 'Sales Report',
+                    settings?.shopName,
+                    filteredSales.length
+                  );
                 }}
                 className="shrink-0 bg-[#EF4444] hover:bg-[#DC2626] text-white px-2.5 py-1.5 rounded flex items-center gap-1.5 text-[12px] font-bold transition-colors"
               >
@@ -313,6 +400,11 @@ const SalesReport = () => {
                         <div>
                           <span className="font-black text-[#1E3A8A] text-[13px]">{s.invoiceNo}</span>
                           <span className="text-[11px] text-gray-500 block">{s.date}</span>
+                          {s.batchCodes.length > 0 && (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                              {s.batchCodesText}
+                            </span>
+                          )}
                         </div>
                         <span className="font-black text-[15px] text-[#2563EB]">{s.netPayable}</span>
                       </div>
@@ -371,6 +463,7 @@ const SalesReport = () => {
                     <th className="px-4 py-3 border-r border-[#1E293B] w-12 text-center">S.No</th>
                     <th className="px-4 py-3 border-r border-[#1E293B]">Invoice No</th>
                     <th className="px-4 py-3 border-r border-[#1E293B] text-center">Date</th>
+                    <th className="px-4 py-3 border-r border-[#1E293B] text-center">Batch Code</th>
                     <th className="px-4 py-3 border-r border-[#1E293B]">Customer Name</th>
                     <th className="px-4 py-3 border-r border-[#1E293B] text-center">Payment Mode</th>
                     <th className="px-4 py-3 border-r border-[#1E293B] text-center">Total Amount</th>
@@ -379,9 +472,9 @@ const SalesReport = () => {
                 </thead>
                 <tbody>
                   {isLoading ? (
-                    <TableLoader columns={7} />
+                    <TableLoader columns={8} />
                   ) : filteredSales.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center p-6 text-gray-500">No sales records found.</td></tr>
+                    <tr><td colSpan={8} className="text-center p-6 text-gray-500">No sales records found.</td></tr>
                   ) : (
                     paginatedSales.map((s: any, index: number) => (
                       <React.Fragment key={s.id}>
@@ -389,6 +482,19 @@ const SalesReport = () => {
                           <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-black font-bold">{(currentPage - 1) * entriesPerPage + index + 1}</td>
                           <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-[#3B82F6] cursor-pointer hover:underline">{s.invoiceNo}</td>
                           <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-black font-bold">{s.date}</td>
+                          <td className="px-4 py-3 border-r border-[#E2E8F0] text-center">
+                            {s.batchCodes.length > 0 ? (
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {s.batchCodes.map((code: string) => (
+                                  <span key={code} className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold">
+                                    {code}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 font-bold">-</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 border-r border-[#E2E8F0] font-bold text-black">{s.customerName}</td>
                           <td className="px-4 py-3 border-r border-[#E2E8F0] text-center">
                             <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${s.paymentMode?.toLowerCase() === 'credit'

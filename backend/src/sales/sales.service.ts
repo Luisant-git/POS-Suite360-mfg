@@ -202,7 +202,7 @@ export class SalesService {
     });
   }
 
-  findAll(query?: any) {
+  async findAll(query?: any) {
     const where: any = {};
     if (query?.fromDate || query?.toDate) {
       where.date = {};
@@ -221,6 +221,54 @@ export class SalesService {
     }
     if (query?.paymentModeId) {
       where.paymentModeId = Number(query.paymentModeId);
+    }
+    if (query?.productionBatchCode) {
+      const rawBatchCode = String(query.productionBatchCode).trim();
+      if (rawBatchCode) {
+        const codeMatch = rawBatchCode.match(/^(BCH-\d+)/i);
+        const searchToken = codeMatch ? codeMatch[1].toUpperCase() : rawBatchCode;
+        const candidateProductions = await this.prisma.production.findMany({
+          where: {
+            workName: { contains: searchToken, mode: 'insensitive' },
+          },
+          select: {
+            id: true,
+            workName: true,
+            finishedProductId: true,
+            outcomes: { select: { finishedProductId: true } },
+            outcomeLogs: { select: { finishedProductId: true } },
+          },
+        });
+
+        const matchedProductions = candidateProductions.filter((p) => {
+          const text = String(p.workName || '').trim();
+          const pMatch = text.match(/^(BCH-\d+)/i);
+          if (codeMatch && pMatch) {
+            return pMatch[1].toUpperCase() === searchToken;
+          }
+          return text.toLowerCase().includes(rawBatchCode.toLowerCase());
+        });
+
+        const productIds = new Set<number>();
+        for (const prod of matchedProductions) {
+          if (prod.finishedProductId) productIds.add(prod.finishedProductId);
+          for (const outcome of prod.outcomes || []) {
+            if (outcome.finishedProductId) productIds.add(outcome.finishedProductId);
+          }
+          for (const log of prod.outcomeLogs || []) {
+            if (log.finishedProductId) productIds.add(log.finishedProductId);
+          }
+        }
+
+        if (productIds.size === 0) {
+          return [];
+        }
+        where.items = {
+          some: {
+            productId: { in: Array.from(productIds) },
+          },
+        };
+      }
     }
 
     return this.prisma.sale.findMany({
