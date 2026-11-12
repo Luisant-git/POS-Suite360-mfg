@@ -7,7 +7,11 @@ import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
 import ShortcutHelpButton from '../../components/ShortcutHelp';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
-import { generateNextBatchCode } from '../../utils/productionBatch';
+import {
+  formatRawMaterialLabel,
+  generateNextBatchCode,
+  getRawMaterialBatchOptions,
+} from '../../utils/productionBatch';
 
 const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => void }) => {
   const navigate = useNavigate();
@@ -18,7 +22,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   
   const [items, setItems] = useState<any[]>([
-    { rawMaterialId: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }
+    { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }
   ]);
 
   const { data: rawMaterials = [] } = useQuery({ 
@@ -71,7 +75,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
   const finishedProducts = products;
 
   const addItem = () => {
-    setItems(prev => [...prev, { rawMaterialId: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }]);
+    setItems(prev => [...prev, { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }]);
     setTimeout(() => {
       const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
       if (inputs.length > 0) {
@@ -88,7 +92,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
     setBatchCode(generateNextBatchCode(productions));
     setWorkName('');
     setDate(new Date().toISOString().split('T')[0]);
-    setItems([{ rawMaterialId: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }]);
+    setItems([{ rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }]);
     setTimeout(() => focusProduct(0), 50);
   };
 
@@ -105,15 +109,38 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
         return;
       }
 
-      const sqMPerRoll = material?.rawMaterialPurchaseItems?.[0]?.sqM || 0;
+      const sqMPerRoll = newItems[index].sqMPerRoll || material?.rawMaterialPurchaseItems?.[0]?.sqM || 0;
       newItems[index].sqM = (Number(value) * Number(sqMPerRoll)).toFixed(3);
+    }
+
+    if (field === 'materialBatchCode') {
+      const material = rawMaterials.find((m: any) => m.id === newItems[index].rawMaterialId);
+      const batchOpts = getRawMaterialBatchOptions(material);
+      const matched = batchOpts.find((b) => b.batchCode === String(value).trim());
+      const nextSqMPerRoll = matched?.sqM || newItems[index].sqMPerRoll || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+      newItems[index].materialBatchCode = String(value);
+      if (matched?.materialCode) {
+        newItems[index].materialCode = matched.materialCode;
+      }
+      newItems[index].sqMPerRoll = nextSqMPerRoll;
+      const currentQty = Number(newItems[index].intakeQuantity) || 0;
+      newItems[index].sqM = (currentQty * nextSqMPerRoll).toFixed(3);
+      setItems(newItems);
+      return;
     }
     
     if (field === 'rawMaterialId') {
       const material = rawMaterials.find((m: any) => m.id === Number(value));
-      const sqMPerRoll = material?.rawMaterialPurchaseItems?.[0]?.sqM || 0;
+      const batchOpts = getRawMaterialBatchOptions(material);
+      const defaultOpt = batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
+      const defaultBatch = defaultOpt?.batchCode || material?.batchCode || '';
+      const defaultMatCode = defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
+      const sqMPerRoll = defaultOpt?.sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
       const currentQty = Number(newItems[index].intakeQuantity) || 0;
-      newItems[index].sqM = (currentQty * Number(sqMPerRoll)).toFixed(3);
+      newItems[index].materialCode = defaultMatCode;
+      newItems[index].materialBatchCode = defaultBatch;
+      newItems[index].sqMPerRoll = sqMPerRoll;
+      newItems[index].sqM = (currentQty * sqMPerRoll).toFixed(3);
       newItems[index][field] = value;
       setItems(newItems);
       if (Number(value) > 0) {
@@ -130,25 +157,38 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       if (Number(value) > 0 && !isSameProduct && product && product.rawMaterials && product.rawMaterials.length > 0) {
         // Update current row with the first raw material
         const autoRawMatId = product.rawMaterials[0].rawMaterialId;
-        newItems[index].rawMaterialId = autoRawMatId;
-        
-        // Recalculate sqM
         const material = rawMaterials.find((m: any) => m.id === autoRawMatId);
-        const sqMPerRoll = material?.rawMaterialPurchaseItems?.[0]?.sqM || 0;
+        const batchOpts = getRawMaterialBatchOptions(material);
+        const defaultOpt = batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
+        const defaultBatch = defaultOpt?.batchCode || material?.batchCode || '';
+        const defaultMatCode = defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
+        const sqMPerRoll = defaultOpt?.sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
         const currentQty = Number(newItems[index].intakeQuantity) || 0;
-        newItems[index].sqM = (currentQty * Number(sqMPerRoll)).toFixed(3);
+        newItems[index].rawMaterialId = autoRawMatId;
+        newItems[index].materialCode = defaultMatCode;
+        newItems[index].materialBatchCode = defaultBatch;
+        newItems[index].sqMPerRoll = sqMPerRoll;
+        newItems[index].sqM = (currentQty * sqMPerRoll).toFixed(3);
 
         // If there are multiple raw materials, insert additional rows
         if (product.rawMaterials.length > 1) {
           const additionalItems = product.rawMaterials.slice(1).map((rmMap: any) => {
              const rmId = rmMap.rawMaterialId;
-             const sqM = '0.000';
+             const rmMat = rawMaterials.find((m: any) => m.id === rmId);
+             const rmBatchOpts = getRawMaterialBatchOptions(rmMat);
+             const rmDefaultOpt = rmBatchOpts.find((b) => b.batchCode === (rmMat?.batchCode || '')) || rmBatchOpts[0];
+             const rmBatch = rmDefaultOpt?.batchCode || rmMat?.batchCode || '';
+             const rmMatCode = rmDefaultOpt?.materialCode || rmMat?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
+             const rmSqMPerRoll = rmDefaultOpt?.sqM || Number(rmMat?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
              return {
                rawMaterialId: rmId,
-               sqM,
+               materialCode: rmMatCode,
+               materialBatchCode: rmBatch,
+               sqMPerRoll: rmSqMPerRoll,
+               sqM: '0.000',
                intakeQuantity: '',
                finishedProductId: value,
-               outcomeQuantity: newItems[index].outcomeQuantity || ''
+               outcomeQuantity: ''
              };
           });
           newItems.splice(index + 1, 0, ...additionalItems);
@@ -177,26 +217,47 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
     mutationFn: async () => {
       const finalWorkName = batchCode ? `${batchCode} - ${workName}` : workName;
       const validItems = items.filter(i => i.rawMaterialId > 0 && i.finishedProductId > 0);
-      
-      // Submit multiple production entries concurrently
-      const promises = validItems.map(item => {
-        const payload = {
-          date,
-          workName: finalWorkName,
-          rawMaterialId: parseInt(item.rawMaterialId),
-          intakeQuantity: parseInt(item.intakeQuantity || '0'),
-          finishedProductId: parseInt(item.finishedProductId),
-          outcomeQuantity: parseInt(item.outcomeQuantity || '0')
-        };
-        // The backend doesn't store quality currently, so we just drop it or we can ignore it for now.
-        return api.post('/production', payload);
+
+      const intakes = validItems.map((item) => ({
+        rawMaterialId: parseInt(item.rawMaterialId, 10),
+        materialCode: item.materialCode?.trim() || '',
+        materialBatchCode: item.materialBatchCode?.trim() || '',
+        intakeQuantity: Math.max(0, parseInt(item.intakeQuantity || '0', 10) || 0),
+        sqM: Math.max(0, parseFloat(item.sqM || '0') || 0),
+      }));
+
+      // Aggregate distinct finished products while summing any entered outcome quantities
+      const outcomeMap = new Map<number, number>();
+      validItems.forEach((item) => {
+        const prodId = parseInt(item.finishedProductId, 10);
+        const qty = Math.max(0, parseInt(item.outcomeQuantity || '0', 10) || 0);
+        outcomeMap.set(prodId, (outcomeMap.get(prodId) || 0) + qty);
       });
 
-      return Promise.all(promises);
+      const outcomes = Array.from(outcomeMap.entries()).map(([finishedProductId, outcomeQuantity]) => {
+        const prod = products.find((p: any) => p.id === finishedProductId);
+        const prodSqM = Number(prod?.sqM || 0);
+        return {
+          finishedProductId,
+          outcomeQuantity,
+          sqM: Number((outcomeQuantity * prodSqM).toFixed(4)),
+        };
+      });
+
+      return api.post('/production', {
+        date,
+        workName: finalWorkName,
+        status: 'PENDING',
+        finish: false,
+        intakes,
+        outcomes,
+      });
     },
     onSuccess: () => {
-      toast.success('Production entries saved successfully');
+      toast.success('Production entry saved (Pending)');
       queryClient.invalidateQueries({ queryKey: ['productions'] });
+      queryClient.invalidateQueries({ queryKey: ['rawMaterials'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       handleClear();
     },
     onError: (err: any) => {
@@ -337,7 +398,8 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-10">#</th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Finished Product Name (Outcome)</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Product Sq.M</th>
-                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Material Name (Intake)</th>
+                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Material (Name-Code-Batch)</th>
+                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-40">Material Batch Code</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Current Stock</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Quantity Intake</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-32">RAW SQ.M</th>
@@ -402,9 +464,26 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       onChange={(val) => updateItem(index, 'rawMaterialId', Number(val))}
                       options={[
                         { label: 'Type material...', value: 0 },
-                        ...rawMaterials.map((m: any) => ({ label: `${m.name}`, value: m.id }))
+                        ...rawMaterials.map((m: any) => ({ label: formatRawMaterialLabel(m), value: m.id }))
                       ]}
                     />
+                  </td>
+                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
+                    <input
+                      type="text"
+                      list={`grid-batch-opts-${index}`}
+                      value={item.materialBatchCode || ''}
+                      onChange={e => updateItem(index, 'materialBatchCode', e.target.value)}
+                      placeholder="e.g. L2609250315/4/6"
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[12px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]"
+                    />
+                    <datalist id={`grid-batch-opts-${index}`}>
+                      {getRawMaterialBatchOptions(rawMaterials.find((m: any) => m.id === item.rawMaterialId)).map((b) => (
+                        <option key={`${b.materialCode}-${b.batchCode}`} value={b.batchCode}>
+                          {b.materialCode ? `${b.materialCode} - ` : ''}{b.batchCode} ({b.sqM.toFixed(3)} m²)
+                        </option>
+                      ))}
+                    </datalist>
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
@@ -458,9 +537,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                     <input 
                       type="number" value={item.outcomeQuantity} onChange={e => updateItem(index, 'outcomeQuantity', e.target.value)}
                       placeholder="0" onFocus={e => e.target.select()}
-                      readOnly={true}
-                      tabIndex={-1}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded bg-[#E5E7EB] text-[13px] outline-none text-right font-black text-[#4B5563] cursor-not-allowed" 
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981] text-right font-black text-[#065F46] bg-white" 
                     />
                   </td>
 
@@ -718,9 +795,27 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                     placeholder="Select material..."
                     options={[
                       { label: 'Select material...', value: 0 },
-                      ...rawMaterials.map((m: any) => ({ label: `${m.name}`, value: m.id }))
+                      ...rawMaterials.map((m: any) => ({ label: formatRawMaterialLabel(m), value: m.id }))
                     ]}
                   />
+                  <div className="mt-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Material Batch Code</label>
+                    <input
+                      type="text"
+                      list={`grid-mobile-batch-${index}`}
+                      value={item.materialBatchCode || ''}
+                      onChange={e => updateItem(index, 'materialBatchCode', e.target.value)}
+                      placeholder="e.g. L2609250315/4/6"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-emerald-500"
+                    />
+                    <datalist id={`grid-mobile-batch-${index}`}>
+                      {getRawMaterialBatchOptions(material).map((b) => (
+                        <option key={`${b.materialCode}-${b.batchCode}`} value={b.batchCode}>
+                          {b.materialCode ? `${b.materialCode} - ` : ''}{b.batchCode} ({b.sqM.toFixed(3)} m²)
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
                 </div>
 
                 {/* 3. Quantities Grid */}
@@ -753,9 +848,8 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       type="number"
                       value={item.outcomeQuantity}
                       onChange={e => updateItem(index, 'outcomeQuantity', e.target.value)}
-                      readOnly
                       placeholder="0"
-                      className="w-full px-2 py-1.5 border border-emerald-200 bg-emerald-50/50 rounded-lg text-xs font-bold text-emerald-700 text-right outline-none"
+                      className="w-full px-2 py-1.5 border border-emerald-200 bg-white rounded-lg text-xs font-bold text-emerald-700 text-right outline-none focus:border-emerald-500"
                     />
                   </div>
                 </div>

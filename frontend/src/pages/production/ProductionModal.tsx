@@ -7,7 +7,13 @@ import { useReactToPrint } from 'react-to-print';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
-import { parseBatchWorkName } from '../../utils/productionBatch';
+import {
+  formatRawMaterialLabel,
+  getEffectiveIntakes,
+  getEffectiveOutcomeEntries,
+  isProductionCompleted,
+  parseBatchWorkName,
+} from '../../utils/productionBatch';
 
 interface ProductionModalProps {
   productionId: number;
@@ -51,12 +57,16 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
       doc.text(`Date: ${new Date(production.date).toLocaleDateString()}`, 14, 72);
       
       // Intake Table
+      const intakes = getEffectiveIntakes(production);
+      const outcomeEntries = getEffectiveOutcomeEntries(production);
       doc.setFontSize(12);
       doc.text('Raw Material Intake', 14, 84);
-      const intakeColumns = ["Raw Material", "Quantity Intake"];
-      const intakeRows = [
-        [production.rawMaterial?.name, production.intakeQuantity.toString()]
-      ];
+      const intakeColumns = ["Raw Material (Name-Code-Batch)", "Quantity Intake", "Sq.M"];
+      const intakeRows = intakes.map((i: any) => [
+        formatRawMaterialLabel(i.rawMaterial, i.materialBatchCode, i.materialCode),
+        String(i.intakeQuantity || 0),
+        Number(i.sqM || 0).toFixed(3),
+      ]);
       autoTable(doc, {
         head: [intakeColumns],
         body: intakeRows,
@@ -69,10 +79,12 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
       const finalY = (doc as any).lastAutoTable.finalY + 15;
       doc.setFontSize(12);
       doc.text('Finished Product Outcome', 14, finalY);
-      const outcomeColumns = ["Finished Product", "Quantity Produced"];
-      const outcomeRows = [
-        [production.finishedProduct?.name, production.outcomeQuantity.toString()]
-      ];
+      const outcomeColumns = ["Date", "Finished Product", "Quantity Produced"];
+      const outcomeRows = outcomeEntries.map((o: any) => [
+        new Date(o.date || production.date).toLocaleDateString(),
+        o.finishedProduct?.name || '-',
+        String(o.outcomeQuantity || 0),
+      ]);
       autoTable(doc, {
         head: [outcomeColumns],
         body: outcomeRows,
@@ -142,7 +154,12 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
                 <div>
                   <h1 className="text-lg sm:text-2xl font-black text-gray-800 uppercase tracking-wide">Production Entry</h1>
-                  <p className="text-gray-500 text-xs sm:text-sm font-medium mt-0.5 print:hidden">Status: <span className="text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Completed</span></p>
+                  <p className="text-gray-500 text-xs sm:text-sm font-medium mt-0.5 print:hidden">
+                    Status:{' '}
+                    <span className={`font-bold px-2 py-0.5 rounded ${isProductionCompleted(production) ? 'text-emerald-600 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>
+                      {isProductionCompleted(production) ? 'Completed' : 'Pending'}
+                    </span>
+                  </p>
                 </div>
                 <div className="text-left sm:text-right">
                   <h2 className="text-base sm:text-xl font-bold text-blue-600">{settings?.shopName || 'Suite360'}</h2>
@@ -201,10 +218,14 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      <tr className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-bold text-gray-800">{production.rawMaterial?.name}</td>
-                        <td className="px-4 py-3 text-right font-bold text-amber-600">{production.intakeQuantity}</td>
-                      </tr>
+                      {getEffectiveIntakes(production).map((intake: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 font-bold text-gray-800">
+                            {formatRawMaterialLabel(intake.rawMaterial, intake.materialBatchCode, intake.materialCode)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-amber-600">{intake.intakeQuantity}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -217,15 +238,19 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                   <table className="w-full text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr className="bg-gray-100 text-gray-600 font-bold">
+                        <th className="px-4 py-3 border-b">Date</th>
                         <th className="px-4 py-3 border-b">Finished Product</th>
                         <th className="px-4 py-3 border-b text-right">Quantity Produced</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      <tr className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-bold text-gray-800">{production.finishedProduct?.name}</td>
-                        <td className="px-4 py-3 text-right font-bold text-emerald-600">{production.outcomeQuantity}</td>
-                      </tr>
+                      {getEffectiveOutcomeEntries(production).map((outcome: any, idx: number) => (
+                        <tr key={outcome.key || idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3 text-gray-600">{new Date(outcome.date || production.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 font-bold text-gray-800">{outcome.finishedProduct?.name}</td>
+                          <td className="px-4 py-3 text-right font-bold text-emerald-600">{outcome.outcomeQuantity}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -281,10 +306,12 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="border border-black px-3 py-2">{production.rawMaterial?.name}</td>
-                      <td className="border border-black px-3 py-2 text-right font-bold">{production.intakeQuantity}</td>
-                    </tr>
+                    {getEffectiveIntakes(production).map((intake: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="border border-black px-3 py-2">{formatRawMaterialLabel(intake.rawMaterial, intake.materialBatchCode, intake.materialCode)}</td>
+                        <td className="border border-black px-3 py-2 text-right font-bold">{intake.intakeQuantity}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -294,15 +321,19 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                 <table className="w-full text-left text-sm border-collapse border border-black mb-6">
                   <thead>
                     <tr className="bg-gray-100">
+                      <th className="border border-black px-3 py-2 font-bold w-32">Date</th>
                       <th className="border border-black px-3 py-2 font-bold">Finished Product</th>
-                      <th className="border border-black px-3 py-2 text-right font-bold w-48">Quantity Produced</th>
+                      <th className="border border-black px-3 py-2 text-right font-bold w-40">Quantity Produced</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="border border-black px-3 py-2">{production.finishedProduct?.name}</td>
-                      <td className="border border-black px-3 py-2 text-right font-bold">{production.outcomeQuantity}</td>
-                    </tr>
+                    {getEffectiveOutcomeEntries(production).map((outcome: any, idx: number) => (
+                      <tr key={outcome.key || idx}>
+                        <td className="border border-black px-3 py-2">{new Date(outcome.date || production.date).toLocaleDateString()}</td>
+                        <td className="border border-black px-3 py-2">{outcome.finishedProduct?.name}</td>
+                        <td className="border border-black px-3 py-2 text-right font-bold">{outcome.outcomeQuantity}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

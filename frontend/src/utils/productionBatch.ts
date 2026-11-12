@@ -38,3 +38,156 @@ export const parseBatchWorkName = (rawWorkName?: string | null): { batchCode: st
   return { batchCode: '-', workName: text };
 };
 
+/** Formats a raw material as "MaterialName-MaterialCode-MaterialBatchCode" (e.g. CHROMO-MLJ1019-L2609250315/4/6). */
+export const formatRawMaterialLabel = (
+  material: any,
+  overrideBatchCode?: string | null,
+  overrideMaterialCode?: string | null
+): string => {
+  if (!material) return '-';
+  const effectiveBatch =
+    (overrideBatchCode !== undefined ? overrideBatchCode : null) ||
+    material.rawMaterialPurchaseItems?.[0]?.batchCode ||
+    material.batchCode ||
+    '';
+
+  const matchedPurchaseItem = Array.isArray(material.rawMaterialPurchaseItems) && effectiveBatch
+    ? material.rawMaterialPurchaseItems.find(
+        (pi: any) => String(pi?.batchCode || '').trim() === String(effectiveBatch).trim()
+      )
+    : undefined;
+
+  const effectiveCode =
+    (overrideMaterialCode !== undefined ? overrideMaterialCode : null) ||
+    matchedPurchaseItem?.materialCode ||
+    material.rawMaterialPurchaseItems?.[0]?.materialCode ||
+    material.code ||
+    '';
+
+  const parts = [material.name, effectiveCode, effectiveBatch].map((p) => String(p || '').trim()).filter(Boolean);
+  return parts.join('-') || '-';
+};
+
+/** Extracts distinct material code + batch options (with latest sqM per roll) from purchases. */
+export const getRawMaterialBatchOptions = (
+  material: any
+): { batchCode: string; materialCode: string; sqM: number }[] => {
+  if (!material) return [];
+  const map = new Map<string, { batchCode: string; materialCode: string; sqM: number }>();
+
+  if (Array.isArray(material.rawMaterialPurchaseItems)) {
+    for (const pi of material.rawMaterialPurchaseItems) {
+      const batchCode = String(pi?.batchCode || '').trim();
+      const materialCode = String(pi?.materialCode || '').trim();
+      const sqM = Number(pi?.sqM || 0);
+      const key = `${materialCode}::${batchCode}`;
+      if ((batchCode || materialCode) && !map.has(key)) {
+        map.set(key, { batchCode, materialCode, sqM });
+      }
+    }
+  }
+
+  const masterBatch = String(material.batchCode || '').trim();
+  const masterCode = String(material.code || '').trim();
+  if (masterBatch && !Array.from(map.values()).some((v) => v.batchCode === masterBatch)) {
+    const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+    map.set(`${masterCode}::${masterBatch}`, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
+  }
+
+  return Array.from(map.values());
+};
+
+export const isProductionCompleted = (production: any): boolean => {
+  if (!production) return false;
+  if (production.status) {
+    return production.status === 'COMPLETED';
+  }
+  return Number(production.outcomeQuantity || 0) > 0;
+};
+
+export const getEffectiveIntakes = (production: any): any[] => {
+  if (!production) return [];
+  if (Array.isArray(production.intakes) && production.intakes.length > 0) {
+    return production.intakes;
+  }
+  if (production.rawMaterialId) {
+    return [
+      {
+        rawMaterialId: production.rawMaterialId,
+        rawMaterial: production.rawMaterial,
+        materialCode: production.materialCode || production.rawMaterial?.rawMaterialPurchaseItems?.[0]?.materialCode || '',
+        materialBatchCode: production.materialBatchCode || production.rawMaterial?.batchCode || '',
+        intakeQuantity: Number(production.intakeQuantity || 0),
+        sqM: 0,
+      },
+    ];
+  }
+  return [];
+};
+
+export const getEffectiveOutcomes = (production: any): any[] => {
+  if (!production) return [];
+  if (Array.isArray(production.outcomes) && production.outcomes.length > 0) {
+    return production.outcomes;
+  }
+  if (production.finishedProductId) {
+    return [
+      {
+        finishedProductId: production.finishedProductId,
+        finishedProduct: production.finishedProduct,
+        outcomeQuantity: Number(production.outcomeQuantity || 0),
+        sqM: 0,
+      },
+    ];
+  }
+  return [];
+};
+
+/**
+ * Returns individual display rows for each production's outcomes and logged updates
+ * so multi-product outcomes and multi-day updates appear on separate rows.
+ */
+export const getEffectiveOutcomeEntries = (production: any): any[] => {
+  if (!production) return [];
+  const outcomes = getEffectiveOutcomes(production);
+  const logs = Array.isArray(production.outcomeLogs) ? production.outcomeLogs : [];
+
+  if (logs.length > 0) {
+    const loggedProductIds = new Set(logs.map((l: any) => Number(l.finishedProductId)));
+    const entries = logs.map((l: any) => ({
+      key: `log-${l.id}`,
+      finishedProductId: Number(l.finishedProductId),
+      finishedProduct: l.finishedProduct,
+      outcomeQuantity: Number(l.outcomeQuantity || 0),
+      sqM: Number(l.sqM || 0),
+      date: l.date || production.date,
+      isUpdateLog: true,
+    }));
+
+    outcomes.forEach((o: any, idx: number) => {
+      if (!loggedProductIds.has(Number(o.finishedProductId))) {
+        entries.push({
+          key: `out-pending-${o.id || idx}`,
+          finishedProductId: Number(o.finishedProductId),
+          finishedProduct: o.finishedProduct,
+          outcomeQuantity: Number(o.outcomeQuantity || 0),
+          sqM: Number(o.sqM || 0),
+          date: production.date,
+          isUpdateLog: false,
+        });
+      }
+    });
+
+    return entries;
+  }
+
+  return outcomes.map((o: any, idx: number) => ({
+    key: `out-${o.id || idx}`,
+    finishedProductId: Number(o.finishedProductId),
+    finishedProduct: o.finishedProduct,
+    outcomeQuantity: Number(o.outcomeQuantity || 0),
+    sqM: Number(o.sqM || 0),
+    date: production.date,
+    isUpdateLog: false,
+  }));
+};
