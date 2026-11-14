@@ -1504,7 +1504,7 @@ const Production = () => {
 
           {/* Modal: Update Outcome Quantity for a Single Product */}
           {updatingProductOutcome && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="fixed top-[60px] inset-x-0 bottom-0 z-20 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-emerald-200 animate-in fade-in zoom-in duration-150">
                 <div className="bg-[#047857] text-white px-5 py-3.5 flex justify-between items-center">
                   <div className="flex items-center gap-2">
@@ -1631,7 +1631,7 @@ const Production = () => {
 
           {/* Modal: Confirm Finish for a Single Product */}
           {productToFinish && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="fixed top-[60px] inset-x-0 bottom-0 z-20 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-emerald-200 animate-in fade-in zoom-in duration-150">
                 <div className="bg-emerald-600 text-white px-5 py-3.5 flex justify-between items-center">
                   <div className="flex items-center gap-2">

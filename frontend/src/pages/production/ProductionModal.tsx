@@ -108,8 +108,8 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
   });
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-center items-center p-2 sm:p-6 font-sans">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden relative">
+    <div className="fixed top-[60px] inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm z-20 flex justify-center items-center p-2 sm:p-6 font-sans">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[calc(100vh-100px)] flex flex-col overflow-hidden relative">
         
         {/* Modal Header */}
         <div className="bg-[#0F172A] text-white px-4 sm:px-6 py-3 sm:py-4 shrink-0">
