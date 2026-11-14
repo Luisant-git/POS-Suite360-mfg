@@ -337,8 +337,14 @@ const RawMaterialPurchaseReport = () => {
                   { header: 'Supp. Inv. No', dataKey: 'invoiceNo' },
                   { header: 'Date', dataKey: 'date' },
                   { header: 'Supplier Name', dataKey: 'supplierName' },
-                  { header: 'Material (Name-Code-Batch)', dataKey: 'materialsSummary' },
-                  { header: 'Payment Mode', dataKey: 'paymentModeName' },
+                  { header: 'Material Name', dataKey: 'materialNames' },
+                  { header: 'Material Code', dataKey: 'materialCodes' },
+                  { header: 'Material Batch Code', dataKey: 'materialBatchCodes' },
+                  { header: 'Invoice Value', dataKey: 'invoiceValue' },
+                  { header: 'Tax %', dataKey: 'taxRates' },
+                  { header: 'Tax Amt', dataKey: 'taxAmount' },
+                  { header: 'Transport', dataKey: 'transportCharge' },
+                  { header: 'Wages', dataKey: 'wages' },
                   { header: 'Net Amount', dataKey: 'netAmount' },
                 ];
                 const pdfData = [...filteredPurchases, {
@@ -346,9 +352,15 @@ const RawMaterialPurchaseReport = () => {
                   invoiceNo: '',
                   date: '',
                   supplierName: 'TOTAL:',
-                  materialsSummary: '',
-                  paymentModeName: '',
-                  netAmount: formatCurrency(totalNetAmount),
+                  materialNames: '',
+                  materialCodes: '',
+                  materialBatchCodes: '',
+                  invoiceValue: formatCurrency(totalInvoiceValue),
+                  taxRates: '',
+                  taxAmount: formatCurrency(totalTaxAmount),
+                  transportCharge: '',
+                  wages: '',
+                  netAmount: formatCurrency(totalNetAmount)
                 }];
                 exportTableToPdf(cols, pdfData, `RMPurchase_Report_${fromDate || 'all'}_to_${toDate || 'all'}`, 'Raw Material Purchase Report', settings?.shopName, filteredPurchases.length);
               }}
@@ -391,26 +403,42 @@ const RawMaterialPurchaseReport = () => {
                   </div>
                   {(p.normalizedItems || []).length > 0 ? (
                     <div className="space-y-1 mb-2">
-                      {p.normalizedItems.map((item: any, idx: number) => {
-                        const hasCode = item.materialCode && item.materialCode !== '-';
-                        const hasBatch = item.batchCode && item.batchCode !== '-';
-                        return (
-                          <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2.5 py-1.5 flex flex-wrap items-center justify-between gap-1">
-                            <span className="font-bold text-slate-800">{item.materialName}</span>
-                            {(hasCode || hasBatch) && (
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                {[hasCode ? `Code: ${item.materialCode}` : null, hasBatch ? `Batch: ${item.batchCode}` : null].filter(Boolean).join(' • ')}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {p.normalizedItems.map((item: any, idx: number) => (
+                        <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2 py-1 flex flex-wrap gap-x-2">
+                          <span className="font-bold text-slate-800">{item.materialName}</span>
+                          <span className="text-slate-600">Code: {item.materialCode}</span>
+                          <span className="text-slate-600">Batch: {item.batchCode}</span>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <p className="text-[11px] font-semibold text-slate-700 mb-2 break-words">
                       {p.materialsSummary}
                     </p>
                   )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50 p-2 rounded text-[11px] text-gray-600 mb-2">
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Inv Value</span>
+                      <span className="font-bold text-gray-800">{p.invoiceValue}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Tax %</span>
+                      <span className="font-bold text-gray-800">{p.taxRates}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Tax Amt</span>
+                      <span className="font-bold text-gray-800">{p.taxAmount}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Transport</span>
+                      <span className="font-bold text-gray-800">{p.transportCharge}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px]">Wages</span>
+                      <span className="font-bold text-gray-800">{p.wages}</span>
+                    </div>
+                  </div>
 
                   <div className="flex items-center justify-end pt-1">
                     <button
@@ -426,26 +454,33 @@ const RawMaterialPurchaseReport = () => {
             )}
           </div>
 
-          {/* Desktop Table View - Shows only important columns; fee & item breakdowns inside View Modal */}
+          {/* Desktop Table View */}
           <table className="hidden md:table w-full text-left text-[12px] whitespace-nowrap">
             <thead>
               <tr className="bg-[#0F172A] text-white font-bold">
-                <th className="px-4 py-3 border-r border-[#1E293B] text-center w-12">S.No</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-center">S.No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Entry No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Invoice No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Supplier Name</th>
-                <th className="px-4 py-3 border-r border-[#1E293B]">Material (Name-Code-Batch)</th>
-                <th className="px-4 py-3 border-r border-[#1E293B] text-center">Payment Mode</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Name</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Code</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material Batch Code</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Payment Mode</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-right">Invoice Value</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-center">Tax %</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-right">Tax Amt</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-right">Transport</th>
+                <th className="px-4 py-3 border-r border-[#1E293B] text-right">Wages</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Net Amount</th>
-                <th className="px-4 py-3 border-[#1E293B] text-center w-16">Action</th>
+                <th className="px-4 py-3 border-[#1E293B] text-center">Action</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <TableLoader columns={9} />
+                <TableLoader columns={16} />
               ) : filteredPurchases.length === 0 ? (
-                <tr><td colSpan={9} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
+                <tr><td colSpan={16} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
               ) : (
                 paginatedPurchases.map((p: any, index: number) => (
                   <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
@@ -454,32 +489,44 @@ const RawMaterialPurchaseReport = () => {
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.invoiceNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.date}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-black">{p.supplierName}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0]">
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#1E3A8A]">
                       {(p.normalizedItems || []).length > 0 ? (
-                        <div className="flex flex-col gap-1">
-                          {p.normalizedItems.map((item: any, idx: number) => {
-                            const hasCode = item.materialCode && item.materialCode !== '-';
-                            const hasBatch = item.batchCode && item.batchCode !== '-';
-                            return (
-                              <div key={item.id || idx} className="leading-snug">
-                                <span className="font-bold text-[#1E3A8A] block">{item.materialName}</span>
-                                {(hasCode || hasBatch) && (
-                                  <span className="text-[11px] text-gray-500 font-mono block">
-                                    {[hasCode ? item.materialCode : null, hasBatch ? item.batchCode : null].filter(Boolean).join(' · ')}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
+                        <div className="flex flex-col gap-0.5">
+                          {p.normalizedItems.map((item: any, idx: number) => (
+                            <span key={item.id || idx}>{item.materialName}</span>
+                          ))}
                         </div>
                       ) : '-'}
                     </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center">
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-normal">
+                      {(p.normalizedItems || []).length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {p.normalizedItems.map((item: any, idx: number) => (
+                            <span key={item.id || idx}>{item.materialCode}</span>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-normal">
+                      {(p.normalizedItems || []).length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {p.normalizedItems.map((item: any, idx: number) => (
+                            <span key={item.id || idx}>{item.batchCode}</span>
+                          ))}
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0]">
                       <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
                         {p.paymentModeName}
                       </span>
                     </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-black text-black">{p.netAmount}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.invoiceValue}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center font-semibold text-gray-700">{p.taxRates}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-semibold">{p.taxAmount}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.transportCharge}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.wages}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-black">{p.netAmount}</td>
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => setViewId(p.id)}
@@ -493,15 +540,6 @@ const RawMaterialPurchaseReport = () => {
                 ))
               )}
             </tbody>
-            {filteredPurchases.length > 0 && (
-              <tfoot>
-                <tr className="bg-[#F1F5F9] font-bold text-[12px]">
-                  <td colSpan={7} className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#334155]">Total Net Amount:</td>
-                  <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-black text-blue-700">{formatCurrency(totalNetAmount)}</td>
-                  <td className="px-4 py-3"></td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
         {!isLoading && (
