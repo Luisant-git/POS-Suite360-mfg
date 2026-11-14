@@ -293,9 +293,7 @@ const RawMaterialPurchaseReport = () => {
                   'Supplier Invoice No': p.invoiceNo,
                   'Date': p.date,
                   'Supplier Name': p.supplierName,
-                  'Material Name': p.materialNames,
-                  'Material Code': p.materialCodes,
-                  'Material Batch Code': p.materialBatchCodes,
+                  'Material (Name-Code-Batch)': p.materialsSummary,
                   'Payment Mode': p.paymentModeName,
                   'Invoice Value': p.invoiceValue,
                   'Tax %': p.taxRates,
@@ -309,9 +307,7 @@ const RawMaterialPurchaseReport = () => {
                   'Supplier Invoice No': '',
                   'Date': '',
                   'Supplier Name': 'TOTAL:',
-                  'Material Name': '',
-                  'Material Code': '',
-                  'Material Batch Code': '',
+                  'Material (Name-Code-Batch)': '',
                   'Payment Mode': '',
                   'Invoice Value': formatCurrency(totalInvoiceValue),
                   'Tax %': '',
@@ -337,9 +333,7 @@ const RawMaterialPurchaseReport = () => {
                   { header: 'Supp. Inv. No', dataKey: 'invoiceNo' },
                   { header: 'Date', dataKey: 'date' },
                   { header: 'Supplier Name', dataKey: 'supplierName' },
-                  { header: 'Material Name', dataKey: 'materialNames' },
-                  { header: 'Material Code', dataKey: 'materialCodes' },
-                  { header: 'Material Batch Code', dataKey: 'materialBatchCodes' },
+                  { header: 'Material (Name-Code-Batch)', dataKey: 'materialsSummary' },
                   { header: 'Invoice Value', dataKey: 'invoiceValue' },
                   { header: 'Tax %', dataKey: 'taxRates' },
                   { header: 'Tax Amt', dataKey: 'taxAmount' },
@@ -352,9 +346,7 @@ const RawMaterialPurchaseReport = () => {
                   invoiceNo: '',
                   date: '',
                   supplierName: 'TOTAL:',
-                  materialNames: '',
-                  materialCodes: '',
-                  materialBatchCodes: '',
+                  materialsSummary: '',
                   invoiceValue: formatCurrency(totalInvoiceValue),
                   taxRates: '',
                   taxAmount: formatCurrency(totalTaxAmount),
@@ -404,10 +396,8 @@ const RawMaterialPurchaseReport = () => {
                   {(p.normalizedItems || []).length > 0 ? (
                     <div className="space-y-1 mb-2">
                       {p.normalizedItems.map((item: any, idx: number) => (
-                        <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2 py-1 flex flex-wrap gap-x-2">
-                          <span className="font-bold text-slate-800">{item.materialName}</span>
-                          <span className="text-slate-600">Code: {item.materialCode}</span>
-                          <span className="text-slate-600">Batch: {item.batchCode}</span>
+                        <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2 py-1 font-semibold text-slate-800">
+                          {item.label}
                         </div>
                       ))}
                     </div>
@@ -463,9 +453,7 @@ const RawMaterialPurchaseReport = () => {
                 <th className="px-4 py-3 border-r border-[#1E293B]">Invoice No</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Supplier Name</th>
-                <th className="px-4 py-3 border-r border-[#1E293B]">Material Name</th>
-                <th className="px-4 py-3 border-r border-[#1E293B]">Material Code</th>
-                <th className="px-4 py-3 border-r border-[#1E293B]">Material Batch Code</th>
+                <th className="px-4 py-3 border-r border-[#1E293B]">Material (Name-Code-Batch)</th>
                 <th className="px-4 py-3 border-r border-[#1E293B]">Payment Mode</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-right">Invoice Value</th>
                 <th className="px-4 py-3 border-r border-[#1E293B] text-center">Tax %</th>
@@ -478,9 +466,9 @@ const RawMaterialPurchaseReport = () => {
             </thead>
             <tbody>
               {isLoading ? (
-                <TableLoader columns={16} />
+                <TableLoader columns={14} />
               ) : filteredPurchases.length === 0 ? (
-                <tr><td colSpan={16} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
+                <tr><td colSpan={14} className="text-center p-6 text-gray-500">No purchase records found.</td></tr>
               ) : (
                 paginatedPurchases.map((p: any, index: number) => (
                   <tr key={p.id} className={`border-b border-[#E2E8F0] ${index % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
@@ -493,28 +481,14 @@ const RawMaterialPurchaseReport = () => {
                       {(p.normalizedItems || []).length > 0 ? (
                         <div className="flex flex-col gap-0.5">
                           {p.normalizedItems.map((item: any, idx: number) => (
-                            <span key={item.id || idx}>{item.materialName}</span>
+                            <span key={item.id || idx} className="leading-snug">
+                              {item.label}
+                            </span>
                           ))}
                         </div>
-                      ) : '-'}
-                    </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-normal">
-                      {(p.normalizedItems || []).length > 0 ? (
-                        <div className="flex flex-col gap-0.5">
-                          {p.normalizedItems.map((item: any, idx: number) => (
-                            <span key={item.id || idx}>{item.materialCode}</span>
-                          ))}
-                        </div>
-                      ) : '-'}
-                    </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-black font-normal">
-                      {(p.normalizedItems || []).length > 0 ? (
-                        <div className="flex flex-col gap-0.5">
-                          {p.normalizedItems.map((item: any, idx: number) => (
-                            <span key={item.id || idx}>{item.batchCode}</span>
-                          ))}
-                        </div>
-                      ) : '-'}
+                      ) : (
+                        p.materialsSummary || '-'
+                      )}
                     </td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0]">
                       <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
