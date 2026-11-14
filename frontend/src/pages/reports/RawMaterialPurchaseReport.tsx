@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, FileText, Download, Calendar, FileDigit, Truck, RotateCcw, Plus, Eye, Filter, X } from 'lucide-react';
+import { Search, FileText, Download, Calendar, FileDigit, Truck, RotateCcw, Plus, Eye, Filter, X, Box } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
@@ -20,6 +20,7 @@ const RawMaterialPurchaseReport = () => {
   const [toDate, setToDate] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
+  const [filterRmId, setFilterRmId] = useState('');
   const [quickSearch, setQuickSearch] = useState('');
   const [viewId, setViewId] = useState<number | null>(null);
 
@@ -29,22 +30,29 @@ const RawMaterialPurchaseReport = () => {
     queryFn: async () => (await api.get('/suppliers')).data
   });
 
+  const { data: rawMaterials = [] } = useQuery({
+    queryKey: ['rawMaterials'],
+    queryFn: async () => (await api.get('/raw-materials')).data,
+  });
+
   // Fetch Report Data
   const { data: purchases = [], isLoading, refetch } = useQuery({
-    queryKey: ['rawMaterialPurchaseReport', fromDate, toDate, supplierId, invoiceNo],
+    queryKey: ['rawMaterialPurchaseReport', fromDate, toDate, supplierId, invoiceNo, filterRmId],
     queryFn: async () => {
       const { data } = await api.get(`/raw-material-purchases`, {
         params: {
-          fromDate,
-          toDate,
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
           supplierId: supplierId || undefined,
-          invoiceNo: invoiceNo || undefined,
+          invoiceNo: invoiceNo ? invoiceNo.trim() : undefined,
+          rawMaterialId: filterRmId || undefined,
         }
       });
       return data.map((p: any) => {
         const items = Array.isArray(p.items) ? p.items : [];
         const normalizedItems = items.map((item: any) => ({
           id: item.id,
+          rawMaterialId: item.rawMaterialId,
           materialName: item.rawMaterial?.name || '-',
           materialCode: String(item.materialCode || item.rawMaterial?.code || '').trim() || '-',
           batchCode: String(item.batchCode || item.rawMaterial?.batchCode || '').trim() || '-',
@@ -68,6 +76,7 @@ const RawMaterialPurchaseReport = () => {
           entryNo: `RM-PUR-${p.id.toString().padStart(5, '0')}`,
           invoiceNo: p.invoiceNo || '-',
           date: new Date(p.date).toISOString().split('T')[0],
+          supplierId: p.supplierId || p.supplier?.id,
           supplierName: p.supplier?.name || '-',
           paymentMode: p.paymentMode,
           paymentModeName: p.paymentMode?.name || 'Cash',
@@ -91,6 +100,12 @@ const RawMaterialPurchaseReport = () => {
   });
 
   const filteredPurchases = purchases.filter((p: any) => {
+    if (fromDate && p.date < fromDate) return false;
+    if (toDate && p.date > toDate) return false;
+    if (supplierId && String(p.supplierId) !== String(supplierId)) return false;
+    if (invoiceNo && !p.invoiceNo.toLowerCase().includes(invoiceNo.toLowerCase().trim())) return false;
+    if (filterRmId && !(p.normalizedItems || []).some((item: any) => String(item.rawMaterialId) === String(filterRmId))) return false;
+
     if (!quickSearch) return true;
     const term = quickSearch.toLowerCase();
     return (
@@ -166,7 +181,7 @@ const RawMaterialPurchaseReport = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4 items-end mb-4">
 
           <div>
             <label className="flex items-center gap-1 text-[12px] text-[#64748B] mb-1 font-bold"><Calendar size={12} /> From Date</label>
@@ -220,6 +235,20 @@ const RawMaterialPurchaseReport = () => {
           </div>
 
           <div>
+            <label className="flex items-center gap-1 text-[12px] text-[#3B82F6] mb-1 font-bold"><Box size={12} /> Material (Name-Code-Batch)</label>
+            <select
+              value={filterRmId}
+              onChange={(e) => setFilterRmId(e.target.value)}
+              className="w-full px-3 py-1.5 border border-[#CBD5E1] rounded outline-none text-[13px] text-[#334155] bg-white focus:border-[#3B82F6]"
+            >
+              <option value="">All Materials</option>
+              {rawMaterials.map((rm: any) => (
+                <option key={rm.id} value={rm.id}>{formatRawMaterialLabel(rm)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="flex items-center gap-1 text-[12px] text-[#64748B] mb-1 font-bold">Show</label>
             <select
               value={entriesPerPage}
@@ -253,10 +282,11 @@ const RawMaterialPurchaseReport = () => {
             <button
               type="button"
               onClick={() => {
-                setFromDate(new Date(new Date().setDate(1)).toISOString().split('T')[0]);
-                setToDate(new Date().toISOString().split('T')[0]);
+                setFromDate('');
+                setToDate('');
                 setSupplierId('');
                 setInvoiceNo('');
+                setFilterRmId('');
                 setQuickSearch('');
                 setIsFilterOpen(false);
               }}

@@ -70,8 +70,43 @@ export class RawMaterialPurchasesService {
     });
   }
 
-  findAll() {
+  findAll(query?: {
+    fromDate?: string;
+    toDate?: string;
+    supplierId?: number;
+    invoiceNo?: string;
+    rawMaterialId?: number;
+  }) {
+    const where: any = {};
+
+    if (query?.fromDate || query?.toDate) {
+      where.date = {};
+      if (query.fromDate) {
+        where.date.gte = new Date(`${query.fromDate}T00:00:00.000Z`);
+      }
+      if (query.toDate) {
+        where.date.lte = new Date(`${query.toDate}T23:59:59.999Z`);
+      }
+    }
+
+    if (query?.supplierId) {
+      where.supplierId = query.supplierId;
+    }
+
+    if (query?.invoiceNo && query.invoiceNo.trim()) {
+      where.invoiceNo = { contains: query.invoiceNo.trim(), mode: 'insensitive' };
+    }
+
+    if (query?.rawMaterialId) {
+      where.items = {
+        some: {
+          rawMaterialId: query.rawMaterialId,
+        },
+      };
+    }
+
     return this.prisma.rawMaterialPurchase.findMany({
+      where,
       include: {
         supplier: true,
         paymentMode: true,
