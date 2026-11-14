@@ -54,6 +54,60 @@ const ProductionViewModal = ({
         return sum + Number(o.outcomeQuantity || 0) * prodSqM;
       }, 0);
 
+  // Group outcome entries under distinct finished products so the completed status is shown on the final outcome, not duplicated per log
+  const productOutcomeGroups: Array<{
+    productId: number;
+    productName: string;
+    prodSqM: number;
+    totalQty: number;
+    totalSqM: number;
+    isDone: boolean;
+    entries: any[];
+  }> = [];
+
+  const handledPids = new Set<number>();
+
+  for (const o of outcomes) {
+    const pid = Number(o.finishedProductId || o.finishedProduct?.id);
+    if (!pid || handledPids.has(pid)) continue;
+    handledPids.add(pid);
+    const prodName = o.finishedProduct?.name || 'Finished Product';
+    const prodSqM = Number(o.finishedProduct?.sqM || 0);
+    const entries = outcomeEntries.filter((e: any) => Number(e.finishedProductId || e.finishedProduct?.id) === pid);
+    const totalQty = entries.length > 0
+      ? entries.reduce((s: number, e: any) => s + Number(e.outcomeQuantity || 0), 0)
+      : Number(o.outcomeQuantity || 0);
+    const isDone = o.status === 'COMPLETED' || completed;
+    productOutcomeGroups.push({
+      productId: pid,
+      productName: prodName,
+      prodSqM,
+      totalQty,
+      totalSqM: totalQty * prodSqM,
+      isDone,
+      entries,
+    });
+  }
+
+  for (const e of outcomeEntries) {
+    const pid = Number(e.finishedProductId || e.finishedProduct?.id);
+    if (!pid || handledPids.has(pid)) continue;
+    handledPids.add(pid);
+    const prodName = e.finishedProduct?.name || 'Finished Product';
+    const prodSqM = Number(e.finishedProduct?.sqM || 0);
+    const entries = outcomeEntries.filter((x: any) => Number(x.finishedProductId || x.finishedProduct?.id) === pid);
+    const totalQty = entries.reduce((s: number, x: any) => s + Number(x.outcomeQuantity || 0), 0);
+    productOutcomeGroups.push({
+      productId: pid,
+      productName: prodName,
+      prodSqM,
+      totalQty,
+      totalSqM: totalQty * prodSqM,
+      isDone: completed,
+      entries,
+    });
+  }
+
   const wastageSqM = totalIntakeSqM > 0 ? Math.max(0, totalIntakeSqM - totalOutcomeSqM) : 0;
   const wastagePct = totalIntakeSqM > 0 ? (wastageSqM / totalIntakeSqM) * 100 : 0;
 
@@ -178,47 +232,82 @@ const ProductionViewModal = ({
                   <div className="flex items-center gap-2">
                     <ArrowRight size={14} className="text-emerald-700" />
                     <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                      Product Outcome ({outcomeEntries.length})
+                      Product Outcome ({productOutcomeGroups.length})
                     </span>
                   </div>
                   <span className="text-xs font-bold text-emerald-700">{totalOutcomeSqM.toFixed(3)} m²</span>
                 </div>
                 <div className="divide-y divide-gray-100 flex-1">
-                  {outcomeEntries.map((entry: any, idx: number) => (
-                    <div key={entry.key || idx} className="p-3.5 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            #{idx + 1}
-                          </span>
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                              entry.isFinished
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-amber-100 text-amber-800 border border-amber-300'
-                            }`}
-                          >
-                            {entry.isFinished ? 'Completed' : 'Pending'}
-                          </span>
-                          <p className="text-xs font-bold text-gray-900 break-words">{entry.finishedProduct?.name || '-'}</p>
+                  {productOutcomeGroups.map((group: any, idx: number) => (
+                    <div key={group.productId || idx} className="p-3.5 space-y-2.5">
+                      {/* Product Summary Header with Final Status */}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              #{idx + 1}
+                            </span>
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                group.isDone
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-amber-100 text-amber-800 border border-amber-300'
+                              }`}
+                            >
+                              {group.isDone ? 'Completed' : 'Pending'}
+                            </span>
+                            <p className="text-xs font-black text-gray-900 break-words">{group.productName}</p>
+                          </div>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            Prod Sq.M: {group.prodSqM.toFixed(3)} · Total Sq.M: {group.totalSqM.toFixed(3)} m²
+                          </p>
                         </div>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          {formatDateTime(entry.date || production.date)} · Product Sq.M: {Number(entry.finishedProduct?.sqM || 0).toFixed(3)}
-                        </p>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] font-bold text-gray-400 uppercase">Total Qty</p>
+                          <p className="text-base font-black text-emerald-600">{group.totalQty}</p>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Qty</p>
-                        <p className={`text-base font-black ${Number(entry.outcomeQuantity || 0) < 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {entry.outcomeQuantity}
-                        </p>
-                      </div>
+
+                      {/* Update Logs / Timeline (Audit trail without redundant Completed badges) */}
+                      {group.entries.length > 1 ? (
+                        <div className="bg-emerald-50/40 rounded-lg p-2.5 border border-emerald-100/80 space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] font-bold text-emerald-900 uppercase tracking-wide">
+                            <span>Update History ({group.entries.length} entries)</span>
+                            <span className="text-emerald-700">Audit Trail</span>
+                          </div>
+                          <div className="space-y-1">
+                            {group.entries.map((entry: any, eIdx: number) => (
+                              <div
+                                key={entry.key || eIdx}
+                                className="flex items-center justify-between text-xs py-1 px-2 rounded bg-white border border-emerald-100 text-gray-700"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-gray-400">#{eIdx + 1}</span>
+                                  <span className="text-[11px] text-gray-600">
+                                    {formatDateTime(entry.date || production.date)}
+                                  </span>
+                                </div>
+                                <span className="font-extrabold text-emerald-700">
+                                  +{entry.outcomeQuantity} units
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        group.entries.length === 1 && (
+                          <p className="text-[10px] text-gray-400 italic">
+                            Logged at {formatDateTime(group.entries[0]?.date || production.date)}
+                          </p>
+                        )
+                      )}
                     </div>
                   ))}
                 </div>
-                {outcomeEntries.length > 1 && (
+                {totalOutcomeQty > 0 && (
                   <div className="bg-emerald-50/60 border-t border-emerald-100 px-4 py-2 flex items-center justify-between text-xs font-bold text-emerald-900">
-                    <span>Total Outcome Qty</span>
-                    <span className="text-sm font-black text-emerald-700">{totalOutcomeQty}</span>
+                    <span>Total Batch Outcome</span>
+                    <span className="text-sm font-black text-emerald-700">{totalOutcomeQty} units</span>
                   </div>
                 )}
               </div>

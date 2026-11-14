@@ -1370,15 +1370,21 @@ const Production = () => {
                               {entryQty}
                             </td>
                             <td data-label="Status" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center whitespace-nowrap">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  isEntryDone
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
-                                }`}
-                              >
-                                {isEntryDone ? 'Completed' : 'Pending'}
-                              </span>
+                              {isPrimaryRow ? (
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    isEntryDone
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  }`}
+                                >
+                                  {isEntryDone ? 'Completed' : 'Pending'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-medium text-gray-400 italic">
+                                  Update
+                                </span>
+                              )}
                             </td>
                             <td data-label="Actions" className="px-2.5 py-2.5 text-center whitespace-nowrap">
                               <div className="flex justify-center items-center gap-1.5">

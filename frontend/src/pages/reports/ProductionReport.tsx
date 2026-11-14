@@ -246,7 +246,7 @@ const ProductionReport = () => {
         completedDate: p.completedDate,
         batchCode: p.batchCode,
         displayWorkName: p.displayWorkName,
-        statusLabel: isEntryDone ? 'Completed' : 'Pending',
+        statusLabel: isPrimaryRow ? (isEntryDone ? 'Completed' : 'Pending') : '-',
         completed: isEntryDone,
         rawMaterial: p.rawMaterial,
         intakeQuantityDisplay: isPrimaryRow ? String(p.intakeQuantity) : '-',
