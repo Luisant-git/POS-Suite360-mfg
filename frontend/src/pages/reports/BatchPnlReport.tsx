@@ -8,7 +8,7 @@ import { exportToExcel } from '../../utils/exportExcel';
 import { exportTableToPdf, type PdfColumn } from '../../utils/exportPdf';
 import Select from 'react-select';
 import TableLoader from '../../components/TableLoader';
-import { getEffectiveOutcomes } from '../../utils/productionBatch';
+import { formatDateTime, getEffectiveOutcomes } from '../../utils/productionBatch';
 
 const BatchPnlReport = () => {
   const { formatCurrency, settings } = useSettings();
@@ -33,7 +33,13 @@ const BatchPnlReport = () => {
   // Filter products based on selected batch
   const batchProductions = productions.filter((p: any) => p.workName === workName);
   const batchProductIds = Array.from(
-    new Set(batchProductions.flatMap((p: any) => getEffectiveOutcomes(p).map((o: any) => o.finishedProductId)))
+    new Set(
+      batchProductions.flatMap((p: any) => [
+        ...(p.finishedProductId ? [p.finishedProductId] : []),
+        ...getEffectiveOutcomes(p).map((o: any) => o.finishedProductId),
+        ...(Array.isArray(p.outcomeLogs) ? p.outcomeLogs.map((l: any) => l.finishedProductId) : []),
+      ]).filter(Boolean)
+    )
   );
   const availableProducts = workName
     ? products.filter((p: any) => batchProductIds.includes(p.id))
@@ -397,7 +403,7 @@ const BatchPnlReport = () => {
               <thead>
                 <tr className="bg-[#0F172A] text-white font-bold">
                   <th className="px-4 py-3 border-r border-[#1E293B] text-center w-14">S.No</th>
-                  <th className="px-4 py-3 border-r border-[#1E293B]">Date</th>
+                  <th className="px-4 py-3 border-r border-[#1E293B]">Date & Time</th>
                   <th className="px-4 py-3 border-r border-[#1E293B]">Finished Product</th>
                   <th className="px-4 py-3 border-r border-[#1E293B] text-right">Outcome Sq.M</th>
                   <th className="px-4 py-3 border-r border-[#1E293B] text-right">Produced Qty</th>
@@ -407,7 +413,7 @@ const BatchPnlReport = () => {
                 {reportData.outcomeEntries.map((entry: any, idx: number) => (
                   <tr key={idx} className={`border-b border-[#E2E8F0] ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]'} hover:bg-[#EFF6FF]`}>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-center text-[#64748B]">{idx + 1}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-[#475569]">{new Date(entry.date).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-[#475569]">{formatDateTime(entry.date)}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#334155]">{entry.productName}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-[#475569]">{Number(entry.sqM || 0).toFixed(3)}</td>
                     <td className={`px-4 py-3 border-r border-[#E2E8F0] text-right font-bold ${Number(entry.quantity || 0) < 0 ? 'text-amber-600' : 'text-[#1A63A8]'}`}>{entry.quantity}</td>

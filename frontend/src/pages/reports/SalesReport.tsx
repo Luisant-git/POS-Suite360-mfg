@@ -65,8 +65,11 @@ const SalesReport = () => {
       }
 
       const outcomes = getEffectiveOutcomes(prod);
-      for (const outcome of outcomes) {
-        const pid = Number(outcome?.finishedProductId);
+      const pids = new Set([
+        ...outcomes.map((o: any) => Number(o?.finishedProductId)),
+        ...(Array.isArray(prod.outcomeLogs) ? prod.outcomeLogs.map((l: any) => Number(l?.finishedProductId)) : []),
+      ]);
+      for (const pid of pids) {
         if (!pid) continue;
         const list = prodToBatch.get(pid) || [];
         if (!list.includes(parsed.batchCode)) {

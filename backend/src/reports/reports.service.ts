@@ -102,6 +102,7 @@ export class ReportsService {
       whereClause.OR = [
         { finishedProductId: Number(productId) },
         { outcomes: { some: { finishedProductId: Number(productId) } } },
+        { outcomeLogs: { some: { finishedProductId: Number(productId) } } },
       ];
     }
 

@@ -13,6 +13,7 @@ import Select from 'react-select';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import TableLoader from '../../components/TableLoader';
 import {
+  formatDateTime,
   formatRawMaterialLabel,
   getEffectiveIntakes,
   getEffectiveOutcomeEntries,
@@ -63,6 +64,13 @@ const ProductionReport = () => {
           .join(', ') || '-';
         const totalIn = intakes.reduce((s: number, i: any) => s + Number(i.intakeQuantity || 0), 0);
         const totalOut = outcomes.reduce((s: number, o: any) => s + Number(o.outcomeQuantity || 0), 0);
+        const finishedProductIds = Array.from(
+          new Set([
+            ...(p.finishedProductId ? [String(p.finishedProductId)] : []),
+            ...outcomes.map((o: any) => (o.finishedProductId ? String(o.finishedProductId) : '')).filter(Boolean),
+            ...outcomeEntries.map((e: any) => (e.finishedProductId || e.finishedProduct?.id ? String(e.finishedProductId || e.finishedProduct?.id) : '')).filter(Boolean),
+          ])
+        );
         return {
           id: p.id,
           date: new Date(p.date).toISOString().split('T')[0],
@@ -83,7 +91,7 @@ const ProductionReport = () => {
           intakeQuantity: totalIn,
           finishedProduct: finishedProductLabel,
           finishedProductId: p.finishedProductId,
-          finishedProductIds: outcomes.map((o: any) => String(o.finishedProductId)),
+          finishedProductIds,
           outcomeQuantity: totalOut,
         };
       });
@@ -211,26 +219,35 @@ const ProductionReport = () => {
   });
 
   const reportRows = filteredProductions.flatMap((p: any, prodIdx: number) => {
-    const entries = Array.isArray(p.outcomeEntries) && p.outcomeEntries.length > 0
+    const rawEntries = Array.isArray(p.outcomeEntries) && p.outcomeEntries.length > 0
       ? p.outcomeEntries
       : [{ key: `fallback-${p.id}`, finishedProduct: { name: p.finishedProduct }, outcomeQuantity: p.outcomeQuantity, date: p.date }];
+
+    // Filter rows to only the selected product when filterProductId is active
+    const entries = filterProductId
+      ? rawEntries.filter((entry: any) => String(entry.finishedProductId || entry.finishedProduct?.id) === String(filterProductId))
+      : rawEntries;
+
     const { displayWastage, wastagePercentage } = computeRowWastage(p);
     const wastageDisplay = displayWastage !== '-' && wastagePercentage !== '-' ? `${displayWastage} (${wastagePercentage})` : '-';
 
     return entries.map((entry: any, entryIdx: number) => {
       const isPrimaryRow = entryIdx === 0;
       const entryDate = new Date(entry.date || p.date).toISOString().split('T')[0];
+      const entryDateTime = formatDateTime(entry.date || p.date);
+      const isEntryDone = entry.isFinished || entry.status === 'COMPLETED' || p.completed;
       return {
         rowKey: `${p.id}-${entry.key || entryIdx}`,
         id: p.id,
         sNo: isPrimaryRow ? String(prodIdx + 1) : `${prodIdx + 1}.${entryIdx + 1}`,
         isPrimaryRow,
         date: entryDate,
+        dateTimeDisplay: entryDateTime,
         completedDate: p.completedDate,
         batchCode: p.batchCode,
         displayWorkName: p.displayWorkName,
-        statusLabel: p.statusLabel,
-        completed: p.completed,
+        statusLabel: isEntryDone ? 'Completed' : 'Pending',
+        completed: isEntryDone,
         rawMaterial: p.rawMaterial,
         intakeQuantityDisplay: isPrimaryRow ? String(p.intakeQuantity) : '-',
         intakeQuantityNum: isPrimaryRow ? Number(p.intakeQuantity || 0) : 0,
@@ -594,7 +611,7 @@ const ProductionReport = () => {
                             </span>
                           </div>
                           <span className="text-[11px] text-gray-500 block mt-0.5">
-                            {r.date}{r.completedDate !== '-' ? ` • Completed: ${r.completedDate}` : ''}
+                            {r.dateTimeDisplay}{r.completedDate !== '-' ? ` • Completed: ${r.completedDate}` : ''}
                           </span>
                         </div>
                         {r.isPrimaryRow && (
@@ -636,7 +653,7 @@ const ProductionReport = () => {
               <thead className="sticky top-0 z-10">
                 <tr className="bg-[#0F172A] text-white font-bold">
                   <th className="px-3.5 py-3 border-r border-[#1E293B] text-center">S.No</th>
-                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Date</th>
+                  <th className="px-3.5 py-3 border-r border-[#1E293B]">Date & Time</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B]">Batch Code</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B]">Work Name</th>
                   <th className="px-3.5 py-3 border-r border-[#1E293B] text-center">Status</th>
@@ -662,7 +679,7 @@ const ProductionReport = () => {
                       } hover:bg-[#EFF6FF]`}
                     >
                       <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-center text-[#64748B] font-bold">{r.sNo}</td>
-                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[#475569]">{r.date}</td>
+                      <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[#475569]">{r.dateTimeDisplay}</td>
                       <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-[11px] font-bold text-black">{r.batchCode}</td>
                       <td className="px-3.5 py-3 border-r border-[#E2E8F0] font-bold text-[#1E293B]">{r.displayWorkName}</td>
                       <td className="px-3.5 py-3 border-r border-[#E2E8F0] text-center">
