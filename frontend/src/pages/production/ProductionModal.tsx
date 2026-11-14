@@ -8,6 +8,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import toast from 'react-hot-toast';
 import {
+  formatDateTime,
   formatRawMaterialLabel,
   getEffectiveIntakes,
   getEffectiveOutcomeEntries,
@@ -238,7 +239,7 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                   <table className="w-full text-left text-[13px] whitespace-nowrap">
                     <thead>
                       <tr className="bg-gray-100 text-gray-600 font-bold">
-                        <th className="px-4 py-3 border-b">Date</th>
+                        <th className="px-4 py-3 border-b">Date & Time</th>
                         <th className="px-4 py-3 border-b">Finished Product</th>
                         <th className="px-4 py-3 border-b text-right">Quantity Produced</th>
                       </tr>
@@ -246,7 +247,7 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {getEffectiveOutcomeEntries(production).map((outcome: any, idx: number) => (
                         <tr key={outcome.key || idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-gray-600">{new Date(outcome.date || production.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-gray-600">{formatDateTime(outcome.date || production.date)}</td>
                           <td className="px-4 py-3 font-bold text-gray-800">{outcome.finishedProduct?.name}</td>
                           <td className="px-4 py-3 text-right font-bold text-emerald-600">{outcome.outcomeQuantity}</td>
                         </tr>
@@ -321,7 +322,7 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                 <table className="w-full text-left text-sm border-collapse border border-black mb-6">
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border border-black px-3 py-2 font-bold w-32">Date</th>
+                      <th className="border border-black px-3 py-2 font-bold w-40">Date & Time</th>
                       <th className="border border-black px-3 py-2 font-bold">Finished Product</th>
                       <th className="border border-black px-3 py-2 text-right font-bold w-40">Quantity Produced</th>
                     </tr>
@@ -329,7 +330,7 @@ const ProductionModal = ({ productionId, onClose }: ProductionModalProps) => {
                   <tbody>
                     {getEffectiveOutcomeEntries(production).map((outcome: any, idx: number) => (
                       <tr key={outcome.key || idx}>
-                        <td className="border border-black px-3 py-2">{new Date(outcome.date || production.date).toLocaleDateString()}</td>
+                        <td className="border border-black px-3 py-2">{formatDateTime(outcome.date || production.date)}</td>
                         <td className="border border-black px-3 py-2">{outcome.finishedProduct?.name}</td>
                         <td className="border border-black px-3 py-2 text-right font-bold">{outcome.outcomeQuantity}</td>
                       </tr>

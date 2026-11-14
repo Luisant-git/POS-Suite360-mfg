@@ -1,5 +1,6 @@
 import { X, Box, Calendar, Package, Tag, ArrowRight, Hash, CheckCircle, Flag, AlertTriangle } from 'lucide-react';
 import {
+  formatDateTime,
   formatRawMaterialLabel,
   getEffectiveIntakes,
   getEffectiveOutcomeEntries,
@@ -190,10 +191,19 @@ const ProductionViewModal = ({
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
                             #{idx + 1}
                           </span>
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              entry.isFinished
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-amber-100 text-amber-800 border border-amber-300'
+                            }`}
+                          >
+                            {entry.isFinished ? 'Completed' : 'Pending'}
+                          </span>
                           <p className="text-xs font-bold text-gray-900 break-words">{entry.finishedProduct?.name || '-'}</p>
                         </div>
                         <p className="text-[11px] text-gray-500 mt-0.5">
-                          {new Date(entry.date || production.date).toLocaleDateString('en-GB')} · Product Sq.M: {Number(entry.finishedProduct?.sqM || 0).toFixed(3)}
+                          {formatDateTime(entry.date || production.date)} · Product Sq.M: {Number(entry.finishedProduct?.sqM || 0).toFixed(3)}
                         </p>
                       </div>
                       <div className="text-right shrink-0">

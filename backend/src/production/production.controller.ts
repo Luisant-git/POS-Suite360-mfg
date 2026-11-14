@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, Patch, Delete } from '@nestjs/common';
 import { ProductionService } from './production.service';
-import { CreateProductionDto } from './dto/create-production.dto';
+import { CreateProductionDto, ProductOutcomeUpdateDto } from './dto/create-production.dto';
 
 @Controller('production')
 export class ProductionController {
@@ -29,6 +29,22 @@ export class ProductionController {
   @Patch(':id/finish')
   finish(@Param('id') id: string, @Body() updateData?: Partial<CreateProductionDto>) {
     return this.productionService.finish(+id, updateData);
+  }
+
+  @Patch(':id/outcome-update')
+  updateProductOutcome(
+    @Param('id') id: string,
+    @Body() body: ProductOutcomeUpdateDto,
+  ) {
+    return this.productionService.updateProductOutcome(+id, body);
+  }
+
+  @Patch(':id/outcome-finish/:finishedProductId')
+  finishProductOutcome(
+    @Param('id') id: string,
+    @Param('finishedProductId') finishedProductId: string,
+  ) {
+    return this.productionService.finishProductOutcome(+id, +finishedProductId);
   }
 
   @Delete(':id')

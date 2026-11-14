@@ -708,6 +708,8 @@ model ProductionOutcome {
   finishedProduct   Product    @relation(fields: [finishedProductId], references: [id])
   outcomeQuantity   Int        @default(0)
   sqM               Decimal    @default(0)
+  status            String     @default("PENDING") // PENDING | COMPLETED
+  completedAt       DateTime?
 }
 
 model ProductionOutcomeLog {

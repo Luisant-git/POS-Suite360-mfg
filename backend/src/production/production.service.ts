@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateProductionDto } from './dto/create-production.dto';
+import { CreateProductionDto, ProductOutcomeUpdateDto } from './dto/create-production.dto';
 
 const PRODUCTION_INCLUDE = {
   rawMaterial: {
@@ -77,6 +77,8 @@ export class ProductionService {
           finishedProductId: Number(o.finishedProductId),
           outcomeQuantity: Math.max(0, Number(o.outcomeQuantity) || 0),
           sqM: Math.max(0, Number(o.sqM) || 0),
+          status: o.finish || o.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+          completedAt: o.finish || o.status === 'COMPLETED' ? new Date() : null,
         }));
     }
     if (dto.finishedProductId && Number(dto.finishedProductId) > 0) {
@@ -85,6 +87,8 @@ export class ProductionService {
           finishedProductId: Number(dto.finishedProductId),
           outcomeQuantity: Math.max(0, Number(dto.outcomeQuantity) || 0),
           sqM: 0,
+          status: dto.finish || dto.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
+          completedAt: dto.finish || dto.status === 'COMPLETED' ? new Date() : null,
         },
       ];
     }
@@ -299,11 +303,13 @@ export class ProductionService {
         newIntakes = this.normalizeIntakes(updateData);
       }
 
-      let newOutcomes: { finishedProductId: number; outcomeQuantity: number; sqM: number }[] =
+      let newOutcomes: { finishedProductId: number; outcomeQuantity: number; sqM: number; status: string; completedAt: Date | null }[] =
         oldOutcomes.map((o: any) => ({
           finishedProductId: Number(o.finishedProductId),
           outcomeQuantity: Number(o.outcomeQuantity || 0),
           sqM: Number(o.sqM || 0),
+          status: o.status || 'PENDING',
+          completedAt: o.completedAt ? new Date(o.completedAt) : null,
         }));
 
       if (hasNewOutcomes) {
@@ -313,11 +319,14 @@ export class ProductionService {
           updateData.outcomeQuantity !== undefined &&
           oldOutcomes.length === 1
         ) {
+          const isDone = updateData.finish || updateData.status === 'COMPLETED';
           newOutcomes = [
             {
               finishedProductId: Number(oldOutcomes[0].finishedProductId),
               outcomeQuantity: Math.max(0, Number(updateData.outcomeQuantity) || 0),
               sqM: Number(oldOutcomes[0].sqM || 0),
+              status: isDone ? 'COMPLETED' : (oldOutcomes[0].status || 'PENDING'),
+              completedAt: isDone ? new Date() : (oldOutcomes[0].completedAt ? new Date(oldOutcomes[0].completedAt) : null),
             },
           ];
         } else {
@@ -327,7 +336,8 @@ export class ProductionService {
 
       const nextWorkName = updateData.workName ?? oldProduction.workName;
       const nextDate = updateData.date ? new Date(updateData.date) : oldProduction.date;
-      const shouldFinish = updateData.finish === true || updateData.status === 'COMPLETED';
+      const allOutcomesFinished = newOutcomes.length > 0 && newOutcomes.every((o) => o.status === 'COMPLETED');
+      const shouldFinish = updateData.finish === true || updateData.status === 'COMPLETED' || allOutcomesFinished;
 
       await this.applyStockDeltas(
         tx,
@@ -419,6 +429,132 @@ export class ProductionService {
   async finish(id: number, updateData?: Partial<CreateProductionDto>) {
     const payload = { ...(updateData || {}), finish: true, status: 'COMPLETED' };
     return this.update(id, payload);
+  }
+
+  async updateProductOutcome(id: number, dto: ProductOutcomeUpdateDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const production = await tx.production.findUnique({
+        where: { id },
+        include: PRODUCTION_INCLUDE,
+      });
+
+      if (!production) {
+        throw new NotFoundException('Production entry not found');
+      }
+
+      if (production.status === 'COMPLETED') {
+        throw new BadRequestException('Completed production batch cannot be updated');
+      }
+
+      const outcomes = this.getEffectiveOutcomes(production);
+      const outcomeRow = outcomes.find(
+        (o: any) => Number(o.finishedProductId) === Number(dto.finishedProductId),
+      );
+
+      if (!outcomeRow) {
+        throw new BadRequestException('This product is not part of the production batch');
+      }
+
+      if (outcomeRow.status === 'COMPLETED') {
+        throw new BadRequestException('This product is already marked Completed');
+      }
+
+      const addedQty = Math.max(0, Number(dto.outcomeQuantity) || 0);
+      const shouldFinish = dto.finish === true;
+
+      if (addedQty <= 0 && !shouldFinish) {
+        throw new BadRequestException('Please enter an outcome quantity greater than 0 or mark the product as finished');
+      }
+
+      const product = await tx.product.findUnique({
+        where: { id: dto.finishedProductId },
+      });
+      if (!product) {
+        throw new NotFoundException('Finished product not found');
+      }
+
+      const productSqM = Number(product.sqM || 0);
+      const oldQty = Number(outcomeRow.outcomeQuantity || 0);
+      const newQty = oldQty + addedQty;
+      const newSqM = Number((newQty * productSqM).toFixed(4));
+      const logSqM = Number((addedQty * productSqM).toFixed(4));
+      const logDate = dto.date ? new Date(dto.date) : new Date();
+
+      // 1. Update ProductionOutcome record
+      await tx.productionOutcome.updateMany({
+        where: {
+          productionId: id,
+          finishedProductId: dto.finishedProductId,
+        },
+        data: {
+          outcomeQuantity: newQty,
+          sqM: newSqM,
+          status: shouldFinish ? 'COMPLETED' : 'PENDING',
+          completedAt: shouldFinish ? new Date() : null,
+        },
+      });
+
+      // 2. If addedQty > 0, create outcome log and increment product stock
+      if (addedQty > 0) {
+        await tx.productionOutcomeLog.create({
+          data: {
+            productionId: id,
+            finishedProductId: dto.finishedProductId,
+            outcomeQuantity: addedQty,
+            sqM: logSqM,
+            date: logDate,
+          },
+        });
+
+        const updatedProduct = await tx.product.update({
+          where: { id: dto.finishedProductId },
+          data: { currentStock: { increment: addedQty } },
+        });
+
+        await tx.stockTransaction.create({
+          data: {
+            productId: dto.finishedProductId,
+            type: 'ADJUSTMENT',
+            quantityIn: addedQty,
+            quantityOut: 0,
+            balance: updatedProduct.currentStock,
+            reference: `Production Outcome Update - ${production.workName}`,
+            date: logDate,
+          },
+        });
+      }
+
+      // 3. Check overall batch completion
+      const allOutcomes = await tx.productionOutcome.findMany({
+        where: { productionId: id },
+      });
+      const allCompleted =
+        allOutcomes.length > 0 && allOutcomes.every((o) => o.status === 'COMPLETED');
+      const totalBatchOutcome = allOutcomes.reduce(
+        (sum, o) => sum + Number(o.outcomeQuantity || 0),
+        0,
+      );
+
+      const updatedBatch = await tx.production.update({
+        where: { id },
+        data: {
+          outcomeQuantity: totalBatchOutcome,
+          status: allCompleted ? 'COMPLETED' : 'PENDING',
+          completedAt: allCompleted ? new Date() : null,
+        },
+        include: PRODUCTION_INCLUDE,
+      });
+
+      return updatedBatch;
+    });
+  }
+
+  async finishProductOutcome(id: number, finishedProductId: number) {
+    return this.updateProductOutcome(id, {
+      finishedProductId,
+      outcomeQuantity: 0,
+      finish: true,
+    });
   }
 
   async remove(id: number) {

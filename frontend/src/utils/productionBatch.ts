@@ -143,6 +143,20 @@ export const getEffectiveOutcomes = (production: any): any[] => {
   return [];
 };
 
+export const formatDateTime = (val?: string | Date | null): string => {
+  if (!val) return '-';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 /**
  * Returns individual display rows for each production's outcomes and logged updates
  * so multi-product outcomes and multi-day updates appear on separate rows.
@@ -151,29 +165,46 @@ export const getEffectiveOutcomeEntries = (production: any): any[] => {
   if (!production) return [];
   const outcomes = getEffectiveOutcomes(production);
   const logs = Array.isArray(production.outcomeLogs) ? production.outcomeLogs : [];
+  const outcomeByPid = new Map<number, any>();
+  outcomes.forEach((o: any) => {
+    outcomeByPid.set(Number(o.finishedProductId), o);
+  });
 
   if (logs.length > 0) {
     const loggedProductIds = new Set(logs.map((l: any) => Number(l.finishedProductId)));
-    const entries = logs.map((l: any) => ({
-      key: `log-${l.id}`,
-      finishedProductId: Number(l.finishedProductId),
-      finishedProduct: l.finishedProduct,
-      outcomeQuantity: Number(l.outcomeQuantity || 0),
-      sqM: Number(l.sqM || 0),
-      date: l.date || production.date,
-      isUpdateLog: true,
-    }));
+    const entries = logs.map((l: any) => {
+      const pid = Number(l.finishedProductId);
+      const parentOutcome = outcomeByPid.get(pid);
+      const status = parentOutcome?.status || production.status || 'PENDING';
+      return {
+        key: `log-${l.id}`,
+        finishedProductId: pid,
+        finishedProduct: l.finishedProduct,
+        outcomeQuantity: Number(l.outcomeQuantity || 0),
+        sqM: Number(l.sqM || 0),
+        date: l.date || l.createdAt || production.date,
+        isUpdateLog: true,
+        status,
+        isFinished: status === 'COMPLETED',
+        completedAt: parentOutcome?.completedAt || null,
+      };
+    });
 
     outcomes.forEach((o: any, idx: number) => {
-      if (!loggedProductIds.has(Number(o.finishedProductId))) {
+      const pid = Number(o.finishedProductId);
+      if (!loggedProductIds.has(pid)) {
+        const status = o.status || production.status || 'PENDING';
         entries.push({
           key: `out-pending-${o.id || idx}`,
-          finishedProductId: Number(o.finishedProductId),
+          finishedProductId: pid,
           finishedProduct: o.finishedProduct,
           outcomeQuantity: Number(o.outcomeQuantity || 0),
           sqM: Number(o.sqM || 0),
           date: production.date,
           isUpdateLog: false,
+          status,
+          isFinished: status === 'COMPLETED',
+          completedAt: o.completedAt || null,
         });
       }
     });
@@ -181,13 +212,19 @@ export const getEffectiveOutcomeEntries = (production: any): any[] => {
     return entries;
   }
 
-  return outcomes.map((o: any, idx: number) => ({
-    key: `out-${o.id || idx}`,
-    finishedProductId: Number(o.finishedProductId),
-    finishedProduct: o.finishedProduct,
-    outcomeQuantity: Number(o.outcomeQuantity || 0),
-    sqM: Number(o.sqM || 0),
-    date: production.date,
-    isUpdateLog: false,
-  }));
+  return outcomes.map((o: any, idx: number) => {
+    const status = o.status || production.status || 'PENDING';
+    return {
+      key: `out-${o.id || idx}`,
+      finishedProductId: Number(o.finishedProductId),
+      finishedProduct: o.finishedProduct,
+      outcomeQuantity: Number(o.outcomeQuantity || 0),
+      sqM: Number(o.sqM || 0),
+      date: production.date,
+      isUpdateLog: false,
+      status,
+      isFinished: status === 'COMPLETED',
+      completedAt: o.completedAt || null,
+    };
+  });
 };

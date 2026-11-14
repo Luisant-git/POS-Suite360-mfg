@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit, Trash2, CheckCircle, Box, Grid, Maximize, Minimize, Search, PlusCircle, RotateCcw, Eye, X, Flag } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, Box, Grid, Maximize, Minimize, Search, PlusCircle, RotateCcw, Eye, X, Flag, Layers, Calendar } from 'lucide-react';
 import DeleteConfirmationModal from '../../components/DeleteConfirmationModal';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
@@ -10,6 +10,7 @@ import ProductionViewModal from '../../components/ProductionViewModal';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
 import { useNavigate } from 'react-router-dom';
 import {
+  formatDateTime,
   formatRawMaterialLabel,
   generateNextBatchCode,
   getEffectiveIntakes,
@@ -33,6 +34,8 @@ interface OutcomeRow {
   finishedProductId: number;
   previousQuantity: number;
   outcomeQuantity: string;
+  status?: string;
+  completedAt?: string | null;
 }
 
 const createEmptyIntake = (): IntakeRow => ({
@@ -76,6 +79,28 @@ const Production = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullTable, setIsFullTable] = useState(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+
+  const [updatingProductOutcome, setUpdatingProductOutcome] = useState<{
+    productionId: number;
+    batchCode: string;
+    workName: string;
+    finishedProductId: number;
+    finishedProduct: any;
+    previousQuantity: number;
+    isFinished: boolean;
+  } | null>(null);
+  const [outcomeUpdateQty, setOutcomeUpdateQty] = useState('');
+  const [outcomeUpdateDateTime, setOutcomeUpdateDateTime] = useState('');
+  const [outcomeUpdateFinish, setOutcomeUpdateFinish] = useState(false);
+
+  const [productToFinish, setProductToFinish] = useState<{
+    productionId: number;
+    batchCode: string;
+    workName: string;
+    finishedProductId: number;
+    finishedProduct: any;
+    outcomeQuantity: number;
+  } | null>(null);
 
   const { data: rawMaterials = [] } = useQuery({
     queryKey: ['rawMaterials'],
@@ -340,6 +365,103 @@ const Production = () => {
     },
   });
 
+  const productOutcomeMutation = useMutation({
+    mutationFn: async (payload: {
+      productionId: number;
+      finishedProductId: number;
+      outcomeQuantity: number;
+      finish: boolean;
+      date: string;
+    }) => {
+      const { data } = await api.patch(
+        `/production/${payload.productionId}/outcome-update`,
+        {
+          finishedProductId: payload.finishedProductId,
+          outcomeQuantity: payload.outcomeQuantity,
+          finish: payload.finish,
+          date: payload.date,
+        },
+      );
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['productions'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(
+        variables.finish
+          ? 'Product outcome updated and marked Completed!'
+          : 'Product outcome updated successfully!',
+      );
+      setUpdatingProductOutcome(null);
+      setOutcomeUpdateQty('');
+      setOutcomeUpdateFinish(false);
+    },
+    onError: (err: any) => {
+      console.error(err);
+      toast.error(err?.response?.data?.message || 'Failed to update product outcome');
+    },
+  });
+
+  const finishSingleProductMutation = useMutation({
+    mutationFn: async (payload: { productionId: number; finishedProductId: number }) => {
+      const { data } = await api.patch(
+        `/production/${payload.productionId}/outcome-finish/${payload.finishedProductId}`,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['productions'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Product marked as Completed!');
+      setProductToFinish(null);
+    },
+    onError: (err: any) => {
+      console.error(err);
+      toast.error(err?.response?.data?.message || 'Failed to finish product');
+    },
+  });
+
+  const handleOpenProductOutcomeUpdate = (production: any, entry: any) => {
+    const { batchCode: bCode, workName: wName } = parseBatchWorkName(production.workName);
+    const outcomesList = getEffectiveOutcomes(production);
+    const parentOutcome = outcomesList.find(
+      (o: any) => Number(o.finishedProductId) === Number(entry.finishedProductId),
+    );
+    const prevQty = Number(parentOutcome?.outcomeQuantity || 0);
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const localDateTimeStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    setUpdatingProductOutcome({
+      productionId: production.id,
+      batchCode: bCode,
+      workName: wName,
+      finishedProductId: Number(entry.finishedProductId),
+      finishedProduct: entry.finishedProduct,
+      previousQuantity: prevQty,
+      isFinished: parentOutcome?.status === 'COMPLETED' || entry.isFinished,
+    });
+    setOutcomeUpdateQty('');
+    setOutcomeUpdateDateTime(localDateTimeStr);
+    setOutcomeUpdateFinish(false);
+  };
+
+  const handleSaveProductOutcomeUpdate = () => {
+    if (!updatingProductOutcome) return;
+    const addedQty = Math.max(0, parseInt(outcomeUpdateQty || '0', 10) || 0);
+    if (addedQty <= 0 && !outcomeUpdateFinish) {
+      toast.error('Please enter an outcome quantity greater than 0, or mark as Completed');
+      return;
+    }
+    productOutcomeMutation.mutate({
+      productionId: updatingProductOutcome.productionId,
+      finishedProductId: updatingProductOutcome.finishedProductId,
+      outcomeQuantity: addedQty,
+      finish: outcomeUpdateFinish,
+      date: outcomeUpdateDateTime ? new Date(outcomeUpdateDateTime).toISOString() : new Date().toISOString(),
+    });
+  };
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/production/${id}`),
     onSuccess: () => {
@@ -495,6 +617,8 @@ const Production = () => {
       finishedProductId: Number(o.finishedProductId),
       previousQuantity: Number(o.outcomeQuantity || 0),
       outcomeQuantity: '',
+      status: o.status || 'PENDING',
+      completedAt: o.completedAt || null,
     }));
 
     setOriginalIntakeMap(origMap);
@@ -681,17 +805,20 @@ const Production = () => {
 
                     {outcomes.map((outRow, idx) => {
                       const prod = products.find((p: any) => p.id === outRow.finishedProductId);
-                      const prodSqM = Number(prod?.sqM || 0);
-                      const combinedQty = getCombinedOutcomeQty(outRow);
-                      const rowOutSqM = (combinedQty * prodSqM).toFixed(3);
                       return (
                         <div key={idx} className="bg-white p-2.5 rounded border border-emerald-200/80 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[10px] font-bold text-emerald-800 uppercase">Product #{idx + 1}</span>
-                              {editingId && outRow.previousQuantity > 0 && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                  Produced: {outRow.previousQuantity} → New Total: {combinedQty}
+                              {editingId && (
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                    outRow.status === 'COMPLETED'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                  }`}
+                                >
+                                  {outRow.status === 'COMPLETED' ? 'Completed' : 'Pending'}
                                 </span>
                               )}
                             </div>
@@ -716,29 +843,15 @@ const Production = () => {
                               ]}
                             />
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Prod Sq.M</label>
                               <input
                                 type="text"
                                 readOnly
                                 tabIndex={-1}
-                                value={prod?.sqM || '0.000'}
+                                value={prod?.sqM ? Number(prod.sqM).toFixed(3) : '0.000'}
                                 className="w-full px-2 py-1 border border-[#ccc] rounded bg-gray-100 text-[12px] outline-none text-right font-bold text-gray-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-emerald-800 mb-0.5">
-                                {editingId && outRow.previousQuantity > 0 ? 'Add Outcome Qty' : 'Outcome Qty'}
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                value={outRow.outcomeQuantity}
-                                onChange={(e) => updateOutcome(idx, 'outcomeQuantity', e.target.value)}
-                                placeholder="0"
-                                onFocus={(e) => e.target.select()}
-                                className="w-full px-2 py-1 border border-emerald-400 rounded bg-white text-[13px] outline-none text-right font-extrabold text-emerald-900 focus:border-emerald-600"
                               />
                             </div>
                             <div>
@@ -747,11 +860,17 @@ const Production = () => {
                                 type="text"
                                 readOnly
                                 tabIndex={-1}
-                                value={rowOutSqM}
+                                value={(Number(outRow.previousQuantity || 0) * Number(prod?.sqM || 0)).toFixed(3)}
                                 className="w-full px-2 py-1 border border-[#E5E7EB] rounded bg-emerald-50 text-[12px] outline-none text-right font-bold text-emerald-700"
                               />
                             </div>
                           </div>
+                          {editingId && (
+                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-emerald-100">
+                              <span className="font-bold text-gray-600">Produced so far:</span>
+                              <span className="font-extrabold text-emerald-900">{outRow.previousQuantity || 0} units</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -877,74 +996,39 @@ const Production = () => {
                     })}
                   </div>
 
-                  {/* Total Outcome Quantity */}
-                  <div className="mt-2 border-t-[3px] border-emerald-500 bg-emerald-50 p-3 rounded-lg shadow-sm">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <label className="block text-[11px] font-black text-emerald-900 uppercase tracking-wide">
-                        Total Outcome Quantity *
-                      </label>
-                      {outcomes.length === 1 && editingId && outcomes[0]?.previousQuantity > 0 && (
-                        <span className="text-[10px] font-extrabold text-emerald-700 shrink-0">
-                          Prev: {outcomes[0].previousQuantity} → Total: {getCombinedOutcomeQty(outcomes[0])}
+                  {/* Product Outcomes Summary (Shown only when viewing/editing existing batch) */}
+                  {editingId && (
+                    <div className="mt-2 border-t-[3px] border-emerald-500 bg-emerald-50 p-3 rounded-lg shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-black text-emerald-900 uppercase tracking-wide">
+                          Product Outcomes Summary
+                        </label>
+                        <span className="text-[10px] font-extrabold text-emerald-800">
+                          Total Produced: {totalOutcomeQty}
                         </span>
-                      )}
-                      {outcomes.length > 1 && editingId && (
-                        <span className="text-[10px] font-extrabold text-emerald-800 shrink-0">
-                          Total: {totalOutcomeQty}
-                        </span>
-                      )}
-                    </div>
-
-                    {outcomes.length === 1 ? (
-                      <input
-                        type="number"
-                        min="0"
-                        value={outcomes[0]?.outcomeQuantity || ''}
-                        onChange={(e) => updateOutcome(0, 'outcomeQuantity', e.target.value)}
-                        placeholder="0"
-                        onFocus={(e) => e.target.select()}
-                        readOnly={!editingId}
-                        className={`w-full px-3 py-2 border-2 rounded-md text-[18px] outline-none text-right font-black shadow-inner transition-all ${
-                          !editingId
-                            ? 'border-[#E5E7EB] bg-gray-100 text-gray-400 cursor-not-allowed'
-                            : 'border-emerald-500 bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/30 text-emerald-900'
-                        }`}
-                      />
-                    ) : (
-                      <div className="space-y-2 mt-1.5">
+                      </div>
+                      <div className="space-y-1.5">
                         {outcomes.map((outRow, idx) => {
                           const prod = products.find((p: any) => p.id === outRow.finishedProductId);
-                          const combinedQty = getCombinedOutcomeQty(outRow);
+                          const isDone = outRow.status === 'COMPLETED';
                           return (
-                            <div key={idx} className="space-y-1">
-                              <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-emerald-900">
-                                <span className="truncate">{prod?.name || `Product #${idx + 1}`}</span>
-                                {editingId && outRow.previousQuantity > 0 && (
-                                  <span className="text-[10px] font-extrabold text-emerald-700 shrink-0">
-                                    Prev: {outRow.previousQuantity} → Total: {combinedQty}
-                                  </span>
-                                )}
+                            <div key={idx} className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded border border-emerald-200 text-xs">
+                              <span className="font-bold text-gray-800 truncate">{prod?.name || `Product #${idx + 1}`}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-extrabold text-emerald-800">{outRow.previousQuantity || 0} units</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isDone ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                                  {isDone ? 'Completed' : 'Pending'}
+                                </span>
                               </div>
-                              <input
-                                type="number"
-                                min="0"
-                                value={outRow.outcomeQuantity}
-                                onChange={(e) => updateOutcome(idx, 'outcomeQuantity', e.target.value)}
-                                placeholder="0"
-                                onFocus={(e) => e.target.select()}
-                                readOnly={!editingId}
-                                className={`w-full px-3 py-2 border-2 rounded-md text-[18px] outline-none text-right font-black shadow-inner transition-all ${
-                                  !editingId
-                                    ? 'border-[#E5E7EB] bg-gray-100 text-gray-400 cursor-not-allowed'
-                                    : 'border-emerald-500 bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/30 text-emerald-900'
-                                }`}
-                              />
                             </div>
                           );
                         })}
                       </div>
-                    )}
-                  </div>
+                      <p className="text-[10px] text-gray-500 italic leading-snug">
+                        Tip: Update or finish each product individually in the table using the <strong>+ Update</strong> and <strong>Finish</strong> buttons.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Action Buttons: Save (Green), Update (Keep Pending), Finish Production */}
                   <div className="flex flex-col gap-2 mt-4 shrink-0">
@@ -1091,7 +1175,7 @@ const Production = () => {
                             {rowBatchCode !== '-' && <span className="text-gray-400">·</span>}
                             <p className="font-extrabold text-black text-sm leading-snug">{rowWorkName}</p>
                           </div>
-                          <p className="text-[11px] text-gray-500 mt-0.5">{new Date(production.date).toLocaleDateString()}</p>
+                          <p className="text-[11px] text-gray-500 mt-0.5">{formatDateTime(production.date)}</p>
                         </div>
                         <span
                           className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
@@ -1116,17 +1200,59 @@ const Production = () => {
                           <span className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
                             Outcome Entries ({outcomeEntries.length}) — Total Qty: {totalOut}
                           </span>
-                          <div className="space-y-1">
-                            {outcomeEntries.map((entry: any) => (
-                              <div key={entry.key} className="flex items-center justify-between gap-2 bg-white px-2 py-1 rounded border border-gray-100">
-                                <span className="font-bold text-gray-800 truncate">
-                                  {entry.finishedProduct?.name || '-'}
-                                </span>
-                                <span className="text-[11px] text-gray-500 shrink-0">
-                                  {new Date(entry.date || production.date).toLocaleDateString()} · <strong className="text-emerald-600">{entry.outcomeQuantity}</strong>
-                                </span>
-                              </div>
-                            ))}
+                          <div className="space-y-1.5">
+                            {outcomeEntries.map((entry: any) => {
+                              const isEntryDone = entry.isFinished || completed;
+                              return (
+                                <div key={entry.key} className="flex flex-col gap-1 bg-white p-2 rounded border border-gray-200">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-bold text-gray-900 text-xs truncate">
+                                      {entry.finishedProduct?.name || '-'}
+                                    </span>
+                                    <span
+                                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                        isEntryDone
+                                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      }`}
+                                    >
+                                      {isEntryDone ? 'Completed' : 'Pending'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px] text-gray-500">
+                                    <span>{formatDateTime(entry.date || production.date)}</span>
+                                    <span className="font-black text-emerald-700">Qty: {entry.outcomeQuantity}</span>
+                                  </div>
+                                  {!isEntryDone && (
+                                    <div className="flex justify-end gap-1.5 pt-1 border-t border-gray-100">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenProductOutcomeUpdate(production, entry)}
+                                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1"
+                                      >
+                                        <PlusCircle size={11} /> + Update
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setProductToFinish({
+                                            productionId: production.id,
+                                            batchCode: rowBatchCode,
+                                            workName: rowWorkName,
+                                            finishedProductId: Number(entry.finishedProductId),
+                                            finishedProduct: entry.finishedProduct,
+                                            outcomeQuantity: Number(entry.outcomeQuantity || 0),
+                                          });
+                                        }}
+                                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-100 text-emerald-800 border border-gray-300 flex items-center gap-1"
+                                      >
+                                        <Flag size={11} /> Finish
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -1146,17 +1272,7 @@ const Production = () => {
                               onClick={() => handleEdit(production)}
                               className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50/50"
                             >
-                              <Edit size={13} /> Update
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setConfirmFinishFromForm(false);
-                                setProductionToFinish(production);
-                              }}
-                              className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-800 font-bold px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50/60"
-                            >
-                              <Flag size={13} /> Finish
+                              <Edit size={13} /> Edit Batch
                             </button>
                             <button
                               type="button"
@@ -1180,24 +1296,25 @@ const Production = () => {
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-[#2A2A2A] text-white font-bold whitespace-nowrap">
                     <th className="px-2.5 py-2.5 border-r border-[#444] text-center w-9">#</th>
-                    <th className="px-2.5 py-2.5 border-r border-[#444] text-center">Date</th>
+                    <th className="px-2.5 py-2.5 border-r border-[#444] text-center">Date & Time</th>
                     <th className="px-2.5 py-2.5 border-r border-[#444]">Batch Code</th>
                     <th className="px-2.5 py-2.5 border-r border-[#444]">Work Name</th>
                     <th className="px-2.5 py-2.5 border-r border-[#444]">Material (Name-Code-Batch)</th>
                     <th className="px-2.5 py-2.5 border-r border-[#444] text-center">Intake Qty</th>
                     <th className="px-2.5 py-2.5 border-r border-[#444]">Product (Outcome)</th>
                     <th className="px-2.5 py-2.5 border-r border-[#444] text-center">Outcome Qty</th>
-                    <th className="px-2.5 py-2.5 text-center w-28">Actions</th>
+                    <th className="px-2.5 py-2.5 border-r border-[#444] text-center">Status</th>
+                    <th className="px-2.5 py-2.5 text-center w-36">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading ? (
                     <tr>
-                      <td colSpan={9} className="text-center p-4">Loading...</td>
+                      <td colSpan={10} className="text-center p-4">Loading...</td>
                     </tr>
                   ) : filteredProductions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center p-4">No production entries found.</td>
+                      <td colSpan={10} className="text-center p-4">No production entries found.</td>
                     </tr>
                   ) : (
                     filteredProductions.flatMap((production: any, index: number) => {
@@ -1215,6 +1332,7 @@ const Production = () => {
                       return outcomeEntries.map((entry: any, entryIdx: number) => {
                         const isPrimaryRow = entryIdx === 0;
                         const entryQty = Number(entry.outcomeQuantity || 0);
+                        const isEntryDone = entry.isFinished || completed;
 
                         return (
                           <tr
@@ -1230,8 +1348,8 @@ const Production = () => {
                             <td data-label="#" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-gray-700 whitespace-nowrap">
                               {isPrimaryRow ? index + 1 : `${index + 1}.${entryIdx + 1}`}
                             </td>
-                            <td data-label="Date" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center font-medium text-gray-600 whitespace-nowrap">
-                              {new Date(entry.date || production.date).toLocaleDateString()}
+                            <td data-label="Date & Time" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center font-medium text-gray-600 whitespace-nowrap">
+                              {formatDateTime(entry.date || production.date)}
                             </td>
                             <td data-label="Batch Code" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-[11px] font-bold text-black whitespace-nowrap">
                               {rowBatchCode}
@@ -1251,8 +1369,19 @@ const Production = () => {
                             <td data-label="Outcome Qty" className={`px-2.5 py-2.5 border-r border-[#E5E7EB] text-center font-bold whitespace-nowrap ${entryQty < 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                               {entryQty}
                             </td>
+                            <td data-label="Status" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center whitespace-nowrap">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  isEntryDone
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}
+                              >
+                                {isEntryDone ? 'Completed' : 'Pending'}
+                              </span>
+                            </td>
                             <td data-label="Actions" className="px-2.5 py-2.5 text-center whitespace-nowrap">
-                              <div className="flex justify-center gap-1.5">
+                              <div className="flex justify-center items-center gap-1.5">
                                 <button
                                   type="button"
                                   onClick={() => handleView(production)}
@@ -1261,39 +1390,53 @@ const Production = () => {
                                 >
                                   <Eye size={12} />
                                 </button>
-                                {!completed && (
+                                {!isEntryDone && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenProductOutcomeUpdate(production, entry)}
+                                      className="text-emerald-700 border border-emerald-300 bg-emerald-50 hover:bg-emerald-600 hover:text-white rounded p-1 transition-colors flex items-center gap-0.5"
+                                      title="Update Outcome Quantity for this product"
+                                    >
+                                      <PlusCircle size={12} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setProductToFinish({
+                                          productionId: production.id,
+                                          batchCode: rowBatchCode,
+                                          workName: rowWorkName,
+                                          finishedProductId: Number(entry.finishedProductId),
+                                          finishedProduct: entry.finishedProduct,
+                                          outcomeQuantity: entryQty,
+                                        });
+                                      }}
+                                      className="text-[#16A34A] border border-[#16A34A] rounded p-1 hover:bg-[#16A34A] hover:text-white transition-colors"
+                                      title="Finish this Product (Mark Completed)"
+                                    >
+                                      <Flag size={12} />
+                                    </button>
+                                  </>
+                                )}
+                                {isPrimaryRow && !completed && (
                                   <>
                                     <button
                                       type="button"
                                       onClick={() => handleEdit(production)}
                                       className="text-[#3B82F6] border border-[#3B82F6] rounded p-1 hover:bg-[#3B82F6] hover:text-white transition-colors"
-                                      title="Update Pending Entry"
+                                      title="Edit Batch Entry"
                                     >
                                       <Edit size={12} />
                                     </button>
-                                    {isPrimaryRow && (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setConfirmFinishFromForm(false);
-                                            setProductionToFinish(production);
-                                          }}
-                                          className="text-[#16A34A] border border-[#16A34A] rounded p-1 hover:bg-[#16A34A] hover:text-white transition-colors"
-                                          title="Finish Production"
-                                        >
-                                          <Flag size={12} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setItemToDelete(production)}
-                                          className="text-[#EF4444] border border-[#EF4444] rounded p-1 hover:bg-[#EF4444] hover:text-white transition-colors"
-                                          title="Delete Pending Entry"
-                                        >
-                                          <Trash2 size={12} />
-                                        </button>
-                                      </>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => setItemToDelete(production)}
+                                      className="text-[#EF4444] border border-[#EF4444] rounded p-1 hover:bg-[#EF4444] hover:text-white transition-colors"
+                                      title="Delete Pending Entry"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
                                   </>
                                 )}
                               </div>
@@ -1358,6 +1501,193 @@ const Production = () => {
             onConfirm={() => navigate('/dashboard')}
             onClose={() => setShowLeaveModal(false)}
           />
+
+          {/* Modal: Update Outcome Quantity for a Single Product */}
+          {updatingProductOutcome && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-emerald-200 animate-in fade-in zoom-in duration-150">
+                <div className="bg-[#047857] text-white px-5 py-3.5 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Layers size={18} />
+                    <div>
+                      <h3 className="font-bold text-sm tracking-wide">UPDATE PRODUCT OUTCOME</h3>
+                      <p className="text-[11px] text-emerald-100">
+                        Batch: {updatingProductOutcome.batchCode} · {updatingProductOutcome.workName}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setUpdatingProductOutcome(null)}
+                    className="text-white hover:bg-white/20 p-1.5 rounded-full transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-3">
+                    <div className="flex justify-between items-start gap-2">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-800 block">Product</span>
+                        <h4 className="text-sm font-black text-emerald-950">
+                          {updatingProductOutcome.finishedProduct?.name}
+                        </h4>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          updatingProductOutcome.isFinished
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}
+                      >
+                        {updatingProductOutcome.isFinished ? 'Completed' : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-emerald-200/60 text-xs">
+                      <div>
+                        <span className="text-[10px] text-gray-500 font-bold block">Produced so far:</span>
+                        <span className="font-black text-gray-800">
+                          {updatingProductOutcome.previousQuantity} units
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-gray-500 font-bold block">Unit Area:</span>
+                        <span className="font-bold text-gray-700">
+                          {Number(updatingProductOutcome.finishedProduct?.sqM || 0).toFixed(3)} m²
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-1 text-[11px] font-bold text-gray-700 mb-1">
+                      <Calendar size={13} className="text-emerald-700" /> Date & Time of this Update Run *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={outcomeUpdateDateTime}
+                      onChange={(e) => setOutcomeUpdateDateTime(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded text-xs font-bold text-gray-800 outline-none focus:border-emerald-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center justify-between text-[11px] font-bold text-emerald-900 mb-1">
+                      <span>Add Outcome Quantity (+) *</span>
+                      <span className="text-[10px] font-extrabold text-emerald-700">
+                        New Total: {updatingProductOutcome.previousQuantity + (parseInt(outcomeUpdateQty || '0', 10) || 0)} units
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      autoFocus
+                      value={outcomeUpdateQty}
+                      onChange={(e) => setOutcomeUpdateQty(e.target.value)}
+                      placeholder="Enter quantity produced..."
+                      onFocus={(e) => e.target.select()}
+                      className="w-full px-3 py-2 border-2 border-emerald-500 rounded-lg text-lg font-black text-emerald-900 text-right outline-none focus:ring-4 focus:ring-emerald-500/20"
+                    />
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={outcomeUpdateFinish}
+                        onChange={(e) => setOutcomeUpdateFinish(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-gray-900 block">Mark this product as Finished (Completed)</span>
+                        <span className="text-[11px] text-gray-500 leading-tight block">
+                          Locks this product from further updates. The overall batch will finish when all products are completed.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUpdatingProductOutcome(null)}
+                    className="px-3 py-1.5 rounded text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={productOutcomeMutation.isPending}
+                    onClick={handleSaveProductOutcomeUpdate}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {productOutcomeMutation.isPending ? 'Saving...' : 'Save Product Update'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Confirm Finish for a Single Product */}
+          {productToFinish && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-emerald-200 animate-in fade-in zoom-in duration-150">
+                <div className="bg-emerald-600 text-white px-5 py-3.5 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Flag size={18} />
+                    <h3 className="font-bold text-sm tracking-wide">FINISH PRODUCT PRODUCTION</h3>
+                  </div>
+                  <button
+                    onClick={() => setProductToFinish(null)}
+                    className="text-white hover:bg-white/20 p-1 rounded-full transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="p-5 space-y-3">
+                  <p className="text-xs text-gray-700">
+                    Mark <strong>{productToFinish.finishedProduct?.name}</strong> as completed for batch <strong>{productToFinish.batchCode}</strong>?
+                  </p>
+                  <div className="bg-emerald-50 p-3 rounded border border-emerald-200 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total Outcome:</span>
+                      <span className="font-black text-emerald-800">{productToFinish.outcomeQuantity} units</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Batch:</span>
+                      <span className="font-bold text-gray-800">{productToFinish.workName}</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">
+                    This product will be locked as Completed. Other unfinished products in this batch will remain pending.
+                  </p>
+                </div>
+                <div className="bg-gray-50 px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setProductToFinish(null)}
+                    className="px-3 py-1.5 rounded text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={finishSingleProductMutation.isPending}
+                    onClick={() => {
+                      finishSingleProductMutation.mutate({
+                        productionId: productToFinish.productionId,
+                        finishedProductId: productToFinish.finishedProductId,
+                      });
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-50"
+                  >
+                    {finishSingleProductMutation.isPending ? 'Finishing...' : 'Confirm Finish'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

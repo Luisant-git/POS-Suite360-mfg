@@ -46,6 +46,31 @@ export class ProductionOutcomeDto {
   @IsOptional()
   @Min(0)
   sqM?: number;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  finish?: boolean;
+}
+
+export class ProductOutcomeUpdateDto {
+  @IsInt()
+  finishedProductId: number;
+
+  @IsInt()
+  @Min(0)
+  outcomeQuantity: number;
+
+  @IsBoolean()
+  @IsOptional()
+  finish?: boolean;
+
+  @IsDateString()
+  @IsOptional()
+  date?: string;
 }
 
 export class CreateProductionDto {
