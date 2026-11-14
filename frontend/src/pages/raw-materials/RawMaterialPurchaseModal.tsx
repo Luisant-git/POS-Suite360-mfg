@@ -164,8 +164,12 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                     <FileText size={16} />
                   </div>
                   <div>
-                    <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Invoice Number</p>
-                    <p className="font-bold text-[13px] sm:text-base text-gray-800">{purchase.invoiceNo}</p>
+                    <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">Entry No / Invoice No</p>
+                    <p className="font-bold text-[13px] sm:text-base text-gray-800 flex items-center gap-2">
+                      <span className="font-black text-slate-900">RM-PUR-{String(purchase.id).padStart(5, '0')}</span>
+                      <span className="text-gray-400 font-normal">|</span>
+                      <span className="text-blue-600 font-bold">{purchase.invoiceNo}</span>
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -291,7 +295,7 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
             <div className="bg-slate-50 border border-gray-200 rounded-xl p-5 flex justify-end">
               <div className="w-full sm:w-1/2 space-y-3">
                 <div className="flex justify-between items-center text-gray-600">
-                  <span className="font-medium">Subtotal</span>
+                  <span className="font-medium">Invoice Value (Subtotal)</span>
                   <span className="font-bold">{formatCurrency(purchase.subtotal)}</span>
                 </div>
                 <div className="flex justify-between items-center text-gray-600">
@@ -308,7 +312,7 @@ const RawMaterialPurchaseModal = ({ purchaseId, onClose }: RawMaterialPurchaseMo
                   </div>
                 <div className="h-px bg-gray-200 my-2"></div>
                 <div className="flex justify-between items-center">
-                  <span className="font-black text-gray-800 text-lg">Grand Total</span>
+                  <span className="font-black text-gray-800 text-lg">Net Amount (Total)</span>
                   <span className="font-black text-emerald-600 text-xl">{formatCurrency(purchase.grandTotal)}</span>
                 </div>
               </div>
