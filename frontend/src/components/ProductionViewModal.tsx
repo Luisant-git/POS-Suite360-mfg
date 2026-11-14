@@ -195,122 +195,148 @@ const ProductionViewModal = ({
             </div>
           </div>
 
-          <div className="mt-6 relative">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-              {/* Intake */}
-              <div className="bg-white rounded-xl border border-blue-100 shadow-sm overflow-hidden relative z-10">
-                <div className="bg-blue-50/80 px-4 py-2 border-b border-blue-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Package size={14} className="text-blue-700" />
-                    <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">Material Intake ({intakes.length})</span>
-                  </div>
-                  <span className="text-xs font-bold text-blue-700">{totalIntakeSqM.toFixed(3)} m²</span>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {intakes.map((intake: any, idx: number) => (
-                    <div key={idx} className="p-3.5 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-900 break-words">
+          {/* Raw Material Intake Table */}
+          <div className="mt-5 bg-white rounded-xl border border-blue-100 shadow-sm overflow-hidden">
+            <div className="bg-blue-50/80 px-4 py-2.5 border-b border-blue-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package size={15} className="text-blue-700" />
+                <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+                  Raw Material Intake ({intakes.length})
+                </span>
+              </div>
+              <span className="text-xs font-bold text-blue-700">{totalIntakeSqM.toFixed(3)} m²</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs whitespace-nowrap">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                    <th className="px-3.5 py-2.5 w-12 text-center">#</th>
+                    <th className="px-3.5 py-2.5">Material (Name - Code - Batch Code)</th>
+                    <th className="px-3.5 py-2.5 text-right">Intake Qty</th>
+                    <th className="px-3.5 py-2.5 text-right">Raw Sq.M</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {intakes.map((intake: any, idx: number) => {
+                    const fallbackPerRoll = Number(intake.rawMaterial?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+                    const sqM = Number(intake.sqM || 0) > 0 ? Number(intake.sqM) : Number(intake.intakeQuantity || 0) * fallbackPerRoll;
+                    return (
+                      <tr key={idx} className="hover:bg-blue-50/30">
+                        <td className="px-3.5 py-2.5 text-center text-gray-500 font-medium">{idx + 1}</td>
+                        <td className="px-3.5 py-2.5 font-bold text-gray-800">
                           {formatRawMaterialLabel(intake.rawMaterial, intake.materialBatchCode, intake.materialCode)}
-                        </p>
-                        {Number(intake.sqM || 0) > 0 && (
-                          <p className="text-[11px] text-gray-500 mt-0.5">Area: {Number(intake.sqM).toFixed(3)} m²</p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase">Qty</p>
-                        <p className="text-base font-black text-blue-600">{intake.intakeQuantity}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-black text-blue-700">{intake.intakeQuantity}</td>
+                        <td className="px-3.5 py-2.5 text-right text-gray-600 font-medium">{sqM.toFixed(3)} m²</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-blue-50/50 font-bold text-xs border-t border-blue-100">
+                    <td colSpan={2} className="px-3.5 py-2 text-right text-blue-900">Total Intake:</td>
+                    <td className="px-3.5 py-2 text-right font-black text-blue-700">{totalIntakeQty}</td>
+                    <td className="px-3.5 py-2 text-right font-black text-blue-700">{totalIntakeSqM.toFixed(3)} m²</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Finished Product Outcome Table */}
+          <div className="mt-5 bg-white rounded-xl border border-emerald-100 shadow-sm overflow-hidden">
+            <div className="bg-emerald-50/80 px-4 py-2.5 border-b border-emerald-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ArrowRight size={15} className="text-emerald-700" />
+                <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                  Finished Product Outcome
+                </span>
               </div>
+              <span className="text-xs font-bold text-emerald-700">{totalOutcomeSqM.toFixed(3)} m²</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs whitespace-nowrap">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                    <th className="px-3.5 py-2.5 w-12 text-center">#</th>
+                    <th className="px-3.5 py-2.5">Finished Product</th>
+                    <th className="px-3.5 py-2.5">Date & Time</th>
+                    <th className="px-3.5 py-2.5 text-right">Outcome Qty</th>
+                    <th className="px-3.5 py-2.5 text-right">Area (m²)</th>
+                    <th className="px-3.5 py-2.5 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {productOutcomeGroups.map((group: any, gIdx: number) => {
+                    const entries = group.entries && group.entries.length > 0
+                      ? group.entries
+                      : [{ key: `fallback-${gIdx}`, date: production.date, outcomeQuantity: group.totalQty }];
+                    const isMulti = entries.length > 1;
 
-              {/* Outcome */}
-              <div className="bg-white rounded-xl border border-emerald-100 shadow-sm overflow-hidden relative z-10 flex flex-col">
-                <div className="bg-emerald-50/80 px-4 py-2 border-b border-emerald-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ArrowRight size={14} className="text-emerald-700" />
-                    <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                      Product Outcome ({productOutcomeGroups.length})
-                    </span>
-                  </div>
-                  <span className="text-xs font-bold text-emerald-700">{totalOutcomeSqM.toFixed(3)} m²</span>
-                </div>
-                <div className="divide-y divide-gray-100 flex-1">
-                  {productOutcomeGroups.map((group: any, idx: number) => (
-                    <div key={group.productId || idx} className="p-3.5 space-y-2.5">
-                      {/* Product Summary Header with Final Status */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              #{idx + 1}
-                            </span>
-                            <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                group.isDone
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-300'
-                              }`}
-                            >
-                              {group.isDone ? 'Completed' : 'Pending'}
-                            </span>
-                            <p className="text-xs font-black text-gray-900 break-words">{group.productName}</p>
-                          </div>
-                          <p className="text-[11px] text-gray-500 mt-0.5">
-                            Prod Sq.M: {group.prodSqM.toFixed(3)} · Total Sq.M: {group.totalSqM.toFixed(3)} m²
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">Total Qty</p>
-                          <p className="text-base font-black text-emerald-600">{group.totalQty}</p>
-                        </div>
-                      </div>
+                    return entries.map((entry: any, eIdx: number) => {
+                      const isFirst = eIdx === 0;
+                      const entrySqM = Number(entry.outcomeQuantity || 0) * Number(group.prodSqM || 0);
 
-                      {/* Update Logs / Timeline (Audit trail without redundant Completed badges) */}
-                      {group.entries.length > 1 ? (
-                        <div className="bg-emerald-50/40 rounded-lg p-2.5 border border-emerald-100/80 space-y-1.5">
-                          <div className="flex items-center justify-between text-[10px] font-bold text-emerald-900 uppercase tracking-wide">
-                            <span>Update History ({group.entries.length} entries)</span>
-                            <span className="text-emerald-700">Audit Trail</span>
-                          </div>
-                          <div className="space-y-1">
-                            {group.entries.map((entry: any, eIdx: number) => (
-                              <div
-                                key={entry.key || eIdx}
-                                className="flex items-center justify-between text-xs py-1 px-2 rounded bg-white border border-emerald-100 text-gray-700"
+                      return (
+                        <tr
+                          key={entry.key || `${gIdx}-${eIdx}`}
+                          className={`hover:bg-emerald-50/30 ${isMulti ? 'bg-emerald-50/10' : ''}`}
+                        >
+                          <td className="px-3.5 py-2.5 text-center text-gray-500 font-bold">
+                            {isMulti ? `${gIdx + 1}.${eIdx + 1}` : gIdx + 1}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-bold text-gray-900">
+                            {isFirst ? group.productName : <span className="text-gray-400 font-normal pl-2">↳ update</span>}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-gray-600 font-medium">
+                            {formatDateTime(entry.date || production.date)}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right font-black text-emerald-700">
+                            {isMulti ? `+${entry.outcomeQuantity}` : entry.outcomeQuantity}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right text-gray-600 font-medium">
+                            {entrySqM.toFixed(3)} m²
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center">
+                            {/* ONLY show Completed/Pending badge once per product on the primary row */}
+                            {isFirst ? (
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  group.isDone
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}
                               >
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] font-bold text-gray-400">#{eIdx + 1}</span>
-                                  <span className="text-[11px] text-gray-600">
-                                    {formatDateTime(entry.date || production.date)}
-                                  </span>
-                                </div>
-                                <span className="font-extrabold text-emerald-700">
-                                  +{entry.outcomeQuantity} units
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        group.entries.length === 1 && (
-                          <p className="text-[10px] text-gray-400 italic">
-                            Logged at {formatDateTime(group.entries[0]?.date || production.date)}
-                          </p>
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {totalOutcomeQty > 0 && (
-                  <div className="bg-emerald-50/60 border-t border-emerald-100 px-4 py-2 flex items-center justify-between text-xs font-bold text-emerald-900">
-                    <span>Total Batch Outcome</span>
-                    <span className="text-sm font-black text-emerald-700">{totalOutcomeQty} units</span>
-                  </div>
-                )}
-              </div>
+                                {group.isDone ? 'Completed' : 'Pending'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 italic">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-emerald-50/60 font-bold text-xs border-t border-emerald-200">
+                    <td colSpan={3} className="px-3.5 py-2 text-right text-emerald-950 font-black">Total Outcome:</td>
+                    <td className="px-3.5 py-2 text-right font-black text-emerald-800 text-sm">{totalOutcomeQty} units</td>
+                    <td className="px-3.5 py-2 text-right font-black text-emerald-800">{totalOutcomeSqM.toFixed(3)} m²</td>
+                    <td className="px-3.5 py-2 text-center">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          completed
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-amber-100 text-amber-800 border border-amber-300'
+                        }`}
+                      >
+                        {completed ? 'Completed' : 'Pending'}
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
 
