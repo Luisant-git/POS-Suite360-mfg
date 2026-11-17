@@ -1122,71 +1122,81 @@ const RawMaterialPurchaseEntry = () => {
 
         {/* Footer Calculation Area */}
         <div className="bg-white border-t border-[#E5E7EB] p-3 sm:p-4 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 items-end">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-end justify-between gap-4 lg:gap-8">
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total Quantity:</label>
-              <input
-                value={items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0)}
-                readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
-              />
+            {/* Left Section: Quantities, SQ.M, Subtotal, Tax */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full lg:max-w-3xl xl:max-w-4xl">
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total Quantity:</label>
+                <input
+                  value={items.reduce((acc, item) => acc + (Number(item.quantity) || 0), 0)}
+                  readOnly
+                  tabIndex={-1}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total SQ.M:</label>
+                <input
+                  value={items.reduce((acc, item) => acc + ((Number(item.sqM) || 0) * (Number(item.quantity) || 0)), 0).toFixed(3)}
+                  readOnly
+                  tabIndex={-1}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Subtotal:</label>
+                <input
+                  value={subtotal.toFixed(2)}
+                  readOnly
+                  tabIndex={-1}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total GST (Tax):</label>
+                <input
+                  value={tax.toFixed(2)}
+                  readOnly
+                  tabIndex={-1}
+                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1E3A8A]"
+                />
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total SQ.M:</label>
-              <input
-                value={items.reduce((acc, item) => acc + ((Number(item.sqM) || 0) * (Number(item.quantity) || 0)), 0).toFixed(3)}
-                readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
-              />
-            </div>
+            {/* Right Corner: Transport Charge & Wages */}
+            <div className="flex flex-row gap-3 sm:gap-4 justify-end items-end border-t lg:border-t-0 pt-3 lg:pt-0 border-gray-100 shrink-0">
+              <div className="w-1/2 sm:w-44 lg:w-44 flex flex-col gap-1">
+                <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Transport Chg.</label>
+                <input
+                  type="number"
+                  value={transportCharge}
+                  onChange={(e) => setTransportCharge(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[18px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981] transition-all"
+                />
+              </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Subtotal:</label>
-              <input
-                value={subtotal.toFixed(2)}
-                readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1F2937]"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Total GST (Tax):</label>
-              <input
-                value={tax.toFixed(2)}
-                readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F9FAFB] rounded text-[18px] outline-none text-right font-black text-[#1E3A8A]"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Transport Chg.</label>
-              <input
-                type="number"
-                value={transportCharge}
-                onChange={(e) => setTransportCharge(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[16px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Wages</label>
-              <input
-                type="number"
-                value={wages}
-                onChange={(e) => setwages(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[16px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]"
-              />
+              <div className="w-1/2 sm:w-44 lg:w-44 flex flex-col gap-1">
+                <label className="text-[12px] font-extrabold text-[#1F2937] uppercase">Wages</label>
+                <input
+                  type="number"
+                  value={wages}
+                  onChange={(e) => setwages(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-[#D1D5DB] bg-white focus:bg-[#F0FDF4] rounded text-[18px] outline-none text-right font-black text-black focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981] transition-all"
+                />
+              </div>
             </div>
 
           </div>
         </div>
 
         {/* Bottom Actions Bar */}
-        <div className="bg-[#F8FAFC] border-t border-[#CBD5E1] px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0 mt-auto shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div className="bg-[#F8FAFC] border-t border-[#CBD5E1] px-4 py-2.5 sm:py-3 flex flex-col md:flex-row justify-between items-center gap-2.5 md:gap-0 mt-auto shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <div className="flex flex-nowrap justify-between sm:justify-center gap-2 w-full md:w-auto">
             <button
               type="button" onClick={addItem}
