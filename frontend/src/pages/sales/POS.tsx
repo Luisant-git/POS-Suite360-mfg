@@ -112,6 +112,7 @@ const saleSchema = z.object({
 type SaleFormValues = z.infer<typeof saleSchema>;
 
 const DRAFTS_KEY = 'pos_drafts';
+const AUTO_DRAFT_KEY = 'pos_auto_draft';
 const getDrafts = (): any[] => {
   try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]'); } catch (e) { return []; }
 };
@@ -160,6 +161,10 @@ const POS = () => {
   const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
   const [selectedDraft, setSelectedDraft] = useState<any>(null);
   const activeDraftIdRef = useRef<string | null>(null);
+  const [autoDraft, setAutoDraft] = useState<any>(null);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const isRestoringDraftRef = useRef(false);
+  const autoSaveTimerRef = useRef<any>(null);
   const editPrefilledRef = useRef<string | null>(null);
   const editPrefilledWithProductsRef = useRef(false);
   const prevRateContextRef = useRef({ rateType: 'Retail Rate', customerId: 0 });
@@ -594,6 +599,9 @@ const POS = () => {
         }
 
         reset(freshFormValues());
+        localStorage.removeItem(AUTO_DRAFT_KEY);
+        setAutoDraft(null);
+        setLastAutoSavedAt(null);
 
         // Remove the loaded draft after successful save
         if (activeDraftIdRef.current) {
@@ -787,6 +795,9 @@ const POS = () => {
     setDrafts(next);
     persistDrafts(next);
     activeDraftIdRef.current = null;
+    localStorage.removeItem(AUTO_DRAFT_KEY);
+    setAutoDraft(null);
+    setLastAutoSavedAt(null);
     // Clear the entry form so the next customer starts fresh
     reset(freshFormValues());
     setCustomerPaid('');
@@ -803,6 +814,44 @@ const POS = () => {
       persistDrafts(next);
       return next;
     });
+  };
+
+  const handleRestoreAutoDraft = () => {
+    if (!autoDraft) return;
+    isRestoringDraftRef.current = true;
+    const data = autoDraft.data || autoDraft;
+    const currentInvoice = getValues('invoiceNo');
+    const loadedItems = (data.items || []).map((item: any) => {
+      const product = products.find((p: any) => p.id === Number(item.productId));
+      return {
+        ...item,
+        stock: product?.currentStock ?? item.stock ?? 0,
+        unit: product?.unit?.shortCode || product?.unit?.name || item.unit || 'Nos',
+      };
+    });
+    reset({
+      ...data,
+      invoiceNo: currentInvoice && currentInvoice !== 'Generating...' ? currentInvoice : (data.invoiceNo || 'Generating...'),
+      items: loadedItems.length ? loadedItems : [{ productId: 0, quantity: '' as any, stock: 0, rate: '' as any, unit: 'Nos', discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 }],
+    }, { keepDefaultValues: true });
+    prevRateContextRef.current = { rateType: data.rateType || 'Retail Rate', customerId: Number(data.customerId) || 0 };
+    setValue('customerId', Number(data.customerId) || 0);
+    setValue('paymentModeId', Number(data.paymentModeId) || 0);
+    setValue('rateType', data.rateType || 'Retail Rate');
+    setCustomerPaid('');
+    setAutoDraft(null);
+    setLastAutoSavedAt(new Date(autoDraft.savedAt));
+    toast.success('Unsaved draft restored successfully!');
+    setTimeout(() => {
+      isRestoringDraftRef.current = false;
+    }, 500);
+  };
+
+  const handleDiscardAutoDraft = () => {
+    localStorage.removeItem(AUTO_DRAFT_KEY);
+    setAutoDraft(null);
+    setLastAutoSavedAt(null);
+    toast.success('Unsaved draft discarded.');
   };
 
   const handleLoadDraft = (draft: any) => {
@@ -847,11 +896,96 @@ const POS = () => {
       : (nextInvoiceData?.invoiceNo || 'Generating...');
     reset(freshFormValues(invoiceToKeep));
     setCustomerPaid('');
+    localStorage.removeItem(AUTO_DRAFT_KEY);
+    setAutoDraft(null);
+    setLastAutoSavedAt(null);
     if (activeDraftIdRef.current) {
       removeDraftById(activeDraftIdRef.current);
       activeDraftIdRef.current = null;
     }
   };
+
+  // Check for auto-draft on mount
+  useEffect(() => {
+    if (editId) return;
+    try {
+      const raw = localStorage.getItem(AUTO_DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const hasData =
+          (parsed.data?.items && parsed.data.items.some((i: any) => Number(i.productId) > 0 || i.serviceItemId)) ||
+          Number(parsed.customerId) > 0;
+        if (hasData) {
+          setAutoDraft(parsed);
+        } else {
+          localStorage.removeItem(AUTO_DRAFT_KEY);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to read POS auto draft', e);
+    }
+  }, [editId]);
+
+  // Auto-save draft on form changes (debounced 400ms)
+  useEffect(() => {
+    if (editId) return;
+    const subscription = watch((values) => {
+      if (isRestoringDraftRef.current) return;
+      const validItems = (values.items || []).filter((i: any) => Number(i?.productId) > 0 || i?.serviceItemId);
+      const hasCustomer = Number(values.customerId) > 0;
+      if (validItems.length === 0 && !hasCustomer) {
+        return;
+      }
+
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = setTimeout(() => {
+        try {
+          const customer = customers.find((c: any) => c.id === Number(values.customerId));
+          const customerName = customer?.name || (Number(values.customerId) ? `Customer #${values.customerId}` : 'Counter / Cash Sale');
+          const draftPayload = {
+            savedAt: new Date().toISOString(),
+            customerId: values.customerId,
+            customerName,
+            invoiceNo: values.invoiceNo,
+            itemCount: validItems.length,
+            qtyCount: validItems.reduce((s: number, it: any) => s + (Number(it?.quantity) || 0), 0),
+            netAmount: Number(values.netAmount) || 0,
+            data: {
+              ...values,
+              customerId: Number(values.customerId) || 0,
+              paymentModeId: Number(values.paymentModeId) || 0,
+              rateType: values.rateType || 'Retail Rate',
+            }
+          };
+          localStorage.setItem(AUTO_DRAFT_KEY, JSON.stringify(draftPayload));
+          setLastAutoSavedAt(new Date());
+        } catch (e) {
+          console.error('Failed to auto-save POS draft', e);
+        }
+      }, 400);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [watch, editId, customers]);
+
+  // Warn on page refresh/close if unsaved changes exist
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (editId) return;
+      const values = getValues();
+      const hasItems = (values.items || []).some((i: any) => Number(i.productId) > 0 || i.serviceItemId);
+      const hasCustomer = Number(values.customerId) > 0;
+      if (hasItems || hasCustomer) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [getValues, editId]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -1074,31 +1208,74 @@ const POS = () => {
                 <button
                   type="button"
                   onClick={handleSaveDraft}
-                  className="bg-[#D97706] hover:bg-[#B45309] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
+                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors shadow-sm"
                 >
                   <Save size={16} /> <span className="hidden sm:inline">Save Draft</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsDraftsModalOpen(true)}
-                  className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors relative"
+                  className="bg-[#334155] hover:bg-[#1E293B] text-white border border-slate-600/70 px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors relative shadow-sm"
                 >
                   <Clock size={16} /> <span className="hidden sm:inline">Drafts</span>
                   {drafts.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-white text-[#7C3AED] text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">{drafts.length}</span>
+                    <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-slate-900 text-[10px] font-black w-4 h-4 flex items-center justify-center rounded-full shadow">{drafts.length}</span>
                   )}
                 </button>
               </>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setIsLeaveModalOpen(true)}
-            className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
-          >
-            <X size={16} /> <span className="hidden sm:inline">Close (Esc)</span>
-          </button>
+          <div className="flex items-center gap-3">
+            {lastAutoSavedAt && (
+              <span className="text-[11px] font-semibold text-emerald-300 flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsLeaveModalOpen(true)}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
+            >
+              <X size={16} /> <span className="hidden sm:inline">Close (Esc)</span>
+            </button>
+          </div>
         </div>
+
+        {/* Auto-Draft Notification Banner */}
+        {autoDraft && !editId && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-xs animate-in fade-in duration-150 z-20 print:hidden">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+                <Clock size={16} />
+              </div>
+              <div className="text-xs text-amber-950 min-w-0">
+                <p className="font-bold">
+                  Unsaved Sale Draft Recovered · <span className="font-normal text-amber-800">Auto-saved {new Date(autoDraft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </p>
+                <p className="text-amber-800 text-[11px] truncate">
+                  Customer: <strong>{autoDraft.customerName || 'Counter / Cash Sale'}</strong> · {autoDraft.itemCount || 0} items ({autoDraft.qtyCount || 0} qty) · Net: <strong>{formatCurrency(autoDraft.netAmount || 0)}</strong>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRestoreAutoDraft}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-md shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={13} /> Restore Draft
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardAutoDraft}
+                className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 font-bold text-xs px-2.5 py-1.5 rounded-md shadow-sm transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
 
         {editId && (
           <div className="bg-amber-100 border-b border-amber-300 text-amber-800 px-4 py-1.5 text-[12px] font-bold flex items-center gap-2 shrink-0 print:hidden">
@@ -1264,23 +1441,6 @@ const POS = () => {
             className="border border-[#713F12] text-[#713F12] hover:bg-[#713F12] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
           >
             <RefreshCw size={14} /> Clear (F4)
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            className="border border-[#D97706] text-[#D97706] hover:bg-[#D97706] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
-          >
-            <Save size={14} /> Save Draft
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsDraftsModalOpen(true)}
-            className="border border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold relative"
-          >
-            <Clock size={14} /> Drafts
-            {drafts.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-[#7C3AED] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow">{drafts.length}</span>
-            )}
           </button>
           <button
             type="button"
@@ -1735,6 +1895,19 @@ const POS = () => {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {!editId && (
+                <button
+                  type="button"
+                  onClick={() => setIsDraftsModalOpen(true)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors relative"
+                  title="Saved Drafts"
+                >
+                  <Clock size={16} />
+                  {drafts.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-amber-400 text-slate-900 text-[9px] font-black w-4 h-4 flex items-center justify-center rounded-full shadow">{drafts.length}</span>
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 disabled={createMutation.isPending}
@@ -1755,6 +1928,32 @@ const POS = () => {
             </div>
           </div>
         </div>
+
+        {/* Mobile Auto-Draft Banner */}
+        {autoDraft && !editId && (
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-300 px-3 py-2 flex items-center justify-between gap-2 shrink-0 shadow-xs animate-in fade-in duration-150 z-20">
+            <div className="text-xs text-amber-950 min-w-0">
+              <p className="font-bold truncate">Draft: {autoDraft.customerName || 'Cash Sale'}</p>
+              <p className="text-amber-800 text-[10px]">{autoDraft.itemCount || 0} items · {formatCurrency(autoDraft.netAmount || 0)}</p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleRestoreAutoDraft}
+                className="bg-amber-600 text-white font-bold text-[11px] px-2.5 py-1 rounded shadow-sm"
+              >
+                Restore
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardAutoDraft}
+                className="bg-white text-gray-700 border border-gray-300 font-bold text-[11px] px-2 py-1 rounded"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Scrollable mobile content */}
         <div className="flex-1 min-h-0 overflow-y-auto pb-[100px]">
@@ -2655,13 +2854,13 @@ const POS = () => {
 
       {/* Drafts Modal */}
       {isDraftsModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[110] flex items-center justify-center p-4">
-          <div className="bg-white rounded shadow-lg w-full max-w-lg overflow-hidden flex flex-col">
-            <div className="bg-[#7C3AED] text-white px-4 py-3 flex justify-between items-center">
+        <div className="fixed top-[60px] inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[calc(100vh-100px)] animate-in fade-in zoom-in duration-150">
+            <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-4 py-3 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2 font-bold text-[15px]">
-                <Clock size={18} /> Saved Drafts
+                <Clock size={18} className="text-amber-400" /> Saved Drafts ({drafts.length})
               </div>
-              <button type="button" onClick={() => setIsDraftsModalOpen(false)} className="hover:text-gray-200">
+              <button type="button" onClick={() => setIsDraftsModalOpen(false)} className="text-white/80 hover:text-white transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -2671,9 +2870,9 @@ const POS = () => {
               ) : (
                 <div className="flex flex-col gap-2">
                   {drafts.sort((a: any, b: any) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()).map((draft: any) => (
-                    <div key={draft.id} onClick={() => setSelectedDraft(draft)} className="border border-gray-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50 hover:border-[#7C3AED]/40 cursor-pointer transition-colors">
+                    <div key={draft.id} onClick={() => setSelectedDraft(draft)} className="border border-gray-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-gray-50 hover:border-blue-400 cursor-pointer transition-colors">
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-[14px] text-[#1F2937] truncate">{draft.customerName}{(draft.customerPhone || customers.find((c: any) => c.id === Number(draft.customerId))?.phone) ? <span className="text-[12px] font-medium text-gray-400 ml-2">- {(draft.customerPhone || customers.find((c: any) => c.id === Number(draft.customerId))?.phone)}</span> : null}{draft.customerId ? <span className="text-[11px] font-bold text-[#7C3AED] ml-2">ID: {draft.customerId}</span> : null}</div>
+                        <div className="font-bold text-[14px] text-[#1F2937] truncate">{draft.customerName}{(draft.customerPhone || customers.find((c: any) => c.id === Number(draft.customerId))?.phone) ? <span className="text-[12px] font-medium text-gray-400 ml-2">- {(draft.customerPhone || customers.find((c: any) => c.id === Number(draft.customerId))?.phone)}</span> : null}{draft.customerId ? <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 ml-2">ID: {draft.customerId}</span> : null}</div>
                         <div className="text-[12px] text-gray-500 mt-0.5 flex flex-wrap gap-2">
                           <span>Items: {draft.itemCount} ({draft.qtyCount} qty)</span>
                           <span>Net: {formatCurrency(draft.netAmount)}</span>
@@ -2707,13 +2906,13 @@ const POS = () => {
 
       {/* Draft Preview Modal */}
       {selectedDraft && (
-        <div className="fixed inset-0 bg-black/50 z-[120] flex items-center justify-center p-4" onClick={() => setSelectedDraft(null)}>
-          <div className="bg-white rounded shadow-lg w-full max-w-xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-[#7C3AED] text-white px-4 py-3 flex justify-between items-center">
+        <div className="fixed top-[60px] inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm z-[120] flex items-center justify-center p-4" onClick={() => setSelectedDraft(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[calc(100vh-100px)] animate-in fade-in zoom-in duration-150" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-4 py-3 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2 font-bold text-[15px]">
-                <FileText size={18} /> Draft Details
+                <FileText size={18} className="text-emerald-400" /> Draft Details
               </div>
-              <button type="button" onClick={() => setSelectedDraft(null)} className="hover:text-gray-200">
+              <button type="button" onClick={() => setSelectedDraft(null)} className="text-white/80 hover:text-white transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -2781,7 +2980,7 @@ const POS = () => {
               <button
                 type="button"
                 onClick={() => handleLoadDraft(selectedDraft)}
-                className="flex-1 bg-[#7C3AED] hover:bg-[#6D28D9] text-white py-2.5 rounded font-bold text-[13px] transition-colors flex items-center justify-center gap-2 shadow"
+                className="flex-1 bg-[#2563EB] hover:bg-[#1D4ED8] text-white py-2.5 rounded font-bold text-[13px] transition-colors flex items-center justify-center gap-2 shadow"
               >
                 <Clock size={15} /> Load & Continue Entry
               </button>
