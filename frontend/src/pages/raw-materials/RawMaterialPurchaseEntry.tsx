@@ -1,14 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle, ArrowLeft, PlusCircle, RotateCcw, List, FileText, Plus, Trash2, Package, X, Save, UserPlus, Search, ShoppingCart, User, ChevronRight, Edit3, Truck } from 'lucide-react';
+import { CheckCircle, ArrowLeft, PlusCircle, RotateCcw, List, FileText, Plus, Trash2, Package, X, Save, UserPlus, Search, ShoppingCart, User, ChevronRight, Edit3, Truck, Clock } from 'lucide-react';
 import api from '../../services/api';
 import SearchableSelect from '../../components/SearchableSelect';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
 import ShortcutHelpButton from '../../components/ShortcutHelp';
 import { useSettings } from '../../contexts/SettingsContext';
 import Select from 'react-select';
+
+const RM_AUTO_DRAFT_KEY = 'rm_purchase_auto_draft';
+const RM_DRAFTS_KEY = 'rm_purchase_drafts';
+
+const getRmDrafts = (): any[] => {
+  try {
+    return JSON.parse(localStorage.getItem(RM_DRAFTS_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+};
+
+const persistRmDrafts = (drafts: any[]) => {
+  try {
+    localStorage.setItem(RM_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 const indianStates = [
   "01 - Jammu & Kashmir", "02 - Himachal Pradesh", "03 - Punjab", "04 - Chandigarh",
@@ -95,6 +114,15 @@ const RawMaterialPurchaseEntry = () => {
   const [wages, setwages] = useState<number | ''>('');
 
   const [items, setItems] = useState<any[]>([createEmptyItem()]);
+
+  // Draft & Auto-save state
+  const [autoDraft, setAutoDraft] = useState<any>(null);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const isRestoringDraftRef = useRef(false);
+  const activeDraftIdRef = useRef<string | null>(null);
+  const [drafts, setDrafts] = useState<any[]>(getRmDrafts);
+  const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
+  const [selectedDraft, setSelectedDraft] = useState<any>(null);
 
   // Mobile-specific state
   const [mobileSearch, setMobileSearch] = useState('');
@@ -239,9 +267,116 @@ const RawMaterialPurchaseEntry = () => {
     setInvoiceNo('');
     setDate(new Date().toISOString().split('T')[0]);
     setSupplierId(0);
+    setPaymentModeId(0);
     setTransportCharge('');
     setwages('');
     setItems([createEmptyItem()]);
+    localStorage.removeItem(RM_AUTO_DRAFT_KEY);
+    setAutoDraft(null);
+    setLastAutoSavedAt(null);
+    activeDraftIdRef.current = null;
+  };
+
+  const handleRestoreAutoDraft = () => {
+    if (!autoDraft) return;
+    isRestoringDraftRef.current = true;
+    if (autoDraft.invoiceNo !== undefined) setInvoiceNo(autoDraft.invoiceNo);
+    if (autoDraft.date) setDate(autoDraft.date);
+    if (autoDraft.supplierId) setSupplierId(Number(autoDraft.supplierId));
+    if (autoDraft.paymentModeId) setPaymentModeId(Number(autoDraft.paymentModeId));
+    if (autoDraft.transportCharge !== undefined) setTransportCharge(autoDraft.transportCharge);
+    if (autoDraft.wages !== undefined) setwages(autoDraft.wages);
+    if (Array.isArray(autoDraft.items) && autoDraft.items.length > 0) {
+      setItems(autoDraft.items.map((i: any) => ({ ...createEmptyItem(), ...i })));
+    }
+    setAutoDraft(null);
+    setLastAutoSavedAt(new Date(autoDraft.savedAt));
+    toast.success('Unsaved draft restored successfully!');
+    setTimeout(() => {
+      isRestoringDraftRef.current = false;
+    }, 500);
+  };
+
+  const handleDiscardAutoDraft = () => {
+    localStorage.removeItem(RM_AUTO_DRAFT_KEY);
+    setAutoDraft(null);
+    setLastAutoSavedAt(null);
+    toast.success('Unsaved draft discarded.');
+  };
+
+  const handleSaveDraft = () => {
+    const validItems = items.filter((i: any) => Number(i.rawMaterialId) > 0 || String(i.materialCode || '').trim() || Number(i.quantity) > 0);
+    const hasHeader = Boolean(String(invoiceNo || '').trim()) || Number(supplierId) > 0;
+    if (validItems.length === 0 && !hasHeader) {
+      toast.error('Add at least one item or fill supplier/invoice before saving a draft.');
+      return;
+    }
+
+    const supplier = suppliers.find((s: any) => s.id === Number(supplierId));
+    const supplierName = supplier?.name || (supplierId ? `Supplier #${supplierId}` : 'Unassigned Supplier');
+
+    const draft = {
+      id: activeDraftIdRef.current || String(Date.now()),
+      savedAt: new Date().toISOString(),
+      invoiceNo: invoiceNo || '',
+      date,
+      supplierId,
+      supplierName,
+      paymentModeId,
+      transportCharge,
+      wages,
+      itemCount: validItems.length,
+      grandTotal,
+      data: {
+        invoiceNo,
+        date,
+        supplierId,
+        paymentModeId,
+        transportCharge,
+        wages,
+        items,
+        grandTotal,
+      }
+    };
+
+    const next = [...drafts.filter((d: any) => d.id !== draft.id), draft];
+    setDrafts(next);
+    persistRmDrafts(next);
+    localStorage.removeItem(RM_AUTO_DRAFT_KEY);
+    setAutoDraft(null);
+    activeDraftIdRef.current = null;
+    toast.success(`Purchase saved as draft (Invoice: ${invoiceNo || 'Draft'}). Form cleared.`);
+    handleClear();
+  };
+
+  const handleLoadDraft = (draft: any) => {
+    const data = draft.data || draft;
+    isRestoringDraftRef.current = true;
+    if (data.invoiceNo !== undefined) setInvoiceNo(data.invoiceNo);
+    if (data.date) setDate(data.date);
+    if (data.supplierId) setSupplierId(Number(data.supplierId));
+    if (data.paymentModeId) setPaymentModeId(Number(data.paymentModeId));
+    if (data.transportCharge !== undefined) setTransportCharge(data.transportCharge);
+    if (data.wages !== undefined) setwages(data.wages);
+    if (Array.isArray(data.items) && data.items.length > 0) {
+      setItems(data.items.map((i: any) => ({ ...createEmptyItem(), ...i })));
+    }
+    activeDraftIdRef.current = draft.id;
+    setIsDraftsModalOpen(false);
+    setSelectedDraft(null);
+    setAutoDraft(null);
+    toast.success(`Draft loaded for ${draft.supplierName || 'Purchase'}.`);
+    setTimeout(() => {
+      isRestoringDraftRef.current = false;
+    }, 500);
+  };
+
+  const handleDeleteDraft = (id: string) => {
+    if (activeDraftIdRef.current === id) activeDraftIdRef.current = null;
+    const next = drafts.filter((d: any) => d.id !== id);
+    setDrafts(next);
+    persistRmDrafts(next);
+    toast.success('Draft deleted.');
   };
 
   const updateItem = (index: number, field: string, value: any) => {
@@ -328,6 +463,13 @@ const RawMaterialPurchaseEntry = () => {
       return api.post('/raw-material-purchases', payload);
     },
     onSuccess: () => {
+      localStorage.removeItem(RM_AUTO_DRAFT_KEY);
+      if (activeDraftIdRef.current) {
+        const next = drafts.filter((d: any) => d.id !== activeDraftIdRef.current);
+        setDrafts(next);
+        persistRmDrafts(next);
+        activeDraftIdRef.current = null;
+      }
       toast.success('Purchase saved successfully');
       navigate('/raw-materials/purchase-list');
     },
@@ -370,6 +512,9 @@ const RawMaterialPurchaseEntry = () => {
       if (e.key === 'F10') {
         e.preventDefault();
         handleSubmit();
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        handleSaveDraft();
       } else if (e.key === 'F2') {
         e.preventDefault();
         addItem();
@@ -377,7 +522,13 @@ const RawMaterialPurchaseEntry = () => {
         e.preventDefault();
         handleClear();
       } else if (e.key === 'Escape') {
-        if (isLeaveModalOpen) {
+        if (selectedDraft) {
+          setSelectedDraft(null);
+        } else if (isDraftsModalOpen) {
+          setIsDraftsModalOpen(false);
+        } else if (isSupplierModalOpen) {
+          setIsSupplierModalOpen(false);
+        } else if (isLeaveModalOpen) {
           setIsLeaveModalOpen(false);
         } else {
           setIsLeaveModalOpen(true);
@@ -386,7 +537,78 @@ const RawMaterialPurchaseEntry = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSubmit, handleClear, isLeaveModalOpen, navigate]);
+  }, [handleSubmit, handleClear, handleSaveDraft, isLeaveModalOpen, isDraftsModalOpen, selectedDraft, isSupplierModalOpen, navigate]);
+
+  // Check for auto-draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RM_AUTO_DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const hasData =
+          (parsed.items && parsed.items.some((i: any) => Number(i.rawMaterialId) > 0 || String(i.materialCode || '').trim() || String(i.batchCode || '').trim())) ||
+          Boolean(String(parsed.invoiceNo || '').trim()) ||
+          Number(parsed.supplierId) > 0;
+        if (hasData) {
+          setAutoDraft(parsed);
+        } else {
+          localStorage.removeItem(RM_AUTO_DRAFT_KEY);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to read RM auto draft', e);
+    }
+  }, []);
+
+  // Auto-save draft on any meaningful change (debounced 400ms)
+  useEffect(() => {
+    if (isRestoringDraftRef.current) return;
+    const validItems = items.filter((i: any) => Number(i.rawMaterialId) > 0 || String(i.materialCode || '').trim() || String(i.batchCode || '').trim() || Number(i.quantity) > 0);
+    const hasHeader = Boolean(String(invoiceNo || '').trim()) || Number(supplierId) > 0;
+
+    if (validItems.length === 0 && !hasHeader) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      try {
+        const supplier = suppliers.find((s: any) => s.id === Number(supplierId));
+        const draftPayload = {
+          savedAt: new Date().toISOString(),
+          invoiceNo,
+          date,
+          supplierId,
+          supplierName: supplier?.name || '',
+          paymentModeId,
+          transportCharge,
+          wages,
+          items,
+          grandTotal,
+          itemCount: validItems.length,
+        };
+        localStorage.setItem(RM_AUTO_DRAFT_KEY, JSON.stringify(draftPayload));
+        setLastAutoSavedAt(new Date());
+      } catch (e) {
+        console.error('Failed to auto-save RM draft', e);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [date, supplierId, invoiceNo, paymentModeId, transportCharge, wages, items, grandTotal, suppliers]);
+
+  // Warn on page refresh/close if unsaved changes exist
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasItems = items.some((i: any) => Number(i.rawMaterialId) > 0 || String(i.materialCode || '').trim() || String(i.batchCode || '').trim());
+      const hasHeader = Boolean(String(invoiceNo || '').trim()) || Number(supplierId) > 0;
+      if (hasItems || hasHeader) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [items, invoiceNo, supplierId]);
 
   const addSupplierMutation = useMutation({
     mutationFn: (data: any) => api.post('/suppliers', data),
@@ -546,7 +768,7 @@ const RawMaterialPurchaseEntry = () => {
 
       {/* Top Bar - Differentiated color for Manufacturing - Desktop only */}
       <div className="hidden md:flex bg-[#475569] text-white px-2 sm:px-4 py-2 flex-wrap gap-2 justify-between items-center shrink-0">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-bold text-[14px] uppercase tracking-wider flex items-center gap-2">
             <span className="bg-[#334155] p-1 rounded"><Package size={16} /></span>
             Raw Material Purchase
@@ -554,18 +776,82 @@ const RawMaterialPurchaseEntry = () => {
           <button
             type="button"
             onClick={() => handleSubmit()}
-            className="bg-[#10B981] hover:bg-[#059669] text-white px-4 py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors shadow-sm"
+            className="bg-[#10B981] hover:bg-[#059669] text-white px-3.5 py-1.5 rounded flex items-center gap-1.5 font-bold text-[13px] transition-colors shadow-sm"
           >
             <CheckCircle size={16} /> SAVE PURCHASE (F10)
           </button>
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            className="bg-[#334155] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm border border-slate-600"
+            title="Save as Draft (F8)"
+          >
+            <Save size={14} /> Save Draft (F8)
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsDraftsModalOpen(true)}
+            className="relative bg-[#334155] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm border border-slate-600"
+            title="View saved drafts"
+          >
+            <Clock size={14} /> Drafts
+            {drafts.length > 0 && (
+              <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full ml-0.5">
+                {drafts.length}
+              </span>
+            )}
+          </button>
         </div>
-        <button
-          onClick={() => setIsLeaveModalOpen(true)}
-          className="text-white hover:text-white/80 transition-colors flex items-center gap-1.5 font-medium text-[13px]"
-        >
-          <ArrowLeft size={16} /> Back to Dashboard
-        </button>
+        <div className="flex items-center gap-3">
+          {lastAutoSavedAt && (
+            <span className="text-[11px] font-semibold text-emerald-300 flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+          <button
+            onClick={() => setIsLeaveModalOpen(true)}
+            className="text-white hover:text-white/80 transition-colors flex items-center gap-1.5 font-medium text-[13px]"
+          >
+            <ArrowLeft size={16} /> Back to Dashboard
+          </button>
+        </div>
       </div>
+
+      {/* Auto-Draft Notification Banner (Desktop & Mobile) */}
+      {autoDraft && (
+        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-300 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-xs animate-in fade-in duration-150 z-20">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-1.5 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+              <Clock size={16} />
+            </div>
+            <div className="text-xs text-amber-950 min-w-0">
+              <p className="font-bold">
+                Unsaved Draft Recovered · <span className="font-normal text-amber-800">Auto-saved {new Date(autoDraft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              </p>
+              <p className="text-amber-800 text-[11px] truncate">
+                Invoice: <strong>{autoDraft.invoiceNo || 'N/A'}</strong> · {autoDraft.supplierName ? `Supplier: ${autoDraft.supplierName} · ` : ''}{autoDraft.items?.filter((i: any) => Number(i.rawMaterialId) > 0)?.length || 0} materials entered · Total: <strong>{formatCurrency(autoDraft.grandTotal || 0)}</strong>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleRestoreAutoDraft}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-md shadow-sm transition-colors flex items-center gap-1.5"
+            >
+              <RotateCcw size={13} /> Restore Draft
+            </button>
+            <button
+              type="button"
+              onClick={handleDiscardAutoDraft}
+              className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 font-bold text-xs px-2.5 py-1.5 rounded-md shadow-sm transition-colors"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       <form className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden" onSubmit={handleSubmit}>
 
@@ -660,6 +946,14 @@ const RawMaterialPurchaseEntry = () => {
               className="border border-[#0B355B] text-[#0B355B] hover:bg-[#0B355B] hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
             >
               <PlusCircle size={14} /> Add Row
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="border border-slate-600 text-slate-700 hover:bg-slate-700 hover:text-white px-3 py-1 rounded flex items-center gap-1 text-[12px] transition-colors font-bold"
+              title="Save Draft (F8)"
+            >
+              <Save size={14} /> Save Draft (F8)
             </button>
             <button
               type="button"
@@ -902,6 +1196,13 @@ const RawMaterialPurchaseEntry = () => {
             </button>
 
             <button
+              type="button" onClick={handleSaveDraft}
+              className="bg-[#475569] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#334155] shadow-sm transition-colors"
+            >
+              <span className="opacity-60 border-r border-[#64748B] pr-1.5">F8</span> Save Draft
+            </button>
+
+            <button
               type="button" disabled={mutation.isPending} onClick={() => handleSubmit()}
               className="bg-[#10B981] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#059669] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -946,6 +1247,20 @@ const RawMaterialPurchaseEntry = () => {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsDraftsModalOpen(true)}
+            className="relative p-1.5 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold flex items-center gap-1"
+            title="Saved Drafts"
+          >
+            <Clock size={14} />
+            <span>Drafts</span>
+            {drafts.length > 0 && (
+              <span className="bg-amber-400 text-slate-900 text-[9px] font-black px-1 rounded-full">
+                {drafts.length}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => navigate('/raw-materials/purchase-list')}
@@ -1542,6 +1857,17 @@ const RawMaterialPurchaseEntry = () => {
                 <CheckCircle size={18} />
                 <span>{mutation.isPending ? 'Saving Purchase...' : `SAVE PURCHASE • ${formatCurrency(grandTotal)}`}</span>
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleSaveDraft();
+                  setIsMobileCheckoutOpen(false);
+                }}
+                className="w-full mt-2 bg-slate-200 hover:bg-slate-300 text-slate-800 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Save size={15} />
+                <span>Save as Draft</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1695,6 +2021,223 @@ const RawMaterialPurchaseEntry = () => {
               >
                 <Save size={16} /> Save Supplier & Select
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved Drafts List Modal */}
+      {isDraftsModalOpen && (
+        <div className="fixed top-[60px] inset-x-0 bottom-0 bg-black/50 backdrop-blur-sm z-30 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[calc(100vh-100px)] animate-in fade-in zoom-in duration-150">
+            <div className="bg-[#334155] text-white px-5 py-3.5 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2 font-bold text-sm tracking-wide">
+                <Clock size={18} className="text-amber-400" />
+                <span>SAVED PURCHASE DRAFTS ({drafts.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDraftsModalOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded-full transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto custom-scrollbar flex-1 space-y-2.5 bg-gray-50">
+              {drafts.length === 0 ? (
+                <div className="text-center py-10 px-4">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                    <Clock size={24} />
+                  </div>
+                  <p className="text-sm font-bold text-gray-700">No Saved Drafts</p>
+                  <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
+                    Click "Save Draft (F8)" while entering a purchase to save it temporarily without losing any rows.
+                  </p>
+                </div>
+              ) : (
+                drafts
+                  .slice()
+                  .sort((a: any, b: any) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
+                  .map((draft: any) => (
+                    <div
+                      key={draft.id}
+                      onClick={() => setSelectedDraft(draft)}
+                      className="bg-white border border-gray-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-blue-400 hover:shadow-md cursor-pointer transition-all"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-gray-900 truncate">
+                            {draft.supplierName || 'Unassigned Supplier'}
+                          </span>
+                          {draft.invoiceNo && (
+                            <span className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                              Inv: {draft.invoiceNo}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-2 sm:gap-3 flex-wrap">
+                          <span><strong>{draft.itemCount || (draft.data?.items || []).filter((i: any) => Number(i.rawMaterialId) > 0).length}</strong> materials</span>
+                          <span>·</span>
+                          <span className="font-bold text-emerald-600">{formatCurrency(draft.grandTotal || 0)}</span>
+                          <span>·</span>
+                          <span>{new Date(draft.savedAt).toLocaleDateString('en-GB')} {new Date(draft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLoadDraft(draft);
+                          }}
+                          className="bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          Load
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDraft(draft.id);
+                          }}
+                          className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                          title="Delete Draft"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+            <div className="bg-white border-t border-gray-200 px-5 py-3 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsDraftsModalOpen(false)}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-1.5 rounded-lg text-xs transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draft Preview Modal */}
+      {selectedDraft && (
+        <div
+          className="fixed top-[60px] inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-3 sm:p-4"
+          onClick={() => setSelectedDraft(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[calc(100vh-100px)] animate-in fade-in zoom-in duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#1E293B] text-white px-5 py-3.5 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <FileText size={18} className="text-emerald-400" />
+                <span>DRAFT DETAILS</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDraft(null)}
+                className="text-white/80 hover:text-white p-1 rounded-full transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs">
+                <div>
+                  <p className="text-gray-500 uppercase font-bold text-[10px]">Supplier</p>
+                  <p className="font-bold text-gray-900 mt-0.5">{selectedDraft.supplierName || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 uppercase font-bold text-[10px]">Invoice No</p>
+                  <p className="font-bold text-gray-900 mt-0.5">{selectedDraft.invoiceNo || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 uppercase font-bold text-[10px]">Saved Date & Time</p>
+                  <p className="font-bold text-gray-900 mt-0.5">
+                    {new Date(selectedDraft.savedAt).toLocaleDateString('en-GB')} {new Date(selectedDraft.savedAt).toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Materials in this draft</p>
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs min-w-[500px]">
+                    <thead className="bg-gray-100 text-gray-600 font-bold border-b border-gray-200">
+                      <tr>
+                        <th className="py-2 px-3 text-left">#</th>
+                        <th className="py-2 px-3 text-left">Material / Code / Batch</th>
+                        <th className="py-2 px-3 text-right">Sq.M</th>
+                        <th className="py-2 px-3 text-right">Qty</th>
+                        <th className="py-2 px-3 text-right">Price</th>
+                        <th className="py-2 px-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {((selectedDraft.data?.items || selectedDraft.items || []).filter((i: any) => Number(i.rawMaterialId) > 0)).map((item: any, idx: number) => {
+                        const mat = rawMaterials.find((m: any) => m.id === Number(item.rawMaterialId));
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="py-2 px-3 font-bold text-gray-500">{idx + 1}</td>
+                            <td className="py-2 px-3">
+                              <p className="font-bold text-gray-900">{mat?.name || `Material #${item.rawMaterialId}`}</p>
+                              {(item.materialCode || item.batchCode) && (
+                                <p className="text-[11px] text-gray-500">
+                                  {item.materialCode && `Code: ${item.materialCode}`} {item.batchCode && `· Batch: ${item.batchCode}`}
+                                </p>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-right">{Number(item.sqM || 0).toFixed(3)}</td>
+                            <td className="py-2 px-3 text-right font-bold text-blue-600">{item.quantity}</td>
+                            <td className="py-2 px-3 text-right">{formatCurrency(Number(item.price || 0))}</td>
+                            <td className="py-2 px-3 text-right font-bold text-emerald-600">{formatCurrency(Number(item.amount || 0))}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-3 rounded-lg text-xs font-bold text-emerald-950">
+                <span>Grand Total</span>
+                <span className="text-base font-black text-emerald-700">
+                  {formatCurrency(selectedDraft.grandTotal || selectedDraft.data?.grandTotal || 0)}
+                </span>
+              </div>
+            </div>
+            <div className="bg-gray-50 border-t border-gray-200 px-5 py-3 flex justify-between items-center shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  handleDeleteDraft(selectedDraft.id);
+                  setSelectedDraft(null);
+                }}
+                className="text-red-600 hover:text-red-700 font-bold text-xs flex items-center gap-1.5"
+              >
+                <Trash2 size={15} /> Delete Draft
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDraft(null)}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-4 py-1.5 rounded-lg text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadDraft(selectedDraft)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  <RotateCcw size={14} /> Load Draft into Form
+                </button>
+              </div>
             </div>
           </div>
         </div>
