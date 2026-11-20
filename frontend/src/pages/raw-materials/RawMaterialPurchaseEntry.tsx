@@ -854,14 +854,16 @@ const RawMaterialPurchaseEntry = () => {
           >
             <CheckCircle size={16} /> {isEditMode ? 'UPDATE PURCHASE (F10)' : 'SAVE PURCHASE (F10)'}
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/raw-materials/purchase-list')}
-            className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3.5 py-1.5 rounded flex items-center gap-1.5 font-bold text-[13px] transition-colors shadow-sm"
-            title="Cancel and return to list"
-          >
-            <X size={16} /> CANCEL
-          </button>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={() => navigate('/raw-materials/purchase-list')}
+              className="bg-[#EF4444] hover:bg-[#DC2626] text-white px-3.5 py-1.5 rounded flex items-center gap-1.5 font-bold text-[13px] transition-colors shadow-sm"
+              title="Cancel and return to list"
+            >
+              <X size={16} /> CANCEL
+            </button>
+          )}
           {!isEditMode && (
             <>
               <button
@@ -1307,14 +1309,16 @@ const RawMaterialPurchaseEntry = () => {
               <span className="opacity-60 border-r border-[#6EE7B7] pr-1.5">F10</span>
               {mutation.isPending ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Record' : 'Save Record')}
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/raw-materials/purchase-list')}
-              className="bg-[#EF4444] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#DC2626] shadow-sm transition-colors"
-              title="Cancel and return to list"
-            >
-              <X size={14} /> Cancel
-            </button>
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={() => navigate('/raw-materials/purchase-list')}
+                className="bg-[#EF4444] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#DC2626] shadow-sm transition-colors"
+                title="Cancel and return to list"
+              >
+                <X size={14} /> Cancel
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end border-t border-gray-200 md:border-none pt-3 md:pt-0">
