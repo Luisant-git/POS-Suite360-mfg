@@ -283,6 +283,7 @@ const MainLayout = () => {
               <MobileDropdownItem to="/production/products" icon="fa-cubes" title="Product Master" />
               <MobileDropdownItem to="/raw-materials/master" icon="fa-database" title="Raw Material Master" />
               <MobileDropdownItem to="/raw-materials/purchase" icon="fa-shopping-cart" title="Raw Material Purchase" />
+              <MobileDropdownItem to="/raw-materials/purchase-list" icon="fa-list-alt" title="RM Purchase List" />
               {hasPerm('mfg_production') && <MobileDropdownItem to="/production" icon="fa-cogs" title="Production Entry" />}
             </MobileNavDropdown>
 
@@ -421,6 +422,7 @@ const MainLayout = () => {
                     <NavDropdown title="Manufacturing" icon="fa-industry" isActive={isManufacturingActive} compact={showBackButton} isCrowded={isCrowded}>
                       {hasPerm('mfg_rm_master') && <DropdownItem to="/raw-materials/master" icon="fa-database" title="Raw Material Master" />}
                       {hasPerm('mfg_rm_purchase') && <DropdownItem to="/raw-materials/purchase" icon="fa-shopping-cart" title="Raw Material Purchase" />}
+                      {hasPerm('mfg_rm_purchase') && <DropdownItem to="/raw-materials/purchase-list" icon="fa-list-alt" title="RM Purchase List" />}
                       {hasPerm('mfg_production') && <DropdownItem to="/production" icon="fa-cogs" title="Production Entry" />}
                     </NavDropdown>
                   )}
@@ -641,6 +643,7 @@ const MainLayout = () => {
                   <MobileNavDropdown title="Manufacturing" icon="fa-industry" isActive={isManufacturingActive}>
                     {hasPerm('mfg_rm_master') && <MobileDropdownItem to="/raw-materials/master" icon="fa-database" title="Raw Material Master" onClick={closeMobileMenu} />}
                     {hasPerm('mfg_rm_purchase') && <MobileDropdownItem to="/raw-materials/purchase" icon="fa-shopping-cart" title="Raw Material Purchase" onClick={closeMobileMenu} />}
+                    {hasPerm('mfg_rm_purchase') && <MobileDropdownItem to="/raw-materials/purchase-list" icon="fa-list-alt" title="RM Purchase List" onClick={closeMobileMenu} />}
                     {hasPerm('mfg_production') && <MobileDropdownItem to="/production" icon="fa-cogs" title="Production Entry" onClick={closeMobileMenu} />}
                   </MobileNavDropdown>
                 )}
