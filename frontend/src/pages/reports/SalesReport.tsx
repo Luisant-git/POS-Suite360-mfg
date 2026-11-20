@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText, Search, Calendar, FileDigit, Users, CreditCard, RotateCcw, Plus, Printer, Eye, Pencil, Filter, X, Layers } from 'lucide-react';
+import { Download, FileText, Search, Calendar, FileDigit, Users, CreditCard, RotateCcw, Plus, Printer, Eye, Edit, Filter, X, Layers } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettings } from '../../contexts/SettingsContext';
 import api from '../../services/api';
@@ -440,7 +440,7 @@ const SalesReport = () => {
                             onClick={() => navigate(`/sales/pos?editId=${s.id}`)}
                             className="flex items-center gap-1 text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 px-2.5 py-1 rounded"
                           >
-                            <Pencil size={13} /> Edit
+                            <Edit size={13} /> Edit
                           </button>
                         )}
                         <button
@@ -528,7 +528,7 @@ const SalesReport = () => {
                                   className="text-[#64748B] border border-[#64748B] rounded p-1 hover:bg-[#64748B] hover:text-white transition-colors"
                                   title="Edit Invoice"
                                 >
-                                  <Pencil size={14} />
+                                  <Edit size={14} />
                                 </button>
                               )}
                               <button type="button"

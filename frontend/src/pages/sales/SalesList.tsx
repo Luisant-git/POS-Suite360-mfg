@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Eye, Printer, Pencil, Search, User, LayoutGrid, List, FileText } from 'lucide-react';
+import { Plus, Eye, Printer, Edit, Search, User, LayoutGrid, List, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import InvoicePrintModal from '../../components/InvoicePrintModal';
@@ -225,7 +225,7 @@ const SalesList = () => {
                           className="text-[#64748B] border border-[#64748B] bg-gray-50 hover:bg-[#64748B] hover:text-white rounded p-1.5 transition-colors"
                           title="Edit Invoice"
                         >
-                          <Pencil size={13} />
+                          <Edit size={13} />
                         </button>
                       </div>
                     </div>
@@ -292,7 +292,7 @@ const SalesList = () => {
                               className="text-[#64748B] border border-[#64748B] rounded p-1 hover:bg-[#64748B] hover:text-white transition-colors"
                               title="Edit Invoice"
                             >
-                              <Pencil size={14} />
+                              <Edit size={14} />
                             </button>
                           </div>
                         </td>

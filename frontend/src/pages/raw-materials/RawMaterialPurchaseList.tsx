@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Eye, Pencil } from 'lucide-react';
+import { Plus, Eye, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -170,7 +170,7 @@ const RawMaterialPurchaseList = () => {
                         onClick={() => navigate(`/raw-materials/purchase?editId=${purchase.id}`)}
                         className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1 rounded transition-colors"
                       >
-                        <Pencil size={13} /> Edit
+                        <Edit size={13} /> Edit
                       </button>
                       <button
                         type="button"
@@ -299,7 +299,7 @@ const RawMaterialPurchaseList = () => {
                             className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white rounded transition-colors border border-amber-200"
                             title="Edit Invoice"
                           >
-                            <Pencil size={15} />
+                            <Edit size={15} />
                           </button>
                         </div>
                       </td>
