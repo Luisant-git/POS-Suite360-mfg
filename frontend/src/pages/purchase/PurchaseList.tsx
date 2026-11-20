@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Eye, Search, Truck, LayoutGrid, List, FileText } from 'lucide-react';
+import { Plus, Eye, Search, Truck, LayoutGrid, List, FileText, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -236,6 +236,13 @@ const PurchaseList = () => {
                         >
                           <Eye size={13} /> View
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/purchase/new?editId=${purchase.id}`)}
+                          className="flex items-center gap-1 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 px-3 py-1.5 rounded text-[11px] font-bold transition-colors shadow-sm"
+                        >
+                          <Pencil size={13} /> Edit
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -285,6 +292,13 @@ const PurchaseList = () => {
                               title="View Invoice"
                             >
                               <Eye size={14} />
+                            </button>
+                            <button type="button" 
+                              onClick={() => navigate(`/purchase/new?editId=${purchase.id}`)}
+                              className="text-amber-600 border border-amber-500 rounded p-1 hover:bg-amber-500 hover:text-white transition-colors"
+                              title="Edit Purchase"
+                            >
+                              <Pencil size={14} />
                             </button>
                           </div>
                         </td>

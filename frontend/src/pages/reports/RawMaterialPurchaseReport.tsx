@@ -425,11 +425,20 @@ const RawMaterialPurchaseReport = () => {
                   </div>
                   {(p.normalizedItems || []).length > 0 ? (
                     <div className="space-y-1 mb-2">
-                      {p.normalizedItems.map((item: any, idx: number) => (
-                        <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2 py-1 font-semibold text-slate-800">
+                      {p.normalizedItems.slice(0, 2).map((item: any, idx: number) => (
+                        <div key={item.id || idx} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-2 py-1 font-semibold text-slate-800 truncate">
                           {item.label}
                         </div>
                       ))}
+                      {p.normalizedItems.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => setViewId(p.id)}
+                          className="text-[10px] text-blue-600 font-bold hover:underline block pt-0.5"
+                        >
+                          +{p.normalizedItems.length - 2} more materials (view details)
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <p className="text-[11px] font-semibold text-slate-700 mb-2 break-words">
@@ -464,7 +473,7 @@ const RawMaterialPurchaseReport = () => {
                     <button
                       type="button"
                       onClick={() => setViewId(p.id)}
-                      className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded"
+                      className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded transition-colors"
                     >
                       <Eye size={13} /> View Invoice
                     </button>
@@ -507,32 +516,43 @@ const RawMaterialPurchaseReport = () => {
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.invoiceNo}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] text-black">{p.date}</td>
                     <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-black">{p.supplierName}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#1E3A8A]">
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] font-medium text-[#1E3A8A] align-top">
                       {(p.normalizedItems || []).length > 0 ? (
-                        <div className="flex flex-col gap-0.5">
-                          {p.normalizedItems.map((item: any, idx: number) => (
-                            <span key={item.id || idx} className="leading-snug">
+                        <div className="flex flex-col gap-0.5 max-w-[280px]">
+                          {p.normalizedItems.slice(0, 2).map((item: any, idx: number) => (
+                            <span key={item.id || idx} className="leading-snug truncate block" title={item.label}>
                               {item.label}
                             </span>
                           ))}
+                          {p.normalizedItems.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => setViewId(p.id)}
+                              className="text-[10px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded w-fit mt-0.5 transition-colors cursor-pointer text-left"
+                              title="Click to view all items"
+                            >
+                              +{p.normalizedItems.length - 2} more materials
+                            </button>
+                          )}
                         </div>
                       ) : (
                         p.materialsSummary || '-'
                       )}
                     </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0]">
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] align-top">
                       <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
                         {p.paymentModeName}
                       </span>
                     </td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.invoiceValue}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center font-semibold text-gray-700">{p.taxRates}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-semibold">{p.taxAmount}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.transportCharge}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black">{p.wages}</td>
-                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-black">{p.netAmount}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black align-top">{p.invoiceValue}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-center font-semibold text-gray-700 align-top">{p.taxRates}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black font-semibold align-top">{p.taxAmount}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black align-top">{p.transportCharge}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right text-black align-top">{p.wages}</td>
+                    <td className="px-4 py-3 border-r border-[#E2E8F0] text-right font-bold text-black align-top">{p.netAmount}</td>
+                    <td className="px-4 py-3 text-center align-middle">
                       <button
+                        type="button"
                         onClick={() => setViewId(p.id)}
                         className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
                         title="View Details"

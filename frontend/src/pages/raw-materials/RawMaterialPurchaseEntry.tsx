@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { CheckCircle, ArrowLeft, PlusCircle, RotateCcw, List, FileText, Plus, Trash2, Package, X, Save, UserPlus, Search, ShoppingCart, User, ChevronRight, Edit3, Truck, Clock } from 'lucide-react';
 import api from '../../services/api';
@@ -98,6 +98,9 @@ const calculateRmItemAmounts = (
 
 const RawMaterialPurchaseEntry = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
+  const isEditMode = Boolean(editId && !isNaN(Number(editId)));
   const { formatCurrency, settings } = useSettings();
   const queryClient = useQueryClient();
   const isTaxInclusive = settings?.taxType === 'inclusive';
@@ -114,6 +117,68 @@ const RawMaterialPurchaseEntry = () => {
   const [wages, setwages] = useState<number | ''>('');
 
   const [items, setItems] = useState<any[]>([createEmptyItem()]);
+
+  // Fetch purchase data when in edit mode
+  const { data: editPurchaseData } = useQuery({
+    queryKey: ['rawMaterialPurchase', editId],
+    queryFn: async () => (await api.get(`/raw-material-purchases/${editId}`)).data,
+    enabled: isEditMode,
+  });
+
+  useEffect(() => {
+    if (editPurchaseData && isEditMode) {
+      isRestoringDraftRef.current = true;
+      if (editPurchaseData.date) {
+        setDate(new Date(editPurchaseData.date).toISOString().split('T')[0]);
+      }
+      if (editPurchaseData.invoiceNo) setInvoiceNo(editPurchaseData.invoiceNo);
+      if (editPurchaseData.supplierId) setSupplierId(Number(editPurchaseData.supplierId));
+      if (editPurchaseData.paymentModeId) setPaymentModeId(Number(editPurchaseData.paymentModeId));
+      setTransportCharge(
+        editPurchaseData.transportCharge !== undefined && editPurchaseData.transportCharge !== null
+          ? Number(editPurchaseData.transportCharge)
+          : ''
+      );
+      setwages(
+        editPurchaseData.wages !== undefined && editPurchaseData.wages !== null
+          ? Number(editPurchaseData.wages)
+          : ''
+      );
+      if (Array.isArray(editPurchaseData.items) && editPurchaseData.items.length > 0) {
+        setItems(
+          editPurchaseData.items.map((it: any) => {
+            const widthMm = it.widthMm ? String(it.widthMm) : '';
+            const lengthM = it.lengthM ? String(it.lengthM) : '';
+            const sqM = Number(it.sqM) || 0;
+            const quantity = it.quantity ? String(it.quantity) : '1';
+            const price = it.price ? String(it.price) : '';
+            const taxPercent = it.taxPercent !== undefined && it.taxPercent !== null ? String(it.taxPercent) : '';
+            const tax = it.tax !== undefined && it.tax !== null ? String(it.tax) : '';
+            const amount = Number(it.amount || 0);
+            const baseAmount = amount - (Number(tax) || 0);
+            return {
+              id: it.id,
+              rawMaterialId: Number(it.rawMaterialId) || 0,
+              materialCode: it.materialCode || '',
+              batchCode: it.batchCode || '',
+              widthMm,
+              lengthM,
+              sqM,
+              quantity,
+              price,
+              taxPercent,
+              tax,
+              baseAmount: Number(baseAmount.toFixed(2)),
+              amount: Number(amount.toFixed(2)),
+            };
+          })
+        );
+      }
+      setTimeout(() => {
+        isRestoringDraftRef.current = false;
+      }, 500);
+    }
+  }, [editPurchaseData, isEditMode]);
 
   // Draft & Auto-save state
   const [autoDraft, setAutoDraft] = useState<any>(null);
@@ -460,22 +525,30 @@ const RawMaterialPurchaseEntry = () => {
           amount: parseFloat(item.amount || '0')
         }))
       };
-      return api.post('/raw-material-purchases', payload);
+      if (isEditMode) {
+        return api.put(`/raw-material-purchases/${editId}`, payload);
+      } else {
+        return api.post('/raw-material-purchases', payload);
+      }
     },
     onSuccess: () => {
-      localStorage.removeItem(RM_AUTO_DRAFT_KEY);
-      if (activeDraftIdRef.current) {
-        const next = drafts.filter((d: any) => d.id !== activeDraftIdRef.current);
-        setDrafts(next);
-        persistRmDrafts(next);
-        activeDraftIdRef.current = null;
+      queryClient.invalidateQueries({ queryKey: ['rawMaterialPurchases'] });
+      queryClient.invalidateQueries({ queryKey: ['rawMaterialPurchaseReport'] });
+      if (!isEditMode) {
+        localStorage.removeItem(RM_AUTO_DRAFT_KEY);
+        if (activeDraftIdRef.current) {
+          const next = drafts.filter((d: any) => d.id !== activeDraftIdRef.current);
+          setDrafts(next);
+          persistRmDrafts(next);
+          activeDraftIdRef.current = null;
+        }
       }
-      toast.success('Purchase saved successfully');
+      toast.success(isEditMode ? 'Purchase updated successfully' : 'Purchase saved successfully');
       navigate('/raw-materials/purchase-list');
     },
     onError: (err: any) => {
       console.error(err);
-      toast.error('Failed to save purchase');
+      toast.error(isEditMode ? 'Failed to update purchase' : 'Failed to save purchase');
     }
   });
 
@@ -541,6 +614,7 @@ const RawMaterialPurchaseEntry = () => {
 
   // Check for auto-draft on mount
   useEffect(() => {
+    if (isEditMode) return;
     try {
       const raw = localStorage.getItem(RM_AUTO_DRAFT_KEY);
       if (raw) {
@@ -558,11 +632,11 @@ const RawMaterialPurchaseEntry = () => {
     } catch (e) {
       console.error('Failed to read RM auto draft', e);
     }
-  }, []);
+  }, [isEditMode]);
 
   // Auto-save draft on any meaningful change (debounced 400ms)
   useEffect(() => {
-    if (isRestoringDraftRef.current) return;
+    if (isEditMode || isRestoringDraftRef.current) return;
     const validItems = items.filter((i: any) => Number(i.rawMaterialId) > 0 || String(i.materialCode || '').trim() || String(i.batchCode || '').trim() || Number(i.quantity) > 0);
     const hasHeader = Boolean(String(invoiceNo || '').trim()) || Number(supplierId) > 0;
 
@@ -594,7 +668,7 @@ const RawMaterialPurchaseEntry = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [date, supplierId, invoiceNo, paymentModeId, transportCharge, wages, items, grandTotal, suppliers]);
+  }, [isEditMode, date, supplierId, invoiceNo, paymentModeId, transportCharge, wages, items, grandTotal, suppliers]);
 
   // Warn on page refresh/close if unsaved changes exist
   useEffect(() => {
@@ -771,36 +845,40 @@ const RawMaterialPurchaseEntry = () => {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-bold text-[14px] uppercase tracking-wider flex items-center gap-2">
             <span className="bg-[#334155] p-1 rounded"><Package size={16} /></span>
-            Raw Material Purchase
+            {isEditMode ? `Edit RM Purchase (Invoice: ${invoiceNo || `#${editId}`})` : 'Raw Material Purchase'}
           </h1>
           <button
             type="button"
             onClick={() => handleSubmit()}
             className="bg-[#10B981] hover:bg-[#059669] text-white px-3.5 py-1.5 rounded flex items-center gap-1.5 font-bold text-[13px] transition-colors shadow-sm"
           >
-            <CheckCircle size={16} /> SAVE PURCHASE (F10)
+            <CheckCircle size={16} /> {isEditMode ? 'UPDATE PURCHASE (F10)' : 'SAVE PURCHASE (F10)'}
           </button>
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            className="bg-[#334155] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm border border-slate-600"
-            title="Save as Draft (F8)"
-          >
-            <Save size={14} /> Save Draft (F8)
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsDraftsModalOpen(true)}
-            className="relative bg-[#334155] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm border border-slate-600"
-            title="View saved drafts"
-          >
-            <Clock size={14} /> Drafts
-            {drafts.length > 0 && (
-              <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full ml-0.5">
-                {drafts.length}
-              </span>
-            )}
-          </button>
+          {!isEditMode && (
+            <>
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                className="bg-[#334155] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm border border-slate-600"
+                title="Save as Draft (F8)"
+              >
+                <Save size={14} /> Save Draft (F8)
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDraftsModalOpen(true)}
+                className="relative bg-[#334155] hover:bg-[#1E293B] text-white px-3 py-1.5 rounded flex items-center gap-1.5 font-bold text-[12px] transition-colors shadow-sm border border-slate-600"
+                title="View saved drafts"
+              >
+                <Clock size={14} /> Drafts
+                {drafts.length > 0 && (
+                  <span className="bg-amber-400 text-slate-900 text-[10px] font-black px-1.5 py-0.2 rounded-full ml-0.5">
+                    {drafts.length}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {lastAutoSavedAt && (
@@ -1205,19 +1283,21 @@ const RawMaterialPurchaseEntry = () => {
               <span className="opacity-60 border-r border-[#64748B] pr-1.5">F2</span> Add Material
             </button>
 
-            <button
-              type="button" onClick={handleSaveDraft}
-              className="bg-[#475569] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#334155] shadow-sm transition-colors"
-            >
-              <span className="opacity-60 border-r border-[#64748B] pr-1.5">F8</span> Save Draft
-            </button>
+            {!isEditMode && (
+              <button
+                type="button" onClick={handleSaveDraft}
+                className="bg-[#475569] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#334155] shadow-sm transition-colors"
+              >
+                <span className="opacity-60 border-r border-[#64748B] pr-1.5">F8</span> Save Draft
+              </button>
+            )}
 
             <button
               type="button" disabled={mutation.isPending} onClick={() => handleSubmit()}
               className="bg-[#10B981] text-white text-[11px] font-bold px-3 py-2 rounded flex items-center gap-1.5 cursor-pointer hover:bg-[#059669] shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="opacity-60 border-r border-[#6EE7B7] pr-1.5">F10</span>
-              {mutation.isPending ? 'Saving...' : 'Save Record'}
+              {mutation.isPending ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Record' : 'Save Record')}
             </button>
           </div>
 

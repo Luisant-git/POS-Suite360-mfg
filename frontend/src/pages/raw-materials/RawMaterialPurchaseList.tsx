@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -108,7 +108,86 @@ const RawMaterialPurchaseList = () => {
 
         {/* Table Container */}
         <div className="flex-1 overflow-auto overflow-x-auto bg-white">
-          <table className="w-full text-left text-[13px] whitespace-nowrap">
+          {/* Mobile Card View (md:hidden) */}
+          <div className="md:hidden divide-y divide-[#E2E8F0]">
+            {isLoading ? (
+              <div className="p-6 text-center text-gray-500 font-bold">Loading RM purchases...</div>
+            ) : filteredPurchases.length === 0 ? (
+              <div className="text-center p-6 text-gray-500">No purchase invoices found matching your criteria.</div>
+            ) : (
+              paginatedPurchases.map((purchase: any) => {
+                const purchaseItems = Array.isArray(purchase.items) ? purchase.items : [];
+                return (
+                  <div key={purchase.id} className="p-3.5 bg-white hover:bg-[#F8FAFC]">
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <div>
+                        <span className="font-black text-[#1E3A8A] text-[13px]">{purchase.invoiceNo}</span>
+                        <span className="text-[11px] text-gray-500 block">
+                          {purchase.date ? new Date(purchase.date).toISOString().split('T')[0] : '-'}
+                        </span>
+                      </div>
+                      <span className="font-black text-[15px] text-[#059669]">
+                        {formatCurrency(purchase.grandTotal)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[12px] text-gray-700 mb-2">
+                      <span className="font-bold text-slate-800">{purchase.supplier?.name || 'Unknown Supplier'}</span>
+                      <span className="inline-block px-2 py-0.5 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
+                        {purchase.paymentMode?.name || 'Cash'}
+                      </span>
+                    </div>
+
+                    {purchaseItems.length > 0 && (
+                      <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5 mb-2.5 space-y-1">
+                        <div className="text-[11px] font-semibold text-slate-700">
+                          {purchaseItems.slice(0, 2).map((item: any, idx: number) => (
+                            <div key={item.id || idx} className="truncate">
+                              • <span className="font-bold">{item.rawMaterial?.name || '-'}</span>
+                              {(getItemMaterialCode(item) !== '-' || getItemBatchCode(item) !== '-') && (
+                                <span className="text-slate-500 text-[10px] ml-1">
+                                  ({getItemMaterialCode(item)} / {getItemBatchCode(item)})
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {purchaseItems.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => setViewId(purchase.id)}
+                              className="text-[10px] text-blue-600 font-bold hover:underline block mt-1"
+                            >
+                              +{purchaseItems.length - 2} more materials (view details)
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/raw-materials/purchase?editId=${purchase.id}`)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1 rounded transition-colors"
+                      >
+                        <Pencil size={13} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewId(purchase.id)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-[#3B82F6] bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded transition-colors"
+                      >
+                        <Eye size={13} /> View Invoice
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="hidden md:table w-full text-left text-[13px] whitespace-nowrap">
             <thead>
               <tr className="bg-[#1E293B] text-white font-bold">
                 <th className="px-3 py-2.5 border-r border-[#334155] relative">Date</th>
@@ -136,56 +215,93 @@ const RawMaterialPurchaseList = () => {
                   const purchaseItems = Array.isArray(purchase.items) ? purchase.items : [];
                   return (
                     <tr key={purchase.id} className={`border-b border-[#E5E7EB] ${index % 2 === 0 ? 'bg-[#F9F9F9]' : 'bg-white'} hover:bg-slate-50`}>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.date ? new Date(purchase.date).toISOString().split('T')[0] : '-'}</td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#3B82F6] font-bold">{purchase.invoiceNo}</td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">{purchase.supplier?.name || 'Unknown Supplier'}</td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium">
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium align-top">{purchase.date ? new Date(purchase.date).toISOString().split('T')[0] : '-'}</td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#3B82F6] font-bold align-top">{purchase.invoiceNo}</td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium align-top">{purchase.supplier?.name || 'Unknown Supplier'}</td>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-medium align-top">
                         {purchaseItems.length > 0 ? (
-                          <div className="flex flex-col gap-0.5">
-                            {purchaseItems.map((item: any, idx: number) => (
-                              <span key={item.id || idx}>{item.rawMaterial?.name || '-'}</span>
+                          <div className="flex flex-col gap-0.5 max-w-[200px]">
+                            {purchaseItems.slice(0, 2).map((item: any, idx: number) => (
+                              <span key={item.id || idx} className="truncate block" title={item.rawMaterial?.name || '-'}>
+                                {item.rawMaterial?.name || '-'}
+                              </span>
                             ))}
+                            {purchaseItems.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => setViewId(purchase.id)}
+                                className="text-[10px] text-blue-600 font-bold bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded w-fit mt-0.5 transition-colors cursor-pointer text-left"
+                                title="Click to view all items"
+                              >
+                                +{purchaseItems.length - 2} more items
+                              </button>
+                            )}
                           </div>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-normal">
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-normal align-top">
                         {purchaseItems.length > 0 ? (
-                          <div className="flex flex-col gap-0.5">
-                            {purchaseItems.map((item: any, idx: number) => (
-                              <span key={item.id || idx}>{getItemMaterialCode(item)}</span>
+                          <div className="flex flex-col gap-0.5 max-w-[150px]">
+                            {purchaseItems.slice(0, 2).map((item: any, idx: number) => (
+                              <span key={item.id || idx} className="truncate block font-mono text-[12px]" title={getItemMaterialCode(item)}>
+                                {getItemMaterialCode(item)}
+                              </span>
                             ))}
+                            {purchaseItems.length > 2 && (
+                              <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                +{purchaseItems.length - 2} more
+                              </span>
+                            )}
                           </div>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-normal">
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#333] font-normal align-top">
                         {purchaseItems.length > 0 ? (
-                          <div className="flex flex-col gap-0.5">
-                            {purchaseItems.map((item: any, idx: number) => (
-                              <span key={item.id || idx}>{getItemBatchCode(item)}</span>
+                          <div className="flex flex-col gap-0.5 max-w-[180px]">
+                            {purchaseItems.slice(0, 2).map((item: any, idx: number) => (
+                              <span key={item.id || idx} className="truncate block font-mono text-[12px]" title={getItemBatchCode(item)}>
+                                {getItemBatchCode(item)}
+                              </span>
                             ))}
+                            {purchaseItems.length > 2 && (
+                              <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                +{purchaseItems.length - 2} more
+                              </span>
+                            )}
                           </div>
                         ) : (
                           '-'
                         )}
                       </td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB]">
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] align-top">
                         <span className="inline-block px-2 py-1 bg-[#EBF5FF] text-[#2563EB] rounded text-[10px] font-black uppercase tracking-wider">
                           {purchase.paymentMode?.name || 'Cash'}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#059669] font-bold text-right">{formatCurrency(purchase.grandTotal)}</td>
-                      <td className="px-3 py-2.5 text-center">
-                        <button 
-                          onClick={() => setViewId(purchase.id)}
-                          className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
-                          title="View Details"
-                        >
-                          <Eye size={16} />
-                        </button>
+                      <td className="px-3 py-2.5 border-r border-[#E5E7EB] text-[#059669] font-bold text-right align-top">{formatCurrency(purchase.grandTotal)}</td>
+                      <td className="px-3 py-2.5 text-center align-middle">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => setViewId(purchase.id)}
+                            className="p-1.5 bg-[#EBF5FF] text-[#3B82F6] hover:bg-[#3B82F6] hover:text-white rounded transition-colors"
+                            title="View Details"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => navigate(`/raw-materials/purchase?editId=${purchase.id}`)}
+                            className="p-1.5 bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white rounded transition-colors border border-amber-200"
+                            title="Edit Invoice"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

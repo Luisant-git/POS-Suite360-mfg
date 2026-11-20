@@ -10,7 +10,7 @@ import PaginationControls from '../../components/PaginationControls';
 import TableLoader from '../../components/TableLoader';
 
 const SalesList = () => {
-  const { settings, formatCurrency } = useSettings();
+  const { formatCurrency } = useSettings();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSale, setSelectedSale] = useState<any>(null);
@@ -219,16 +219,14 @@ const SalesList = () => {
                         >
                           <Eye size={13} />
                         </button>
-                        {settings?.enableInvoiceEdit && new Date(sale.date).getTime() >= Date.now() - ((settings?.invoiceEditDays || 30) * 24 * 60 * 60 * 1000) && (
-                          <button
-                            type="button" 
-                            onClick={() => navigate(`/sales/pos?editId=${sale.id}`)}
-                            className="text-[#64748B] border border-[#64748B] bg-gray-50 hover:bg-[#64748B] hover:text-white rounded p-1.5 transition-colors"
-                            title="Edit Invoice"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                        )}
+                        <button
+                          type="button" 
+                          onClick={() => navigate(`/sales/pos?editId=${sale.id}`)}
+                          className="text-[#64748B] border border-[#64748B] bg-gray-50 hover:bg-[#64748B] hover:text-white rounded p-1.5 transition-colors"
+                          title="Edit Invoice"
+                        >
+                          <Pencil size={13} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -289,15 +287,13 @@ const SalesList = () => {
                             >
                               <Eye size={14} />
                             </button>
-                            {settings?.enableInvoiceEdit && new Date(sale.date).getTime() >= Date.now() - ((settings?.invoiceEditDays || 30) * 24 * 60 * 60 * 1000) && (
-                              <button type="button" 
-                                onClick={() => navigate(`/sales/pos?editId=${sale.id}`)}
-                                className="text-[#64748B] border border-[#64748B] rounded p-1 hover:bg-[#64748B] hover:text-white transition-colors"
-                                title="Edit Invoice"
-                              >
-                                <Pencil size={14} />
-                              </button>
-                            )}
+                            <button type="button" 
+                              onClick={() => navigate(`/sales/pos?editId=${sale.id}`)}
+                              className="text-[#64748B] border border-[#64748B] rounded p-1 hover:bg-[#64748B] hover:text-white transition-colors"
+                              title="Edit Invoice"
+                            >
+                              <Pencil size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>

@@ -134,4 +134,92 @@ export class RawMaterialPurchasesService {
     }
     return purchase;
   }
+
+  async update(id: number, updateDto: CreateRawMaterialPurchaseDto) {
+    const existing = await this.prisma.rawMaterialPurchase.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!existing) {
+      throw new BadRequestException('Purchase not found');
+    }
+
+    if (updateDto.invoiceNo && updateDto.invoiceNo !== existing.invoiceNo) {
+      const conflict = await this.prisma.rawMaterialPurchase.findUnique({
+        where: { invoiceNo: updateDto.invoiceNo },
+      });
+      if (conflict && conflict.id !== id) {
+        throw new BadRequestException('Invoice number already exists');
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Revert old stock changes
+      for (const oldItem of existing.items) {
+        await tx.rawMaterial.update({
+          where: { id: oldItem.rawMaterialId },
+          data: {
+            currentStock: { decrement: oldItem.quantity },
+          },
+        });
+      }
+
+      // 2. Delete old items
+      await tx.rawMaterialPurchaseItem.deleteMany({
+        where: { rawMaterialPurchaseId: id },
+      });
+
+      // 3. Update purchase and recreate items
+      const updated = await tx.rawMaterialPurchase.update({
+        where: { id },
+        data: {
+          invoiceNo: updateDto.invoiceNo,
+          date: new Date(updateDto.date),
+          supplierId: updateDto.supplierId,
+          subtotal: updateDto.subtotal,
+          tax: updateDto.tax,
+          transportCharge: updateDto.transportCharge,
+          wages: updateDto.wages,
+          grandTotal: updateDto.grandTotal,
+          paymentModeId: updateDto.paymentModeId,
+          items: {
+            create: updateDto.items.map((item) => ({
+              rawMaterialId: item.rawMaterialId,
+              materialCode: item.materialCode?.trim() || null,
+              batchCode: item.batchCode?.trim() || null,
+              widthMm: item.widthMm,
+              lengthM: item.lengthM,
+              sqM: item.sqM,
+              quantity: item.quantity,
+              price: item.price,
+              taxPercent: item.taxPercent || 0,
+              tax: item.tax || 0,
+              amount: item.amount,
+            })),
+          },
+        },
+        include: {
+          items: {
+            include: { rawMaterial: true },
+          },
+          supplier: true,
+          paymentMode: true,
+        },
+      });
+
+      // 4. Apply new stock changes
+      for (const newItem of updateDto.items) {
+        const trimmedBatch = newItem.batchCode?.trim();
+        await tx.rawMaterial.update({
+          where: { id: newItem.rawMaterialId },
+          data: {
+            currentStock: { increment: newItem.quantity },
+            ...(trimmedBatch ? { batchCode: trimmedBatch } : {}),
+          },
+        });
+      }
+
+      return updated;
+    });
+  }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -80,6 +80,9 @@ type PurchaseFormValues = z.infer<typeof purchaseSchema>;
 const PurchaseEntry = () => {
   const { settings, formatCurrency } = useSettings();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
+  const isEditMode = Boolean(editId);
   const queryClient = useQueryClient();
   const [isSupplierModalOpen, setIsSupplierModalOpen] = useState(false);
   const [newSupplier, setNewSupplier] = useState({ name: '', phone: '', address: '', state: '' });
@@ -196,15 +199,73 @@ const PurchaseEntry = () => {
   // Fetch Masters & Next Entry No
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: async () => (await api.get('/suppliers')).data });
   const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: async () => (await api.get('/products')).data });
-  const { data: nextEntryData } = useQuery({ queryKey: ['nextEntryNo'], queryFn: async () => (await api.get('/purchases/next-entry-no')).data });
+  const { data: nextEntryData } = useQuery({ queryKey: ['nextEntryNo'], queryFn: async () => (await api.get('/purchases/next-entry-no')).data, enabled: !isEditMode });
   const { data: paymentModes = [] } = useQuery({ queryKey: ['paymentModes'], queryFn: async () => (await api.get('/payment-modes')).data });
+
+  // Fetch Purchase Data if in Edit Mode
+  const { data: editPurchaseData } = useQuery({
+    queryKey: ['purchase', editId],
+    queryFn: async () => {
+      const { data } = await api.get(`/purchases/${editId}`);
+      return data;
+    },
+    enabled: isEditMode && !!editId,
+  });
+
+  // Populate form if in Edit Mode
+  useEffect(() => {
+    if (editPurchaseData && isEditMode) {
+      const mappedItems = (editPurchaseData.items || []).map((item: any) => {
+        const pRate = Number(item.rate) || 0;
+        const q = Number(item.quantity) || 0;
+        const total = Number(item.amount) || (pRate * q);
+        const wRate = Number(item.product?.wholesaleRate) || 0;
+        const sRate = Number(item.product?.sellingRate) || 0;
+        const mrp = Number(item.product?.mrp) || 0;
+        const tax = Number(item.tax) || 0;
+        const unit = item.product?.unit?.shortCode || item.product?.unit?.name || 'Nos';
+
+        return {
+          productId: Number(item.productId),
+          quantity: q,
+          unit,
+          pRate,
+          wRate,
+          sRate,
+          mrp,
+          discPercent: 0,
+          discAmt: 0,
+          tax,
+          total,
+        };
+      });
+
+      reset({
+        entryNo: editPurchaseData.invoiceNo || '',
+        invoiceNo: editPurchaseData.supplierInvoiceNo || '',
+        invoiceDate: editPurchaseData.invoiceDate ? new Date(editPurchaseData.invoiceDate).toISOString().split('T')[0] : '',
+        date: editPurchaseData.date ? new Date(editPurchaseData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        supplierId: Number(editPurchaseData.supplierId) || 0,
+        paymentModeId: Number(editPurchaseData.paymentModeId) || 0,
+        items: mappedItems.length > 0 ? mappedItems : [{ productId: 0, quantity: '' as any, unit: 'Nos', pRate: '' as any, wRate: '' as any, sRate: '' as any, mrp: '' as any, discPercent: '' as any, discAmt: '' as any, tax: 0, total: 0 }],
+        totalAmount: Number(editPurchaseData.subtotal) || 0,
+        totalDiscountPercent: '' as any,
+        totalDiscount: Number(editPurchaseData.discount) || '' as any,
+        transportCharge: Number(editPurchaseData.transportCharge) || '' as any,
+        wages: Number(editPurchaseData.wages) || '' as any,
+        tax: Number(editPurchaseData.tax) || 0,
+        roundOff: '' as any,
+        netAmount: Number(editPurchaseData.grandTotal) || 0,
+      });
+    }
+  }, [editPurchaseData, isEditMode, reset]);
 
   // Update default entry no
   useEffect(() => {
-    if (nextEntryData?.entryNo) {
+    if (!isEditMode && nextEntryData?.entryNo) {
       setValue('entryNo', nextEntryData.entryNo);
     }
-  }, [nextEntryData, setValue]);
+  }, [nextEntryData, setValue, isEditMode]);
 
   // Watch values for calculation
   const items = watch('items');
@@ -295,9 +356,14 @@ const PurchaseEntry = () => {
   };
 
   const createMutation = useMutation({
-    mutationFn: (data: PurchaseFormValues) => api.post('/purchases', data),
+    mutationFn: (data: any) => {
+      if (isEditMode) {
+        return api.put(`/purchases/${editId}`, data);
+      }
+      return api.post('/purchases', data);
+    },
     onSuccess: () => {
-      toast.success('Purchase recorded successfully!');
+      toast.success(isEditMode ? 'Purchase updated successfully!' : 'Purchase recorded successfully!');
 
       setTimeout(() => {
         if (printAfterSaveRef.current) {
@@ -306,13 +372,14 @@ const PurchaseEntry = () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['nextEntryNo'] });
         queryClient.invalidateQueries({ queryKey: ['purchases'] });
+        queryClient.invalidateQueries({ queryKey: ['purchase', editId] });
         reset();
         navigate('/purchase');
       }, 100);
     },
     onError: (error) => {
       console.error(error);
-      toast.error('Failed to record purchase. Please check your inputs.');
+      toast.error(isEditMode ? 'Failed to update purchase. Please check your inputs.' : 'Failed to record purchase. Please check your inputs.');
     }
   });
 
@@ -646,14 +713,19 @@ const PurchaseEntry = () => {
 
         {/* Top Bar */}
         <div className="bg-[#0B355B] text-white px-2 sm:px-4 py-2 flex flex-wrap gap-2 justify-between items-center shrink-0">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleSubmit(onSubmit as any, onError)}
               className="bg-[#059669] hover:bg-[#047857] text-white px-3 sm:px-4 py-2 sm:py-1.5 rounded flex items-center gap-2 font-bold text-[13px] transition-colors"
             >
-              <CheckCircle size={16} /> <span className="hidden sm:inline">SAVE PURCHASE (F10)</span><span className="sm:hidden">Save</span>
+              <CheckCircle size={16} /> <span className="hidden sm:inline">{isEditMode ? 'UPDATE PURCHASE (F10)' : 'SAVE PURCHASE (F10)'}</span><span className="sm:hidden">{isEditMode ? 'Update' : 'Save'}</span>
             </button>
+            {isEditMode && (
+              <span className="bg-amber-400 text-slate-900 text-xs px-2.5 py-1 rounded font-black tracking-wider uppercase shadow-sm">
+                EDIT MODE {editPurchaseData?.invoiceNo ? `(#${editPurchaseData.invoiceNo})` : ''}
+              </span>
+            )}
           </div>
           <button
             onClick={() => setIsLeaveModalOpen(true)}
@@ -1485,7 +1557,7 @@ const PurchaseEntry = () => {
                   className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-50 text-white py-3.5 rounded-xl font-extrabold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
                 >
                   <CheckCircle size={20} />
-                  <span>{createMutation.isPending ? 'SAVING...' : 'SAVE PURCHASE'}</span>
+                  <span>{createMutation.isPending ? (isEditMode ? 'UPDATING...' : 'SAVING...') : (isEditMode ? 'UPDATE PURCHASE' : 'SAVE PURCHASE')}</span>
                 </button>
               </div>
             </div>
@@ -1728,7 +1800,7 @@ const PurchaseEntry = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col transform transition-all scale-100">
             <div className="bg-gradient-to-r from-[#0F172A] to-[#1E3A8A] text-white px-5 py-4 flex justify-between items-center">
               <div className="flex items-center gap-2 font-bold text-[16px]">
-                <Save size={20} /> Confirm Save Transaction
+                <Save size={20} /> {isEditMode ? 'Confirm Update Transaction' : 'Confirm Save Transaction'}
               </div>
               <button type="button" onClick={() => setIsSaveModalOpen(false)} className="text-white/80 hover:text-white transition-colors bg-white/10 hover:bg-white/20 p-1.5 rounded-full">
                 <X size={18} />
@@ -1749,7 +1821,7 @@ const PurchaseEntry = () => {
                 onClick={() => handleConfirmSave(false)}
                 className="w-full bg-[#10B981] hover:bg-[#059669] text-white py-2.5 rounded-lg font-bold text-[14px] transition-all shadow-md flex items-center justify-center gap-2"
               >
-                <Save size={16} /> Confirm Save
+                <Save size={16} /> {isEditMode ? 'Confirm Update' : 'Confirm Save'}
               </button>
             </div>
           </div>
