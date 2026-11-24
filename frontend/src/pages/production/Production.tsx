@@ -241,7 +241,7 @@ const Production = () => {
       }
       row.finishedProductId = prodId;
       const product = products.find((p: any) => p.id === prodId);
-      row.prodSqM = product?.sqM ? Number(product.sqM).toFixed(3) : '0.000';
+      row.prodSqM = product?.sqM && Number(product.sqM) > 0 ? Number(product.sqM).toFixed(3) : '';
       // Auto-populate intake only when starting fresh and user hasn't picked a raw material yet
       if (
         !editingId &&
@@ -620,9 +620,9 @@ const Production = () => {
       const calcProdSqM =
         Number(o.outcomeQuantity) > 0 && Number(o.sqM) > 0
           ? (Number(o.sqM) / Number(o.outcomeQuantity)).toFixed(3)
-          : prod?.sqM
+          : prod?.sqM && Number(prod.sqM) > 0
           ? Number(prod.sqM).toFixed(3)
-          : '0.000';
+          : '';
       return {
         finishedProductId: Number(o.finishedProductId),
         previousQuantity: Number(o.outcomeQuantity || 0),
@@ -866,18 +866,19 @@ const Production = () => {
                                 min="0"
                                 readOnly={!canEditProdSqM}
                                 tabIndex={canEditProdSqM ? 0 : -1}
+                                placeholder="0.000"
                                 value={
                                   outRow.prodSqM !== undefined && outRow.prodSqM !== ''
                                     ? outRow.prodSqM
-                                    : prod?.sqM
+                                    : prod?.sqM && Number(prod.sqM) > 0
                                     ? Number(prod.sqM).toFixed(3)
-                                    : '0.000'
+                                    : ''
                                 }
                                 onChange={(e) => updateOutcome(idx, 'prodSqM', e.target.value)}
                                 onFocus={(e) => {
                                   if (canEditProdSqM) e.target.select();
                                 }}
-                                className={`w-full px-2 py-1 border rounded text-[12px] outline-none text-right font-bold transition-colors ${
+                                className={`w-full px-2 py-1 border rounded text-[12px] outline-none text-right font-bold transition-colors placeholder:text-gray-400 placeholder:font-normal ${
                                   canEditProdSqM
                                     ? 'bg-white border-[#CBD5E1] text-blue-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
                                     : 'bg-gray-100 border-[#ccc] text-gray-500 cursor-not-allowed'
@@ -1009,10 +1010,11 @@ const Production = () => {
                               <label className="block text-[10px] font-bold text-gray-600 mb-1">Sq.M</label>
                               <input
                                 type="text"
-                                value={item.sqM || '0.000'}
+                                value={item.sqM && Number(item.sqM) > 0 ? item.sqM : ''}
+                                placeholder="0.000"
                                 readOnly
                                 tabIndex={-1}
-                                className="w-full px-2 py-1.5 border border-[#E5E7EB] rounded bg-gray-100 text-[13px] outline-none text-right font-bold text-gray-500 cursor-not-allowed"
+                                className="w-full px-2 py-1.5 border border-[#E5E7EB] rounded bg-gray-100 text-[13px] outline-none text-right font-bold text-gray-500 cursor-not-allowed placeholder:text-gray-400 placeholder:font-normal"
                               />
                             </div>
                             {intakes.length > 1 && (

@@ -165,7 +165,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       const product = products.find((p: any) => p.id === Number(value));
       const isSameProduct = Number(newItems[index].finishedProductId) === Number(value);
       newItems[index].finishedProductId = value;
-      newItems[index].prodSqM = product?.sqM ? Number(product.sqM).toFixed(3) : '0.000';
+      newItems[index].prodSqM = product?.sqM && Number(product.sqM) > 0 ? Number(product.sqM).toFixed(3) : '';
 
       if (Number(value) > 0 && !isSameProduct && product && product.rawMaterials && product.rawMaterials.length > 0) {
         // Update current row with the first raw material
@@ -201,7 +201,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                sqM: '0.000',
                intakeQuantity: '',
                finishedProductId: value,
-               prodSqM: product?.sqM ? Number(product.sqM).toFixed(3) : '0.000',
+               prodSqM: product?.sqM && Number(product.sqM) > 0 ? Number(product.sqM).toFixed(3) : '',
                outcomeQuantity: ''
              };
           });
@@ -474,18 +474,19 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       min="0"
                       readOnly={!canEditProdSqM}
                       tabIndex={canEditProdSqM ? 0 : -1}
+                      placeholder="0.000"
                       value={
                         item.prodSqM !== undefined && item.prodSqM !== ''
                           ? item.prodSqM
-                          : products.find((p: any) => p.id === item.finishedProductId)?.sqM
+                          : products.find((p: any) => p.id === item.finishedProductId)?.sqM && Number(products.find((p: any) => p.id === item.finishedProductId)?.sqM) > 0
                           ? Number(products.find((p: any) => p.id === item.finishedProductId)?.sqM).toFixed(3)
-                          : '0.000'
+                          : ''
                       }
                       onChange={(e) => updateItem(index, 'prodSqM', e.target.value)}
                       onFocus={(e) => {
                         if (canEditProdSqM) e.target.select();
                       }}
-                      className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors ${
+                      className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors placeholder:text-gray-400 placeholder:font-normal ${
                         canEditProdSqM
                           ? 'bg-white border-[#CBD5E1] text-blue-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
                           : 'bg-[#E5E7EB] border-[#D1D5DB] text-[#4B5563] cursor-not-allowed'
@@ -565,8 +566,12 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
-                      type="text" value={item.sqM || '0.000'} readOnly tabIndex={-1}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded bg-[#E5E7EB] text-[13px] outline-none text-right font-bold text-[#4B5563] cursor-not-allowed" 
+                      type="text" 
+                      value={item.sqM && Number(item.sqM) > 0 ? item.sqM : ''} 
+                      placeholder="0.000"
+                      readOnly 
+                      tabIndex={-1}
+                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded bg-[#E5E7EB] text-[13px] outline-none text-right font-bold text-[#4B5563] cursor-not-allowed placeholder:text-gray-400 placeholder:font-normal" 
                     />
                   </td>
 
@@ -871,10 +876,11 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Raw Sq.M</label>
                     <input 
                       type="text"
-                      value={item.sqM || '0.000'}
+                      value={item.sqM && Number(item.sqM) > 0 ? item.sqM : ''}
+                      placeholder="0.000"
                       readOnly
                       tabIndex={-1}
-                      className="w-full px-2 py-1.5 border border-slate-200 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 text-right outline-none"
+                      className="w-full px-2 py-1.5 border border-slate-200 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 text-right outline-none placeholder:text-slate-400 placeholder:font-normal"
                     />
                   </div>
 
