@@ -843,7 +843,7 @@ const Production = () => {
                               ]}
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div>
                             <div>
                               <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Prod Sq.M</label>
                               <input
@@ -854,6 +854,7 @@ const Production = () => {
                                 className="w-full px-2 py-1 border border-[#ccc] rounded bg-gray-100 text-[12px] outline-none text-right font-bold text-gray-500"
                               />
                             </div>
+                            {/* Commented out Out Sq.M
                             <div>
                               <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Out Sq.M</label>
                               <input
@@ -864,6 +865,7 @@ const Production = () => {
                                 className="w-full px-2 py-1 border border-[#E5E7EB] rounded bg-emerald-50 text-[12px] outline-none text-right font-bold text-emerald-700"
                               />
                             </div>
+                            */}
                           </div>
                           {editingId && (
                             <div className="flex items-center justify-between text-[11px] pt-1 border-t border-emerald-100">
