@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -19,9 +19,23 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
   const [workName, setWorkName] = useState('');
   const [batchCode, setBatchCode] = useState('');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+
+  const canEditProdSqM = useMemo(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return true;
+      const user = JSON.parse(storedUser);
+      const perms: string[] = user?.role?.permissions || [];
+      if (perms.includes('ALL')) return true;
+      if (perms.length === 0 && !user?.roleId) return true;
+      return perms.includes('mfg_production_edit_sqm');
+    } catch {
+      return false;
+    }
+  }, []);
   
   const [items, setItems] = useState<any[]>([
-    { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }
+    { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, prodSqM: '', outcomeQuantity: '' }
   ]);
 
   const { data: rawMaterials = [] } = useQuery({ 
@@ -74,7 +88,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
   const finishedProducts = products;
 
   const addItem = () => {
-    setItems(prev => [...prev, { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }]);
+    setItems(prev => [...prev, { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, prodSqM: '', outcomeQuantity: '' }]);
     setTimeout(() => {
       const inputs = document.querySelectorAll<HTMLElement>('[data-row-product] input');
       if (inputs.length > 0) {
@@ -91,12 +105,18 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
     setBatchCode(generateNextBatchCode(productions));
     setWorkName('');
     setDate(new Date().toISOString().split('T')[0]);
-    setItems([{ rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, outcomeQuantity: '' }]);
+    setItems([{ rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, prodSqM: '', outcomeQuantity: '' }]);
     setTimeout(() => focusProduct(0), 50);
   };
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...items];
+
+    if (field === 'prodSqM') {
+      newItems[index].prodSqM = value;
+      setItems(newItems);
+      return;
+    }
     
     if (field === 'intakeQuantity') {
       const rawMaterialId = newItems[index].rawMaterialId;
@@ -145,6 +165,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       const product = products.find((p: any) => p.id === Number(value));
       const isSameProduct = Number(newItems[index].finishedProductId) === Number(value);
       newItems[index].finishedProductId = value;
+      newItems[index].prodSqM = product?.sqM ? Number(product.sqM).toFixed(3) : '0.000';
 
       if (Number(value) > 0 && !isSameProduct && product && product.rawMaterials && product.rawMaterials.length > 0) {
         // Update current row with the first raw material
@@ -180,6 +201,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                sqM: '0.000',
                intakeQuantity: '',
                finishedProductId: value,
+               prodSqM: product?.sqM ? Number(product.sqM).toFixed(3) : '0.000',
                outcomeQuantity: ''
              };
           });
@@ -219,20 +241,28 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       }));
 
       // Aggregate distinct finished products while summing any entered outcome quantities
-      const outcomeMap = new Map<number, number>();
+      const outcomeMap = new Map<number, { qty: number; prodSqM: number }>();
       validItems.forEach((item) => {
         const prodId = parseInt(item.finishedProductId, 10);
         const qty = Math.max(0, parseInt(item.outcomeQuantity || '0', 10) || 0);
-        outcomeMap.set(prodId, (outcomeMap.get(prodId) || 0) + qty);
+        const prod = products.find((p: any) => p.id === prodId);
+        const effectiveProdSqM =
+          item.prodSqM !== undefined && item.prodSqM !== ''
+            ? Number(item.prodSqM)
+            : Number(prod?.sqM || 0);
+        const existing = outcomeMap.get(prodId);
+        if (existing) {
+          existing.qty += qty;
+        } else {
+          outcomeMap.set(prodId, { qty, prodSqM: effectiveProdSqM });
+        }
       });
 
-      const outcomes = Array.from(outcomeMap.entries()).map(([finishedProductId, outcomeQuantity]) => {
-        const prod = products.find((p: any) => p.id === finishedProductId);
-        const prodSqM = Number(prod?.sqM || 0);
+      const outcomes = Array.from(outcomeMap.entries()).map(([finishedProductId, data]) => {
         return {
           finishedProductId,
-          outcomeQuantity,
-          sqM: Number((outcomeQuantity * prodSqM).toFixed(4)),
+          outcomeQuantity: data.qty,
+          sqM: Number((data.qty * data.prodSqM).toFixed(4)),
         };
       });
 
@@ -389,7 +419,9 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
               <tr className="bg-[#0F172A] text-white">
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-10">#</th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Finished Product Name (Outcome)</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Product Sq.M</th>
+                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">
+                  Product Sq.M {canEditProdSqM && <span className="text-blue-300 font-normal">(Edit)</span>}
+                </th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Material Name</th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-40">Material Batch Code</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Current Stock</th>
@@ -437,11 +469,27 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
-                      type="text" 
-                      readOnly
-                      tabIndex={-1}
-                      value={products.find((p: any) => p.id === item.finishedProductId)?.sqM || '0.000'}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded bg-[#E5E7EB] text-[13px] outline-none text-right font-bold text-[#4B5563] cursor-not-allowed"
+                      type={canEditProdSqM ? 'number' : 'text'}
+                      step="0.001"
+                      min="0"
+                      readOnly={!canEditProdSqM}
+                      tabIndex={canEditProdSqM ? 0 : -1}
+                      value={
+                        item.prodSqM !== undefined && item.prodSqM !== ''
+                          ? item.prodSqM
+                          : products.find((p: any) => p.id === item.finishedProductId)?.sqM
+                          ? Number(products.find((p: any) => p.id === item.finishedProductId)?.sqM).toFixed(3)
+                          : '0.000'
+                      }
+                      onChange={(e) => updateItem(index, 'prodSqM', e.target.value)}
+                      onFocus={(e) => {
+                        if (canEditProdSqM) e.target.select();
+                      }}
+                      className={`w-full px-2 py-1 border rounded text-[13px] outline-none text-right font-bold transition-colors ${
+                        canEditProdSqM
+                          ? 'bg-white border-[#CBD5E1] text-blue-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+                          : 'bg-[#E5E7EB] border-[#D1D5DB] text-[#4B5563] cursor-not-allowed'
+                      }`}
                     />
                   </td>
 

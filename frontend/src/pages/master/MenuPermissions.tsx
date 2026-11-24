@@ -42,6 +42,7 @@ const MODULES = [
       { id: 'mfg_rm_master', name: 'Raw Material Master' },
       { id: 'mfg_rm_purchase', name: 'Raw Material Purchase' },
       { id: 'mfg_production', name: 'Production Entry' },
+      { id: 'mfg_production_edit_sqm', name: 'Edit Prod Sq.M in Production' },
     ]
   },
   {

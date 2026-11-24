@@ -34,6 +34,7 @@ interface OutcomeRow {
   finishedProductId: number;
   previousQuantity: number;
   outcomeQuantity: string;
+  prodSqM?: string;
   status?: string;
   completedAt?: string | null;
 }
@@ -51,6 +52,7 @@ const createEmptyOutcome = (): OutcomeRow => ({
   finishedProductId: 0,
   previousQuantity: 0,
   outcomeQuantity: '',
+  prodSqM: '',
 });
 
 const getCombinedOutcomeQty = (o: OutcomeRow): number =>
@@ -64,6 +66,20 @@ const Production = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [workName, setWorkName] = useState('');
   const [batchCode, setBatchCode] = useState('');
+
+  const canEditProdSqM = useMemo(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (!storedUser) return true;
+      const user = JSON.parse(storedUser);
+      const perms: string[] = user?.role?.permissions || [];
+      if (perms.includes('ALL')) return true;
+      if (perms.length === 0 && !user?.roleId) return true;
+      return perms.includes('mfg_production_edit_sqm');
+    } catch {
+      return false;
+    }
+  }, []);
 
   const [intakes, setIntakes] = useState<IntakeRow[]>([createEmptyIntake()]);
   const [outcomes, setOutcomes] = useState<OutcomeRow[]>([createEmptyOutcome()]);
@@ -224,6 +240,8 @@ const Production = () => {
         row.previousQuantity = 0;
       }
       row.finishedProductId = prodId;
+      const product = products.find((p: any) => p.id === prodId);
+      row.prodSqM = product?.sqM ? Number(product.sqM).toFixed(3) : '0.000';
       // Auto-populate intake only when starting fresh and user hasn't picked a raw material yet
       if (
         !editingId &&
@@ -246,6 +264,8 @@ const Production = () => {
           setIntakes(suggestedIntakes);
         }
       }
+    } else if (field === 'prodSqM') {
+      row.prodSqM = String(value);
     } else if (field === 'outcomeQuantity') {
       row.outcomeQuantity = String(value);
     }
@@ -276,11 +296,14 @@ const Production = () => {
       .map((o) => {
         const qty = getCombinedOutcomeQty(o);
         const prod = products.find((p: any) => p.id === o.finishedProductId);
-        const prodSqM = Number(prod?.sqM || 0);
+        const effectiveProdSqM =
+          o.prodSqM !== undefined && o.prodSqM !== ''
+            ? Number(o.prodSqM)
+            : Number(prod?.sqM || 0);
         return {
           finishedProductId: Number(o.finishedProductId),
           outcomeQuantity: qty,
-          sqM: Number((qty * prodSqM).toFixed(4)),
+          sqM: Number((qty * effectiveProdSqM).toFixed(4)),
         };
       });
 
@@ -592,13 +615,23 @@ const Production = () => {
       };
     });
 
-    const formattedOutcomes: OutcomeRow[] = loadedOutcomes.map((o: any) => ({
-      finishedProductId: Number(o.finishedProductId),
-      previousQuantity: Number(o.outcomeQuantity || 0),
-      outcomeQuantity: '',
-      status: o.status || 'PENDING',
-      completedAt: o.completedAt || null,
-    }));
+    const formattedOutcomes: OutcomeRow[] = loadedOutcomes.map((o: any) => {
+      const prod = products.find((p: any) => p.id === Number(o.finishedProductId));
+      const calcProdSqM =
+        Number(o.outcomeQuantity) > 0 && Number(o.sqM) > 0
+          ? (Number(o.sqM) / Number(o.outcomeQuantity)).toFixed(3)
+          : prod?.sqM
+          ? Number(prod.sqM).toFixed(3)
+          : '0.000';
+      return {
+        finishedProductId: Number(o.finishedProductId),
+        previousQuantity: Number(o.outcomeQuantity || 0),
+        outcomeQuantity: '',
+        prodSqM: calcProdSqM,
+        status: o.status || 'PENDING',
+        completedAt: o.completedAt || null,
+      };
+    });
 
     setOriginalIntakeMap(origMap);
     setIntakes(formattedIntakes.length > 0 ? formattedIntakes : [createEmptyIntake()]);
@@ -824,13 +857,31 @@ const Production = () => {
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Prod Sq.M</label>
+                              <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
+                                Prod Sq.M {canEditProdSqM && <span className="text-blue-600 font-semibold">(Editable)</span>}
+                              </label>
                               <input
-                                type="text"
-                                readOnly
-                                tabIndex={-1}
-                                value={prod?.sqM ? Number(prod.sqM).toFixed(3) : '0.000'}
-                                className="w-full px-2 py-1 border border-[#ccc] rounded bg-gray-100 text-[12px] outline-none text-right font-bold text-gray-500"
+                                type={canEditProdSqM ? 'number' : 'text'}
+                                step="0.001"
+                                min="0"
+                                readOnly={!canEditProdSqM}
+                                tabIndex={canEditProdSqM ? 0 : -1}
+                                value={
+                                  outRow.prodSqM !== undefined && outRow.prodSqM !== ''
+                                    ? outRow.prodSqM
+                                    : prod?.sqM
+                                    ? Number(prod.sqM).toFixed(3)
+                                    : '0.000'
+                                }
+                                onChange={(e) => updateOutcome(idx, 'prodSqM', e.target.value)}
+                                onFocus={(e) => {
+                                  if (canEditProdSqM) e.target.select();
+                                }}
+                                className={`w-full px-2 py-1 border rounded text-[12px] outline-none text-right font-bold transition-colors ${
+                                  canEditProdSqM
+                                    ? 'bg-white border-[#CBD5E1] text-blue-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
+                                    : 'bg-gray-100 border-[#ccc] text-gray-500 cursor-not-allowed'
+                                }`}
                               />
                             </div>
                             {/* Commented out Out Sq.M
