@@ -175,22 +175,11 @@ const Production = () => {
 
     if (field === 'rawMaterialId') {
       const matId = Number(value);
-      const material = rawMaterials.find((m: any) => m.id === matId);
-      const batchOpts = getRawMaterialBatchOptions(material);
-      const defaultOpt =
-        batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
-      const defaultBatch = defaultOpt?.batchCode || material?.batchCode || '';
-      const defaultMatCode =
-        defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
-      const defaultSqMPerRoll =
-        defaultOpt?.sqM ||
-        Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
       row.rawMaterialId = matId;
-      row.materialCode = defaultMatCode;
-      row.materialBatchCode = defaultBatch;
-      row.sqMPerRoll = defaultSqMPerRoll;
-      const qty = Number(row.intakeQuantity) || 0;
-      row.sqM = (qty * defaultSqMPerRoll).toFixed(3);
+      row.materialCode = '';
+      row.materialBatchCode = '';
+      row.sqMPerRoll = 0;
+      row.sqM = '0.000';
     } else if (field === 'materialCode') {
       row.materialCode = String(value);
     } else if (field === 'materialBatchCode') {
@@ -245,21 +234,11 @@ const Production = () => {
         const product = products.find((p: any) => p.id === prodId);
         if (product?.rawMaterials?.length > 0) {
           const suggestedIntakes: IntakeRow[] = product.rawMaterials.map((rmMap: any) => {
-            const material = rawMaterials.find((m: any) => m.id === rmMap.rawMaterialId);
-            const batchOpts = getRawMaterialBatchOptions(material);
-            const defaultOpt =
-              batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
-            const defaultBatch = defaultOpt?.batchCode || material?.batchCode || '';
-            const defaultMatCode =
-              defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
-            const sqMPerRoll =
-              defaultOpt?.sqM ||
-              Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
             return {
               rawMaterialId: rmMap.rawMaterialId,
-              materialCode: defaultMatCode,
-              materialBatchCode: defaultBatch,
-              sqMPerRoll,
+              materialCode: '',
+              materialBatchCode: '',
+              sqMPerRoll: 0,
               intakeQuantity: '',
               sqM: '0.000',
             };
@@ -843,7 +822,7 @@ const Production = () => {
                               ]}
                             />
                           </div>
-                          <div>
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="block text-[10px] font-bold text-gray-600 mb-0.5">Prod Sq.M</label>
                               <input
@@ -956,7 +935,6 @@ const Production = () => {
                                 value={item.materialBatchCode || ''}
                                 onChange={(val) => updateIntake(index, 'materialBatchCode', val || '')}
                                 placeholder="Select / search batch code..."
-                                creatable={true}
                                 options={batchSelectOptions}
                                 isDisabled={!item.rawMaterialId}
                               />

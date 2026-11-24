@@ -129,17 +129,10 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
     }
     
     if (field === 'rawMaterialId') {
-      const material = rawMaterials.find((m: any) => m.id === Number(value));
-      const batchOpts = getRawMaterialBatchOptions(material);
-      const defaultOpt = batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
-      const defaultBatch = defaultOpt?.batchCode || material?.batchCode || '';
-      const defaultMatCode = defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
-      const sqMPerRoll = defaultOpt?.sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      const currentQty = Number(newItems[index].intakeQuantity) || 0;
-      newItems[index].materialCode = defaultMatCode;
-      newItems[index].materialBatchCode = defaultBatch;
-      newItems[index].sqMPerRoll = sqMPerRoll;
-      newItems[index].sqM = (currentQty * sqMPerRoll).toFixed(3);
+      newItems[index].materialCode = '';
+      newItems[index].materialBatchCode = '';
+      newItems[index].sqMPerRoll = 0;
+      newItems[index].sqM = '0.000';
       newItems[index][field] = value;
       setItems(newItems);
       if (Number(value) > 0) {
@@ -472,7 +465,6 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       value={item.materialBatchCode || ''}
                       onChange={val => updateItem(index, 'materialBatchCode', val || '')}
                       placeholder="Select batch..."
-                      creatable={true}
                       options={[
                         { label: 'Select batch code...', value: '' },
                         ...getRawMaterialBatchOptions(rawMaterials.find((m: any) => m.id === item.rawMaterialId)).map((b) => ({
@@ -802,7 +794,6 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       value={item.materialBatchCode || ''}
                       onChange={val => updateItem(index, 'materialBatchCode', val || '')}
                       placeholder="Select / search batch code..."
-                      creatable={true}
                       options={[
                         { label: 'Select batch code...', value: '' },
                         ...getRawMaterialBatchOptions(material).map((b) => ({

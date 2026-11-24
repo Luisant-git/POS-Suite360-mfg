@@ -3,17 +3,20 @@ import Select, { components } from 'react-select';
 import CreatableSelect from 'react-select/creatable';
 
 const CustomOption = (props: any) => {
-  const { onMouseDown } = props.innerProps;
   return (
     <components.Option 
       {...props} 
       innerProps={{
         ...props.innerProps,
         onMouseDown: (e: any) => {
-          e.preventDefault();
-          e.stopPropagation();
-          props.selectOption(props.data);
-          if (onMouseDown) onMouseDown(e);
+          if (typeof props.selectOption === 'function') {
+            props.selectOption(props.data);
+          } else if (typeof props.setValue === 'function') {
+            props.setValue(props.data, 'select-option');
+          }
+          if (props.innerProps?.onMouseDown) {
+            props.innerProps.onMouseDown(e);
+          }
         }
       }}
     />
