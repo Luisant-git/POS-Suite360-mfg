@@ -8,7 +8,6 @@ import SearchableSelect from '../../components/SearchableSelect';
 import ShortcutHelpButton from '../../components/ShortcutHelp';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
 import {
-  formatRawMaterialLabel,
   generateNextBatchCode,
   getRawMaterialBatchOptions,
 } from '../../utils/productionBatch';
@@ -398,7 +397,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-10">#</th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Finished Product Name (Outcome)</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Product Sq.M</th>
-                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Material (Name-Code-Batch)</th>
+                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Material Name</th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-40">Material Batch Code</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Current Stock</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Quantity Intake</th>
@@ -464,26 +463,25 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       onChange={(val) => updateItem(index, 'rawMaterialId', Number(val))}
                       options={[
                         { label: 'Type material...', value: 0 },
-                        ...rawMaterials.map((m: any) => ({ label: formatRawMaterialLabel(m), value: m.id }))
+                        ...rawMaterials.map((m: any) => ({ label: `${m.name} (Stock: ${m.currentStock ?? 0})`, value: m.id }))
                       ]}
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input
-                      type="text"
-                      list={`grid-batch-opts-${index}`}
+                    <SearchableSelect
                       value={item.materialBatchCode || ''}
-                      onChange={e => updateItem(index, 'materialBatchCode', e.target.value)}
-                      placeholder="e.g. L2609250315/4/6"
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[12px] outline-none focus:border-[#3B82F6] focus:ring-1 focus:ring-[#3B82F6]"
+                      onChange={val => updateItem(index, 'materialBatchCode', val || '')}
+                      placeholder="Select batch..."
+                      creatable={true}
+                      options={[
+                        { label: 'Select batch code...', value: '' },
+                        ...getRawMaterialBatchOptions(rawMaterials.find((m: any) => m.id === item.rawMaterialId)).map((b) => ({
+                          label: `${b.batchCode}${b.materialCode ? ` (${b.materialCode})` : ''}`,
+                          value: b.batchCode,
+                        })),
+                        ...(item.materialBatchCode ? [{ label: item.materialBatchCode, value: item.materialBatchCode }] : [])
+                      ]}
                     />
-                    <datalist id={`grid-batch-opts-${index}`}>
-                      {getRawMaterialBatchOptions(rawMaterials.find((m: any) => m.id === item.rawMaterialId)).map((b) => (
-                        <option key={`${b.materialCode}-${b.batchCode}`} value={b.batchCode}>
-                          {b.materialCode ? `${b.materialCode} - ` : ''}{b.batchCode} ({b.sqM.toFixed(3)} m²)
-                        </option>
-                      ))}
-                    </datalist>
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
@@ -782,7 +780,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                 {/* 2. Raw Material (Intake) */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-700">Raw Material (Intake) *</label>
+                    <label className="text-[11px] font-bold text-slate-700">Material Name *</label>
                     {material && (
                       <span className="text-[10px] text-slate-500 font-medium">
                         Stock: <strong className={material.currentStock > 0 ? 'text-slate-800' : 'text-rose-600'}>{material.currentStock || 0}</strong>
@@ -795,26 +793,25 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                     placeholder="Select material..."
                     options={[
                       { label: 'Select material...', value: 0 },
-                      ...rawMaterials.map((m: any) => ({ label: formatRawMaterialLabel(m), value: m.id }))
+                      ...rawMaterials.map((m: any) => ({ label: `${m.name} (Stock: ${m.currentStock ?? 0})`, value: m.id }))
                     ]}
                   />
                   <div className="mt-2">
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Material Batch Code</label>
-                    <input
-                      type="text"
-                      list={`grid-mobile-batch-${index}`}
+                    <SearchableSelect
                       value={item.materialBatchCode || ''}
-                      onChange={e => updateItem(index, 'materialBatchCode', e.target.value)}
-                      placeholder="e.g. L2609250315/4/6"
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-emerald-500"
+                      onChange={val => updateItem(index, 'materialBatchCode', val || '')}
+                      placeholder="Select / search batch code..."
+                      creatable={true}
+                      options={[
+                        { label: 'Select batch code...', value: '' },
+                        ...getRawMaterialBatchOptions(material).map((b) => ({
+                          label: `${b.batchCode}${b.materialCode ? ` (${b.materialCode})` : ''}`,
+                          value: b.batchCode,
+                        })),
+                        ...(item.materialBatchCode ? [{ label: item.materialBatchCode, value: item.materialBatchCode }] : [])
+                      ]}
                     />
-                    <datalist id={`grid-mobile-batch-${index}`}>
-                      {getRawMaterialBatchOptions(material).map((b) => (
-                        <option key={`${b.materialCode}-${b.batchCode}`} value={b.batchCode}>
-                          {b.materialCode ? `${b.materialCode} - ` : ''}{b.batchCode} ({b.sqM.toFixed(3)} m²)
-                        </option>
-                      ))}
-                    </datalist>
                   </div>
                 </div>
 

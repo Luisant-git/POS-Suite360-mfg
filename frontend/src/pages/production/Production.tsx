@@ -892,33 +892,39 @@ const Production = () => {
                     {intakes.map((item, index) => {
                       const selectedMat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
                       const batchOptions = getRawMaterialBatchOptions(selectedMat);
-                      const datalistId = `rm-batch-opts-${index}`;
-                      const formattedLabel = selectedMat
-                        ? formatRawMaterialLabel(selectedMat, item.materialBatchCode, item.materialCode)
-                        : '';
+                      const batchSelectOptions = [
+                        { label: 'Select batch code...', value: '' },
+                        ...batchOptions.map((b) => ({
+                          label: `${b.batchCode}${b.materialCode ? ` (${b.materialCode})` : ''}${b.sqM > 0 ? ` - ${b.sqM.toFixed(3)} m²/roll` : ''}`,
+                          value: b.batchCode,
+                        })),
+                      ];
+
+                      if (item.materialBatchCode && !batchSelectOptions.some((b) => b.value === item.materialBatchCode)) {
+                        batchSelectOptions.push({
+                          label: item.materialBatchCode,
+                          value: item.materialBatchCode,
+                        });
+                      }
 
                       return (
                         <div key={index} className="bg-blue-50/40 p-2.5 rounded-md border border-blue-100 flex flex-col gap-2">
                           <div className="w-full min-w-0">
                             <label className="block text-[10px] font-bold text-blue-800 mb-1">
-                              Material Name - Code - Batch Code
+                              Material Name
                             </label>
                             <SearchableSelect
                               value={item.rawMaterialId}
                               onChange={(val) => updateIntake(index, 'rawMaterialId', Number(val))}
+                              placeholder="Select material..."
                               options={[
                                 { label: 'Select material...', value: 0 },
                                 ...rawMaterials.map((m: any) => ({
-                                  label: `${formatRawMaterialLabel(m)} (Stock: ${m.currentStock})`,
+                                  label: `${m.name} (Stock: ${m.currentStock ?? 0})`,
                                   value: m.id,
                                 })),
                               ]}
                             />
-                            {formattedLabel && (
-                              <p className="text-[10px] font-bold text-blue-700 mt-1 truncate">
-                                {formattedLabel}
-                              </p>
-                            )}
                           </div>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full min-w-0">
@@ -928,31 +934,30 @@ const Production = () => {
                               </label>
                               <input
                                 type="text"
-                                value={item.materialCode}
+                                list={`mat-code-opts-${index}`}
+                                value={item.materialCode || ''}
                                 onChange={(e) => updateIntake(index, 'materialCode', e.target.value)}
                                 placeholder="e.g. MLJ1019"
-                                className="w-full px-2.5 py-1.5 border border-[#ccc] rounded text-[12px] bg-white outline-none focus:border-blue-500"
+                                className="w-full h-[38px] px-2.5 py-1.5 border border-[#CBD5E1] rounded text-[13px] bg-white outline-none focus:border-blue-500 font-bold"
                               />
+                              <datalist id={`mat-code-opts-${index}`}>
+                                {Array.from(new Set(batchOptions.map((b) => b.materialCode).filter(Boolean))).map((code) => (
+                                  <option key={code} value={code} />
+                                ))}
+                              </datalist>
                             </div>
                             <div className="w-full min-w-0">
                               <label className="block text-[10px] font-bold text-gray-700 mb-1">
                                 Material Batch Code
                               </label>
-                              <input
-                                type="text"
-                                list={datalistId}
-                                value={item.materialBatchCode}
-                                onChange={(e) => updateIntake(index, 'materialBatchCode', e.target.value)}
-                                placeholder="e.g. L2609250315/4/6"
-                                className="w-full px-2.5 py-1.5 border border-[#ccc] rounded text-[12px] bg-white outline-none focus:border-blue-500"
+                              <SearchableSelect
+                                value={item.materialBatchCode || ''}
+                                onChange={(val) => updateIntake(index, 'materialBatchCode', val || '')}
+                                placeholder="Select / search batch code..."
+                                creatable={true}
+                                options={batchSelectOptions}
+                                isDisabled={!item.rawMaterialId}
                               />
-                              <datalist id={datalistId}>
-                                {batchOptions.map((b) => (
-                                  <option key={`${b.materialCode}-${b.batchCode}`} value={b.batchCode}>
-                                    {b.materialCode ? `${b.materialCode} - ` : ''}{b.batchCode} ({b.sqM.toFixed(3)} m²/roll)
-                                  </option>
-                                ))}
-                              </datalist>
                             </div>
                           </div>
 
