@@ -36,8 +36,7 @@ export class RawMaterialsService {
         unit: true,
         rawMaterialPurchaseItems: {
           orderBy: { id: 'desc' },
-          take: 25
-        }
+        },
       },
       orderBy: { createdAt: 'desc' }
     });

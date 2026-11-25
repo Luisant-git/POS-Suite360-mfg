@@ -47,18 +47,18 @@ export const formatRawMaterialLabel = (
   if (!material) return '-';
 
   // 1. Determine effective batch code:
-  // If explicitly passed (even as empty string/null), strictly respect it and do NOT inject unrelated purchase items
+  // If explicitly passed (even as empty string/null), strictly respect it and do NOT inject unrelated master batchCode
   let effectiveBatch = '';
-  if (overrideBatchCode !== undefined && overrideBatchCode !== null) {
-    effectiveBatch = String(overrideBatchCode).trim();
+  if (overrideBatchCode !== undefined) {
+    effectiveBatch = String(overrideBatchCode || '').trim();
   } else {
     effectiveBatch = String(material.batchCode || '').trim();
   }
 
   // 2. Determine effective material code:
   let effectiveCode = '';
-  if (overrideMaterialCode !== undefined && overrideMaterialCode !== null) {
-    effectiveCode = String(overrideMaterialCode).trim();
+  if (overrideMaterialCode !== undefined) {
+    effectiveCode = String(overrideMaterialCode || '').trim();
   } else {
     effectiveCode = String(material.code || '').trim();
   }
@@ -74,21 +74,43 @@ export const normalizeCode = (s?: string | null): string => {
   return String(s || '').replace(/[\s\-_]+/g, '').toLowerCase().trim();
 };
 
-/** Extracts all distinct material codes for a raw material (from purchase items and master material). */
+/** Extracts all distinct material codes for a raw material (from purchase items, or master code if none exist). */
 export const getRawMaterialDistinctMaterialCodes = (material: any): string[] => {
   if (!material) return [];
-  const set = new Set<string>();
-  const masterCode = String(material.code || '').trim();
-  if (masterCode) set.add(masterCode);
+  const normCounts = new Map<string, Map<string, number>>();
 
   if (Array.isArray(material.rawMaterialPurchaseItems)) {
     for (const pi of material.rawMaterialPurchaseItems) {
       const code = String(pi?.materialCode || '').trim();
-      if (code) set.add(code);
+      const norm = normalizeCode(code);
+      if (!norm) continue;
+      if (!normCounts.has(norm)) {
+        normCounts.set(norm, new Map());
+      }
+      const variants = normCounts.get(norm)!;
+      variants.set(code, (variants.get(code) || 0) + 1);
     }
   }
 
-  return Array.from(set);
+  if (normCounts.size > 0) {
+    const result: string[] = [];
+    for (const variants of normCounts.values()) {
+      // Pick the most frequent formatting for each normalized code (e.g. "MLJ 1112" over typo "ML J1112")
+      let best = '';
+      let bestCount = -1;
+      for (const [variant, count] of variants.entries()) {
+        if (count > bestCount) {
+          best = variant;
+          bestCount = count;
+        }
+      }
+      if (best) result.push(best);
+    }
+    return result;
+  }
+
+  const masterCode = String(material.code || '').trim();
+  return masterCode ? [masterCode] : [];
 };
 
 /** Extracts distinct batch options (batch code only, deduplicated) for a material. */
@@ -99,6 +121,7 @@ export const getRawMaterialDistinctBatches = (
   if (!material) return [];
   const map = new Map<string, { batchCode: string; materialCode: string; sqM: number }>();
   const normFilter = normalizeCode(filterMaterialCode);
+  let hasPurchaseBatches = false;
 
   if (Array.isArray(material.rawMaterialPurchaseItems)) {
     for (const pi of material.rawMaterialPurchaseItems) {
@@ -106,10 +129,11 @@ export const getRawMaterialDistinctBatches = (
       const materialCode = String(pi?.materialCode || '').trim();
       const sqM = Number(pi?.sqM || 0);
       if (!batchCode) continue;
+      hasPurchaseBatches = true;
 
       if (normFilter) {
         const normItemCode = normalizeCode(materialCode);
-        if (normItemCode && normItemCode !== normFilter) {
+        if (normItemCode !== normFilter) {
           continue;
         }
       }
@@ -120,12 +144,15 @@ export const getRawMaterialDistinctBatches = (
     }
   }
 
-  const masterBatch = String(material.batchCode || '').trim();
-  const masterCode = String(material.code || '').trim();
-  if (masterBatch && !map.has(masterBatch)) {
-    if (!normFilter || !masterCode || normalizeCode(masterCode) === normFilter) {
-      const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      map.set(masterBatch, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
+  // Only fallback to master material.batchCode if the material has NO purchase items with batch codes
+  if (!hasPurchaseBatches) {
+    const masterBatch = String(material.batchCode || '').trim();
+    const masterCode = String(material.code || '').trim();
+    if (masterBatch && !map.has(masterBatch)) {
+      if (!normFilter || (masterCode && normalizeCode(masterCode) === normFilter)) {
+        const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        map.set(masterBatch, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
+      }
     }
   }
 
@@ -179,8 +206,8 @@ export const getEffectiveIntakes = (production: any): any[] => {
       {
         rawMaterialId: production.rawMaterialId,
         rawMaterial: production.rawMaterial,
-        materialCode: production.materialCode || production.rawMaterial?.rawMaterialPurchaseItems?.[0]?.materialCode || '',
-        materialBatchCode: production.materialBatchCode || production.rawMaterial?.batchCode || '',
+        materialCode: production.materialCode || '',
+        materialBatchCode: production.materialBatchCode || '',
         intakeQuantity: Number(production.intakeQuantity || 0),
         sqM: 0,
       },

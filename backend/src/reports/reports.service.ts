@@ -110,13 +110,13 @@ export class ReportsService {
       where: whereClause,
       include: {
         rawMaterial: {
-          include: { rawMaterialPurchaseItems: { orderBy: { id: 'desc' }, take: 25 } }
+          include: { rawMaterialPurchaseItems: { orderBy: { id: 'desc' } } }
         },
         finishedProduct: true,
         intakes: {
           include: {
             rawMaterial: {
-              include: { rawMaterialPurchaseItems: { orderBy: { id: 'desc' }, take: 25 } }
+              include: { rawMaterialPurchaseItems: { orderBy: { id: 'desc' } } }
             },
           },
         },
@@ -171,11 +171,11 @@ export class ReportsService {
         const intakeSqM = Number(intake.sqM) > 0 ? Number(intake.sqM) : intakeQty * fallbackSqM;
         totalRawSqM += intakeSqM;
 
-        const batchVal = intake.materialBatchCode || intake.rawMaterial?.batchCode || '';
+        const batchVal = intake.materialBatchCode || '';
         const matchedPi = (intake.rawMaterial?.rawMaterialPurchaseItems || []).find(
           (pi: any) => pi.batchCode && batchVal && String(pi.batchCode).trim() === String(batchVal).trim()
         );
-        const codeVal = intake.materialCode || matchedPi?.materialCode || intake.rawMaterial?.rawMaterialPurchaseItems?.[0]?.materialCode || intake.rawMaterial?.code || '';
+        const codeVal = intake.materialCode || matchedPi?.materialCode || '';
         const matName = intake.rawMaterial?.name || 'Unknown';
         const matLabel = [matName, codeVal, batchVal]
           .filter(Boolean)

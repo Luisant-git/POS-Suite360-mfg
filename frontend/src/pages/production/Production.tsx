@@ -256,7 +256,10 @@ const Production = () => {
 
       row.materialBatchCode = batchVal;
       if (!row.materialCode && matchedBatch?.materialCode) {
-        row.materialCode = matchedBatch.materialCode;
+        const availableCodes = getRawMaterialDistinctMaterialCodes(material);
+        const normMatched = matchedBatch.materialCode.replace(/[\s\-_]+/g, '').toLowerCase();
+        const canonical = availableCodes.find((c) => c.replace(/[\s\-_]+/g, '').toLowerCase() === normMatched);
+        row.materialCode = canonical || matchedBatch.materialCode;
       }
       row.sqMPerRoll = nextSqMPerRoll;
       const qty = Number(row.intakeQuantity) || 0;
@@ -727,7 +730,7 @@ const Production = () => {
       p.materialBatchCode?.toLowerCase().includes(term) ||
       rowIntakes.some(
         (i: any) =>
-          formatRawMaterialLabel(i.rawMaterial, i.materialBatchCode).toLowerCase().includes(term)
+          formatRawMaterialLabel(i.rawMaterial, i.materialBatchCode, i.materialCode).toLowerCase().includes(term)
       ) ||
       rowOutcomes.some((o: any) => o.finishedProduct?.name?.toLowerCase().includes(term))
     );
@@ -762,7 +765,7 @@ const Production = () => {
           <ProductionGridEntry onSwitchToMaster={() => setActiveTab('master')} />
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-12 grid-rows-1 gap-3 sm:gap-4 flex-1 min-h-0 overflow-hidden p-2 sm:p-4 relative">
+        <div className="flex flex-col xl:flex-row gap-3 sm:gap-4 flex-1 min-h-0 overflow-hidden p-2 sm:p-4 relative">
           {/* Mobile Drawer Backdrop */}
           {isMobileDrawerOpen && (
             <div
@@ -776,9 +779,9 @@ const Production = () => {
             <div
               className={`
               bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex-col min-h-0 overflow-hidden
-              xl:col-span-5 xl:static xl:z-auto xl:h-full xl:min-h-0 xl:overflow-hidden xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex
+              xl:w-[37%] xl:shrink-0 xl:static xl:z-auto xl:h-full xl:min-h-0 xl:overflow-hidden xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex
               ${isMobileDrawerOpen
-                  ? 'fixed inset-y-0 right-0 z-50 w-full max-w-xl shadow-2xl flex h-full animate-in slide-in-from-right duration-200'
+                  ? 'fixed inset-y-0 right-0 z-50 w-full max-w-lg shadow-2xl flex h-full animate-in slide-in-from-right duration-200'
                   : 'hidden'
                 }
             `}
@@ -1158,7 +1161,7 @@ const Production = () => {
 
           {/* Right Column: List */}
           <div
-            className={`${isFullTable ? 'xl:col-span-12' : 'xl:col-span-7'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col h-full min-h-0 min-w-0 w-full`}
+            className="flex-1 bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col h-full min-h-0 min-w-0 w-full"
           >
             <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-3 sm:px-4 py-2.5 sm:py-3 flex flex-wrap justify-between items-center gap-2 shrink-0">
               <div className="flex items-center gap-2 text-[#1E3A8A]">

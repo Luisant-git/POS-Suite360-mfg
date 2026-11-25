@@ -170,7 +170,10 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       const nextSqMPerRoll = matched?.sqM || newItems[index].sqMPerRoll || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
       newItems[index].materialBatchCode = batchVal;
       if (!newItems[index].materialCode && matched?.materialCode) {
-        newItems[index].materialCode = matched.materialCode;
+        const availableCodes = getRawMaterialDistinctMaterialCodes(material);
+        const normMatched = matched.materialCode.replace(/[\s\-_]+/g, '').toLowerCase();
+        const canonical = availableCodes.find((c) => c.replace(/[\s\-_]+/g, '').toLowerCase() === normMatched);
+        newItems[index].materialCode = canonical || matched.materialCode;
       }
       newItems[index].sqMPerRoll = nextSqMPerRoll;
       const currentQty = Number(newItems[index].intakeQuantity) || 0;

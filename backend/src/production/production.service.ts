@@ -7,7 +7,6 @@ const PRODUCTION_INCLUDE = {
     include: {
       rawMaterialPurchaseItems: {
         orderBy: { id: 'desc' as const },
-        take: 10,
       },
     },
   },
@@ -18,7 +17,6 @@ const PRODUCTION_INCLUDE = {
         include: {
           rawMaterialPurchaseItems: {
             orderBy: { id: 'desc' as const },
-            take: 10,
           },
         },
       },
