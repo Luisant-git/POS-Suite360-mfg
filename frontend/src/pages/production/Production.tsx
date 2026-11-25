@@ -1016,10 +1016,8 @@ const Production = () => {
                               <SearchableSelect
                                 value={item.materialCode || ''}
                                 onChange={(val) => updateIntake(index, 'materialCode', val || '')}
-                                onCreate={(newCode) => updateIntake(index, 'materialCode', newCode)}
-                                placeholder="Select / type material code..."
+                                placeholder="Select / search material code..."
                                 options={matCodeSelectOptions}
-                                creatable={true}
                                 isDisabled={!item.rawMaterialId}
                               />
                             </div>
