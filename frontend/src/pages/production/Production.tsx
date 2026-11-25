@@ -18,6 +18,7 @@ import {
   getEffectiveOutcomes,
   getRawMaterialBatchOptions,
   getRawMaterialDistinctBatches,
+  getRawMaterialDistinctMaterialCodes,
   isProductionCompleted,
   parseBatchWorkName,
 } from '../../utils/productionBatch';
@@ -193,26 +194,67 @@ const Production = () => {
     if (field === 'rawMaterialId') {
       const matId = Number(value);
       row.rawMaterialId = matId;
-      row.materialCode = '';
-      row.materialBatchCode = '';
-      row.sqMPerRoll = 0;
-      row.sqM = '0.000';
+      const material = rawMaterials.find((m: any) => m.id === matId);
+      const availableCodes = getRawMaterialDistinctMaterialCodes(material);
+      if (availableCodes.length === 1) {
+        row.materialCode = availableCodes[0];
+        const validBatches = getRawMaterialDistinctBatches(material, availableCodes[0]);
+        if (validBatches.length === 1) {
+          row.materialBatchCode = validBatches[0].batchCode;
+          row.sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        } else {
+          row.materialBatchCode = '';
+          row.sqMPerRoll = 0;
+        }
+      } else {
+        row.materialCode = '';
+        row.materialBatchCode = '';
+        row.sqMPerRoll = 0;
+      }
+      const qty = Number(row.intakeQuantity) || 0;
+      row.sqM = (qty * row.sqMPerRoll).toFixed(3);
     } else if (field === 'materialCode') {
-      row.materialCode = String(value);
+      const newCode = String(value || '').trim();
+      row.materialCode = newCode;
+      const material = rawMaterials.find((m: any) => m.id === row.rawMaterialId);
+      const validBatches = getRawMaterialDistinctBatches(material, newCode);
+      const normCurrentBatch = row.materialBatchCode ? row.materialBatchCode.trim().toLowerCase() : '';
+      const isBatchValid = validBatches.some((b) => b.batchCode.trim().toLowerCase() === normCurrentBatch);
+
+      if (row.materialBatchCode && !isBatchValid) {
+        // Current batch does not belong to the selected material code -> reset or auto-select
+        if (validBatches.length === 1) {
+          row.materialBatchCode = validBatches[0].batchCode;
+          row.sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        } else {
+          row.materialBatchCode = '';
+          row.sqMPerRoll = 0;
+        }
+      } else if (!row.materialBatchCode && validBatches.length === 1) {
+        row.materialBatchCode = validBatches[0].batchCode;
+        row.sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+      } else if (isBatchValid) {
+        const matched = validBatches.find((b) => b.batchCode.trim().toLowerCase() === normCurrentBatch);
+        if (matched?.sqM) {
+          row.sqMPerRoll = matched.sqM;
+        }
+      }
+      const qty = Number(row.intakeQuantity) || 0;
+      row.sqM = (qty * row.sqMPerRoll).toFixed(3);
     } else if (field === 'materialBatchCode') {
       const material = rawMaterials.find((m: any) => m.id === row.rawMaterialId);
-      const batchOpts = getRawMaterialBatchOptions(material);
+      const batchVal = String(value || '').trim();
+      const validBatches = getRawMaterialDistinctBatches(material, row.materialCode);
       const matchedBatch =
-        batchOpts.find(
-          (b) =>
-            b.batchCode === String(value).trim() &&
-            (!row.materialCode || b.materialCode.toLowerCase() === row.materialCode.toLowerCase())
-        ) || batchOpts.find((b) => b.batchCode === String(value).trim());
+        validBatches.find((b) => b.batchCode === batchVal) ||
+        getRawMaterialBatchOptions(material).find((b) => b.batchCode === batchVal);
+
       const nextSqMPerRoll =
         matchedBatch?.sqM ||
         row.sqMPerRoll ||
         Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      row.materialBatchCode = String(value);
+
+      row.materialBatchCode = batchVal;
       if (!row.materialCode && matchedBatch?.materialCode) {
         row.materialCode = matchedBatch.materialCode;
       }
@@ -623,8 +665,8 @@ const Production = () => {
         Number(o.outcomeQuantity) > 0 && Number(o.sqM) > 0
           ? (Number(o.sqM) / Number(o.outcomeQuantity)).toFixed(3)
           : prod?.sqM && Number(prod.sqM) > 0
-          ? Number(prod.sqM).toFixed(3)
-          : '';
+            ? Number(prod.sqM).toFixed(3)
+            : '';
       return {
         finishedProductId: Number(o.finishedProductId),
         previousQuantity: Number(o.outcomeQuantity || 0),
@@ -696,21 +738,19 @@ const Production = () => {
       {/* Tabs */}
       <div className="flex border-b border-gray-300 shrink-0 bg-white shadow-sm overflow-x-auto">
         <button
-          className={`px-4 sm:px-6 py-3 text-[12px] sm:text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'master'
+          className={`px-4 sm:px-6 py-3 text-[12px] sm:text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'master'
               ? 'border-b-2 border-[#3B82F6] text-[#3B82F6] bg-blue-50/50'
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
+            }`}
           onClick={() => setActiveTab('master')}
         >
           <Box size={16} /> Master View
         </button>
         <button
-          className={`px-4 sm:px-6 py-3 text-[12px] sm:text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'grid'
+          className={`px-4 sm:px-6 py-3 text-[12px] sm:text-[13px] font-bold tracking-wider uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'grid'
               ? 'border-b-2 border-[#10B981] text-[#10B981] bg-emerald-50/50'
               : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
+            }`}
           onClick={() => setActiveTab('grid')}
         >
           <Grid size={16} /> Grid Entry View
@@ -737,11 +777,10 @@ const Production = () => {
               className={`
               bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex-col min-h-0 overflow-hidden
               xl:col-span-5 2xl:col-span-4 xl:static xl:z-auto xl:h-full xl:min-h-0 xl:overflow-hidden xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex
-              ${
-                isMobileDrawerOpen
+              ${isMobileDrawerOpen
                   ? 'fixed inset-y-0 right-0 z-50 w-full max-w-lg shadow-2xl flex h-full animate-in slide-in-from-right duration-200'
                   : 'hidden'
-              }
+                }
             `}
             >
               <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-4 py-2 flex items-center justify-between rounded-t-sm shrink-0">
@@ -826,11 +865,10 @@ const Production = () => {
                               <span className="text-[10px] font-bold text-emerald-800 uppercase">Product #{idx + 1}</span>
                               {editingId && (
                                 <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                    outRow.status === 'COMPLETED'
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${outRow.status === 'COMPLETED'
                                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                       : 'bg-amber-100 text-amber-800 border border-amber-300'
-                                  }`}
+                                    }`}
                                 >
                                   {outRow.status === 'COMPLETED' ? 'Completed' : 'Pending'}
                                 </span>
@@ -873,18 +911,17 @@ const Production = () => {
                                   outRow.prodSqM !== undefined && outRow.prodSqM !== ''
                                     ? outRow.prodSqM
                                     : prod?.sqM && Number(prod.sqM) > 0
-                                    ? Number(prod.sqM).toFixed(3)
-                                    : ''
+                                      ? Number(prod.sqM).toFixed(3)
+                                      : ''
                                 }
                                 onChange={(e) => updateOutcome(idx, 'prodSqM', e.target.value)}
                                 onFocus={(e) => {
                                   if (canEditProdSqM) e.target.select();
                                 }}
-                                className={`w-full px-2 py-1 border rounded text-[12px] outline-none text-right font-bold transition-colors placeholder:text-gray-400 placeholder:font-normal ${
-                                  canEditProdSqM
+                                className={`w-full px-2 py-1 border rounded text-[12px] outline-none text-right font-bold transition-colors placeholder:text-gray-400 placeholder:font-normal ${canEditProdSqM
                                     ? 'bg-white border-[#CBD5E1] text-blue-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'
                                     : 'bg-gray-100 border-[#ccc] text-gray-500 cursor-not-allowed'
-                                }`}
+                                  }`}
                               />
                             </div>
                             {/* Commented out Out Sq.M
@@ -926,7 +963,7 @@ const Production = () => {
                   <div className="flex flex-col gap-3">
                     {intakes.map((item, index) => {
                       const selectedMat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
-                      const batchOptions = getRawMaterialBatchOptions(selectedMat);
+                      const materialCodeOptions = getRawMaterialDistinctMaterialCodes(selectedMat);
                       const distinctBatches = getRawMaterialDistinctBatches(selectedMat, item.materialCode);
                       const batchSelectOptions = [
                         { label: 'Select batch code...', value: '' },
@@ -942,6 +979,14 @@ const Production = () => {
                           value: item.materialBatchCode,
                         });
                       }
+
+                      const matCodeSelectOptions = [
+                        { label: 'Select material code...', value: '' },
+                        ...materialCodeOptions.map((code) => ({ label: code, value: code })),
+                        ...(item.materialCode && !materialCodeOptions.includes(item.materialCode)
+                          ? [{ label: item.materialCode, value: item.materialCode }]
+                          : []),
+                      ];
 
                       return (
                         <div key={index} className="bg-blue-50/40 p-2.5 rounded-md border border-blue-100 flex flex-col gap-2">
@@ -968,19 +1013,15 @@ const Production = () => {
                               <label className="block text-[10px] font-bold text-gray-700 mb-1">
                                 Material Code
                               </label>
-                              <input
-                                type="text"
-                                list={`mat-code-opts-${index}`}
+                              <SearchableSelect
                                 value={item.materialCode || ''}
-                                onChange={(e) => updateIntake(index, 'materialCode', e.target.value)}
-                                placeholder="e.g. MLJ1019"
-                                className="w-full h-[38px] px-2.5 py-1.5 border border-[#CBD5E1] rounded text-[13px] bg-white outline-none focus:border-blue-500 font-bold"
+                                onChange={(val) => updateIntake(index, 'materialCode', val || '')}
+                                onCreate={(newCode) => updateIntake(index, 'materialCode', newCode)}
+                                placeholder="Select / type material code..."
+                                options={matCodeSelectOptions}
+                                creatable={true}
+                                isDisabled={!item.rawMaterialId}
                               />
-                              <datalist id={`mat-code-opts-${index}`}>
-                                {Array.from(new Set(batchOptions.map((b) => b.materialCode).filter(Boolean))).map((code) => (
-                                  <option key={String(code)} value={String(code)} />
-                                ))}
-                              </datalist>
                             </div>
                             <div className="w-full min-w-0">
                               <label className="block text-[10px] font-bold text-gray-700 mb-1">
@@ -1159,22 +1200,20 @@ const Production = () => {
                   <button
                     type="button"
                     onClick={() => setFilterStatus('pending')}
-                    className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors whitespace-nowrap ${
-                      filterStatus === 'pending'
+                    className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors whitespace-nowrap ${filterStatus === 'pending'
                         ? 'bg-white shadow-sm text-blue-600'
                         : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                      }`}
                   >
                     Pending
                   </button>
                   <button
                     type="button"
                     onClick={() => setFilterStatus('completed')}
-                    className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors whitespace-nowrap ${
-                      filterStatus === 'completed'
+                    className={`flex-1 sm:flex-none px-3 py-1 text-[12px] font-bold rounded-sm transition-colors whitespace-nowrap ${filterStatus === 'completed'
                         ? 'bg-white shadow-sm text-emerald-600'
                         : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                      }`}
                   >
                     Completed
                   </button>
@@ -1219,11 +1258,10 @@ const Production = () => {
                           <p className="text-[11px] text-gray-500 mt-0.5">{formatDateTime(production.date)}</p>
                         </div>
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                            completed
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${completed
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                               : 'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}
+                            }`}
                         >
                           {completed ? 'Completed' : 'Pending'}
                         </span>
@@ -1251,11 +1289,10 @@ const Production = () => {
                                       {entry.finishedProduct?.name || '-'}
                                     </span>
                                     <span
-                                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                        isEntryDone
+                                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isEntryDone
                                           ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                           : 'bg-amber-100 text-amber-800 border border-amber-300'
-                                      }`}
+                                        }`}
                                     >
                                       {isEntryDone ? 'Completed' : 'Pending'}
                                     </span>
@@ -1378,13 +1415,12 @@ const Production = () => {
                         return (
                           <tr
                             key={`${production.id}-${entry.key}`}
-                            className={`border-b border-[#E5E7EB] ${
-                              isPrimaryRow
+                            className={`border-b border-[#E5E7EB] ${isPrimaryRow
                                 ? index % 2 === 0
                                   ? 'bg-white'
                                   : 'bg-[#F9F9F9]'
                                 : 'bg-blue-50/20'
-                            } hover:bg-blue-50`}
+                              } hover:bg-blue-50`}
                           >
                             <td data-label="#" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center font-bold text-gray-700 whitespace-nowrap">
                               {isPrimaryRow ? index + 1 : `${index + 1}.${entryIdx + 1}`}
@@ -1412,11 +1448,10 @@ const Production = () => {
                             </td>
                             <td data-label="Status" className="px-2.5 py-2.5 border-r border-[#E5E7EB] text-center whitespace-nowrap">
                               <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  isEntryDone
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${isEntryDone
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                     : 'bg-amber-100 text-amber-800 border border-amber-300'
-                                }`}
+                                  }`}
                               >
                                 {isEntryDone ? 'Completed' : 'Pending'}
                               </span>
@@ -1575,11 +1610,10 @@ const Production = () => {
                         </h4>
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          updatingProductOutcome.isFinished
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${updatingProductOutcome.isFinished
                             ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                             : 'bg-amber-100 text-amber-800 border border-amber-300'
-                        }`}
+                          }`}
                       >
                         {updatingProductOutcome.isFinished ? 'Completed' : 'Pending'}
                       </span>

@@ -69,6 +69,28 @@ export const formatRawMaterialLabel = (
   return parts.join('-') || '-';
 };
 
+/** Helper to normalize material codes for comparison (ignoring whitespace, hyphens, underscores, and letter case). */
+export const normalizeCode = (s?: string | null): string => {
+  return String(s || '').replace(/[\s\-_]+/g, '').toLowerCase().trim();
+};
+
+/** Extracts all distinct material codes for a raw material (from purchase items and master material). */
+export const getRawMaterialDistinctMaterialCodes = (material: any): string[] => {
+  if (!material) return [];
+  const set = new Set<string>();
+  const masterCode = String(material.code || '').trim();
+  if (masterCode) set.add(masterCode);
+
+  if (Array.isArray(material.rawMaterialPurchaseItems)) {
+    for (const pi of material.rawMaterialPurchaseItems) {
+      const code = String(pi?.materialCode || '').trim();
+      if (code) set.add(code);
+    }
+  }
+
+  return Array.from(set);
+};
+
 /** Extracts distinct batch options (batch code only, deduplicated) for a material. */
 export const getRawMaterialDistinctBatches = (
   material: any,
@@ -76,7 +98,7 @@ export const getRawMaterialDistinctBatches = (
 ): { batchCode: string; materialCode: string; sqM: number }[] => {
   if (!material) return [];
   const map = new Map<string, { batchCode: string; materialCode: string; sqM: number }>();
-  const cleanFilter = filterMaterialCode ? String(filterMaterialCode).trim().toLowerCase() : '';
+  const normFilter = normalizeCode(filterMaterialCode);
 
   if (Array.isArray(material.rawMaterialPurchaseItems)) {
     for (const pi of material.rawMaterialPurchaseItems) {
@@ -85,8 +107,11 @@ export const getRawMaterialDistinctBatches = (
       const sqM = Number(pi?.sqM || 0);
       if (!batchCode) continue;
 
-      if (cleanFilter && materialCode && materialCode.toLowerCase() !== cleanFilter) {
-        continue;
+      if (normFilter) {
+        const normItemCode = normalizeCode(materialCode);
+        if (normItemCode && normItemCode !== normFilter) {
+          continue;
+        }
       }
 
       if (!map.has(batchCode)) {
@@ -98,23 +123,7 @@ export const getRawMaterialDistinctBatches = (
   const masterBatch = String(material.batchCode || '').trim();
   const masterCode = String(material.code || '').trim();
   if (masterBatch && !map.has(masterBatch)) {
-    if (!cleanFilter || !masterCode || masterCode.toLowerCase() === cleanFilter) {
-      const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      map.set(masterBatch, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
-    }
-  }
-
-  // If filtering yielded 0 batches but material has purchases, fallback to all batches of this material
-  if (map.size === 0 && cleanFilter && Array.isArray(material.rawMaterialPurchaseItems)) {
-    for (const pi of material.rawMaterialPurchaseItems) {
-      const batchCode = String(pi?.batchCode || '').trim();
-      const materialCode = String(pi?.materialCode || '').trim();
-      const sqM = Number(pi?.sqM || 0);
-      if (batchCode && !map.has(batchCode)) {
-        map.set(batchCode, { batchCode, materialCode, sqM });
-      }
-    }
-    if (masterBatch && !map.has(masterBatch)) {
+    if (!normFilter || !masterCode || normalizeCode(masterCode) === normFilter) {
       const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
       map.set(masterBatch, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
     }

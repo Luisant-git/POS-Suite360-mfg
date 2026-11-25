@@ -11,6 +11,7 @@ import {
   generateNextBatchCode,
   getRawMaterialBatchOptions,
   getRawMaterialDistinctBatches,
+  getRawMaterialDistinctMaterialCodes,
 } from '../../utils/productionBatch';
 
 const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => void }) => {
@@ -133,17 +134,41 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       newItems[index].sqM = (Number(value) * Number(sqMPerRoll)).toFixed(3);
     }
 
+    if (field === 'materialCode') {
+      const newCode = String(value || '').trim();
+      newItems[index].materialCode = newCode;
+      const material = rawMaterials.find((m: any) => m.id === newItems[index].rawMaterialId);
+      const validBatches = getRawMaterialDistinctBatches(material, newCode);
+      const normCurrentBatch = newItems[index].materialBatchCode ? newItems[index].materialBatchCode.trim().toLowerCase() : '';
+      const isBatchValid = validBatches.some((b) => b.batchCode.trim().toLowerCase() === normCurrentBatch);
+
+      if (newItems[index].materialBatchCode && !isBatchValid) {
+        if (validBatches.length === 1) {
+          newItems[index].materialBatchCode = validBatches[0].batchCode;
+          newItems[index].sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        } else {
+          newItems[index].materialBatchCode = '';
+          newItems[index].sqMPerRoll = 0;
+        }
+      } else if (!newItems[index].materialBatchCode && validBatches.length === 1) {
+        newItems[index].materialBatchCode = validBatches[0].batchCode;
+        newItems[index].sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+      }
+      const currentQty = Number(newItems[index].intakeQuantity) || 0;
+      newItems[index].sqM = (currentQty * (newItems[index].sqMPerRoll || 0)).toFixed(3);
+      setItems(newItems);
+      return;
+    }
+
     if (field === 'materialBatchCode') {
       const material = rawMaterials.find((m: any) => m.id === newItems[index].rawMaterialId);
-      const batchOpts = getRawMaterialBatchOptions(material);
+      const batchVal = String(value || '').trim();
+      const validBatches = getRawMaterialDistinctBatches(material, newItems[index].materialCode);
       const matched =
-        batchOpts.find(
-          (b) =>
-            b.batchCode === String(value).trim() &&
-            (!newItems[index].materialCode || b.materialCode.toLowerCase() === newItems[index].materialCode.toLowerCase())
-        ) || batchOpts.find((b) => b.batchCode === String(value).trim());
+        validBatches.find((b) => b.batchCode === batchVal) ||
+        getRawMaterialBatchOptions(material).find((b) => b.batchCode === batchVal);
       const nextSqMPerRoll = matched?.sqM || newItems[index].sqMPerRoll || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      newItems[index].materialBatchCode = String(value);
+      newItems[index].materialBatchCode = batchVal;
       if (!newItems[index].materialCode && matched?.materialCode) {
         newItems[index].materialCode = matched.materialCode;
       }
@@ -155,11 +180,26 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
     }
     
     if (field === 'rawMaterialId') {
-      newItems[index].materialCode = '';
-      newItems[index].materialBatchCode = '';
-      newItems[index].sqMPerRoll = 0;
+      const matId = Number(value);
+      const material = rawMaterials.find((m: any) => m.id === matId);
+      const availableCodes = getRawMaterialDistinctMaterialCodes(material);
+      newItems[index].rawMaterialId = matId;
+      if (availableCodes.length === 1) {
+        newItems[index].materialCode = availableCodes[0];
+        const validBatches = getRawMaterialDistinctBatches(material, availableCodes[0]);
+        if (validBatches.length === 1) {
+          newItems[index].materialBatchCode = validBatches[0].batchCode;
+          newItems[index].sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        } else {
+          newItems[index].materialBatchCode = '';
+          newItems[index].sqMPerRoll = 0;
+        }
+      } else {
+        newItems[index].materialCode = '';
+        newItems[index].materialBatchCode = '';
+        newItems[index].sqMPerRoll = 0;
+      }
       newItems[index].sqM = '0.000';
-      newItems[index][field] = value;
       setItems(newItems);
       if (Number(value) > 0) {
         setTimeout(() => focusIntake(index), 50);
