@@ -776,9 +776,9 @@ const Production = () => {
             <div
               className={`
               bg-white border border-[#E6E9ED] shadow-sm rounded-sm flex-col min-h-0 overflow-hidden
-              xl:col-span-5 2xl:col-span-4 xl:static xl:z-auto xl:h-full xl:min-h-0 xl:overflow-hidden xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex
+              xl:col-span-6 xl:static xl:z-auto xl:h-full xl:min-h-0 xl:overflow-hidden xl:max-w-none xl:shadow-sm xl:rounded-sm xl:flex
               ${isMobileDrawerOpen
-                  ? 'fixed inset-y-0 right-0 z-50 w-full max-w-lg shadow-2xl flex h-full animate-in slide-in-from-right duration-200'
+                  ? 'fixed inset-y-0 right-0 z-50 w-full max-w-2xl shadow-2xl flex h-full animate-in slide-in-from-right duration-200'
                   : 'hidden'
                 }
             `}
@@ -1158,7 +1158,7 @@ const Production = () => {
 
           {/* Right Column: List */}
           <div
-            className={`${isFullTable ? 'xl:col-span-12' : 'xl:col-span-7 2xl:col-span-8'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col h-full min-h-0 min-w-0 w-full`}
+            className={`${isFullTable ? 'xl:col-span-12' : 'xl:col-span-6'} bg-white border border-[#E6E9ED] shadow-sm rounded-sm overflow-hidden flex flex-col h-full min-h-0 min-w-0 w-full`}
           >
             <div className="bg-[#EBF5FF] border-b border-[#3B82F6] px-3 sm:px-4 py-2.5 sm:py-3 flex flex-wrap justify-between items-center gap-2 shrink-0">
               <div className="flex items-center gap-2 text-[#1E3A8A]">

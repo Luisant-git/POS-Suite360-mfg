@@ -217,30 +217,47 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
         // Update current row with the first raw material
         const autoRawMatId = product.rawMaterials[0].rawMaterialId;
         const material = rawMaterials.find((m: any) => m.id === autoRawMatId);
-        const batchOpts = getRawMaterialBatchOptions(material);
-        const defaultOpt = batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
-        const defaultMatCode = defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
-        const sqMPerRoll = defaultOpt?.sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+        const availableCodes = getRawMaterialDistinctMaterialCodes(material);
         const currentQty = Number(newItems[index].intakeQuantity) || 0;
         newItems[index].rawMaterialId = autoRawMatId;
-        newItems[index].materialCode = defaultMatCode;
-        newItems[index].materialBatchCode = '';
-        newItems[index].sqMPerRoll = sqMPerRoll;
-        newItems[index].sqM = (currentQty * sqMPerRoll).toFixed(3);
+        if (availableCodes.length === 1) {
+          newItems[index].materialCode = availableCodes[0];
+          const validBatches = getRawMaterialDistinctBatches(material, availableCodes[0]);
+          if (validBatches.length === 1) {
+            newItems[index].materialBatchCode = validBatches[0].batchCode;
+            newItems[index].sqMPerRoll = validBatches[0].sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+          } else {
+            newItems[index].materialBatchCode = '';
+            newItems[index].sqMPerRoll = 0;
+          }
+        } else {
+          newItems[index].materialCode = '';
+          newItems[index].materialBatchCode = '';
+          newItems[index].sqMPerRoll = 0;
+        }
+        newItems[index].sqM = (currentQty * newItems[index].sqMPerRoll).toFixed(3);
 
         // If there are multiple raw materials, insert additional rows
         if (product.rawMaterials.length > 1) {
           const additionalItems = product.rawMaterials.slice(1).map((rmMap: any) => {
              const rmId = rmMap.rawMaterialId;
              const rmMat = rawMaterials.find((m: any) => m.id === rmId);
-             const rmBatchOpts = getRawMaterialBatchOptions(rmMat);
-             const rmDefaultOpt = rmBatchOpts.find((b) => b.batchCode === (rmMat?.batchCode || '')) || rmBatchOpts[0];
-             const rmMatCode = rmDefaultOpt?.materialCode || rmMat?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
-             const rmSqMPerRoll = rmDefaultOpt?.sqM || Number(rmMat?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+             const rmCodes = getRawMaterialDistinctMaterialCodes(rmMat);
+             let rmMatCode = '';
+             let rmBatchCode = '';
+             let rmSqMPerRoll = 0;
+             if (rmCodes.length === 1) {
+               rmMatCode = rmCodes[0];
+               const rmValidBatches = getRawMaterialDistinctBatches(rmMat, rmCodes[0]);
+               if (rmValidBatches.length === 1) {
+                 rmBatchCode = rmValidBatches[0].batchCode;
+                 rmSqMPerRoll = rmValidBatches[0].sqM || Number(rmMat?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+               }
+             }
              return {
                rawMaterialId: rmId,
                materialCode: rmMatCode,
-               materialBatchCode: '',
+               materialBatchCode: rmBatchCode,
                sqMPerRoll: rmSqMPerRoll,
                sqM: '0.000',
                intakeQuantity: '',
@@ -467,11 +484,11 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                   Product Sq.M {canEditProdSqM && <span className="text-blue-300 font-normal">(Edit)</span>}
                 </th>
                 <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-[250px]">Material Name</th>
-                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-40">Material Batch Code</th>
+                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-40">Material Code</th>
+                <th className="px-2 py-2 text-left text-[12px] font-medium border border-[#334155] w-44">Material Batch Code</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Current Stock</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-24">Quantity Intake</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-32">RAW SQ.M</th>
-                <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-28">Outcome Products Count</th>
                 <th className="px-2 py-2 text-center text-[12px] font-medium border border-[#334155] w-16">Act</th>
               </tr>
             </thead>
@@ -556,6 +573,28 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
                     {(() => {
                       const mat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
+                      const materialCodeOptions = getRawMaterialDistinctMaterialCodes(mat);
+                      const matCodeSelectOptions = [
+                        { label: 'Select material code...', value: '' },
+                        ...materialCodeOptions.map((code) => ({ label: code, value: code })),
+                        ...(item.materialCode && !materialCodeOptions.includes(item.materialCode)
+                          ? [{ label: item.materialCode, value: item.materialCode }]
+                          : []),
+                      ];
+                      return (
+                        <SearchableSelect
+                          value={item.materialCode || ''}
+                          onChange={(val) => updateItem(index, 'materialCode', val || '')}
+                          placeholder="Select / search code..."
+                          options={matCodeSelectOptions}
+                          isDisabled={!item.rawMaterialId}
+                        />
+                      );
+                    })()}
+                  </td>
+                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
+                    {(() => {
+                      const mat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
                       const distinctBatches = getRawMaterialDistinctBatches(mat, item.materialCode);
                       const batchSelectOptions = [
                         { label: 'Select batch code...', value: '' },
@@ -573,6 +612,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                           onChange={val => updateItem(index, 'materialBatchCode', val || '')}
                           placeholder="Select batch..."
                           options={batchSelectOptions}
+                          isDisabled={!item.rawMaterialId}
                         />
                       );
                     })()}
@@ -628,15 +668,6 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                     />
                   </td>
 
-                  {/* OUTCOME - Quantity */}
-                  <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <input 
-                      type="number" value={item.outcomeQuantity} onChange={e => updateItem(index, 'outcomeQuantity', e.target.value)}
-                      placeholder="0" onFocus={e => e.target.select()}
-                      className="w-full px-2 py-1 border border-[#D1D5DB] rounded text-[13px] outline-none focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981] text-right font-black text-[#065F46] bg-white" 
-                    />
-                  </td>
-
                   <td className="px-2 py-1 text-center">
                     <div className="flex justify-center gap-2">
                       <button 
@@ -675,16 +706,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
               />
             </div>
 
-            <div className="w-full md:flex-1 flex flex-col gap-1">
-              <label className="text-[14px] font-extrabold text-[#1F2937] uppercase">Total Outcome Produced:</label>
-              <input
-                value={items.reduce((acc, item) => acc + (Number(item.outcomeQuantity) || 0), 0)}
-                readOnly
-                className="w-full px-3 py-2 border border-[#D1D5DB] bg-[#F0FDF4] rounded text-[20px] outline-none text-right font-black text-[#065F46]"
-              />
-            </div>
-            
-            <div className="w-full md:flex-[2] flex flex-col gap-1"></div>
+            <div className="w-full md:flex-[3] flex flex-col gap-1"></div>
 
           </div>
         </div>
@@ -894,35 +916,61 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       ...rawMaterials.map((m: any) => ({ label: `${m.name} (Stock: ${m.currentStock ?? 0})`, value: m.id }))
                     ]}
                   />
-                  <div className="mt-2">
-                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Material Batch Code</label>
-                    {(() => {
-                      const mat = material;
-                      const distinctBatches = getRawMaterialDistinctBatches(mat, item.materialCode);
-                      const batchSelectOptions = [
-                        { label: 'Select batch code...', value: '' },
-                        ...distinctBatches.map((b) => ({
-                          label: b.batchCode,
-                          value: b.batchCode,
-                        })),
-                        ...(item.materialBatchCode && !distinctBatches.some((b) => b.batchCode === item.materialBatchCode)
-                          ? [{ label: item.materialBatchCode, value: item.materialBatchCode }]
-                          : []),
-                      ];
-                      return (
-                        <SearchableSelect
-                          value={item.materialBatchCode || ''}
-                          onChange={val => updateItem(index, 'materialBatchCode', val || '')}
-                          placeholder="Select / search batch code..."
-                          options={batchSelectOptions}
-                        />
-                      );
-                    })()}
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Material Code</label>
+                      {(() => {
+                        const mat = material;
+                        const materialCodeOptions = getRawMaterialDistinctMaterialCodes(mat);
+                        const matCodeSelectOptions = [
+                          { label: 'Select material code...', value: '' },
+                          ...materialCodeOptions.map((code) => ({ label: code, value: code })),
+                          ...(item.materialCode && !materialCodeOptions.includes(item.materialCode)
+                            ? [{ label: item.materialCode, value: item.materialCode }]
+                            : []),
+                        ];
+                        return (
+                          <SearchableSelect
+                            value={item.materialCode || ''}
+                            onChange={(val) => updateItem(index, 'materialCode', val || '')}
+                            placeholder="Select / search code..."
+                            options={matCodeSelectOptions}
+                            isDisabled={!item.rawMaterialId}
+                          />
+                        );
+                      })()}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1">Material Batch Code</label>
+                      {(() => {
+                        const mat = material;
+                        const distinctBatches = getRawMaterialDistinctBatches(mat, item.materialCode);
+                        const batchSelectOptions = [
+                          { label: 'Select batch code...', value: '' },
+                          ...distinctBatches.map((b) => ({
+                            label: b.batchCode,
+                            value: b.batchCode,
+                          })),
+                          ...(item.materialBatchCode && !distinctBatches.some((b) => b.batchCode === item.materialBatchCode)
+                            ? [{ label: item.materialBatchCode, value: item.materialBatchCode }]
+                            : []),
+                        ];
+                        return (
+                          <SearchableSelect
+                            value={item.materialBatchCode || ''}
+                            onChange={val => updateItem(index, 'materialBatchCode', val || '')}
+                            placeholder="Select / search batch code..."
+                            options={batchSelectOptions}
+                            isDisabled={!item.rawMaterialId}
+                          />
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
 
                 {/* 3. Quantities Grid */}
-                <div className="grid grid-cols-3 gap-2 pt-1 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
+                <div className="grid grid-cols-2 gap-2 pt-1 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100">
                   <div>
                     <label className="block text-[10px] font-bold text-blue-900 mb-1">Intake Qty *</label>
                     <input 
@@ -945,17 +993,6 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                       className="w-full px-2 py-1.5 border border-slate-200 bg-slate-100 rounded-lg text-xs font-bold text-slate-600 text-right outline-none placeholder:text-slate-400 placeholder:font-normal"
                     />
                   </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-emerald-900 mb-1">Outcome Qty</label>
-                    <input 
-                      type="number"
-                      value={item.outcomeQuantity}
-                      onChange={e => updateItem(index, 'outcomeQuantity', e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1.5 border border-emerald-200 bg-white rounded-lg text-xs font-bold text-emerald-700 text-right outline-none focus:border-emerald-500"
-                    />
-                  </div>
                 </div>
               </div>
             );
@@ -974,17 +1011,11 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
 
         {/* Mobile Sticky Bottom Summary & CTA */}
         <div className="bg-white border-t border-slate-200 p-3 shrink-0 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] space-y-2">
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-1 gap-2 text-xs">
             <div className="bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-rose-800">Total Intake:</span>
               <span className="font-black text-rose-700 text-sm">
                 {items.reduce((acc, item) => acc + (Number(item.intakeQuantity) || 0), 0)}
-              </span>
-            </div>
-            <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-emerald-800">Total Outcome:</span>
-              <span className="font-black text-emerald-700 text-sm">
-                {items.reduce((acc, item) => acc + (Number(item.outcomeQuantity) || 0), 0)}
               </span>
             </div>
           </div>
