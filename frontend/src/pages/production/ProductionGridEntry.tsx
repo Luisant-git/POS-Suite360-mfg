@@ -363,6 +363,14 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       toast.error('Please add at least one complete production row.');
       return;
     }
+    for (const item of validItems) {
+      const mat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
+      const distinctBatches = getRawMaterialDistinctBatches(mat, item.materialCode);
+      if (distinctBatches.length > 0 && !item.materialBatchCode?.trim()) {
+        toast.error(`Please select Material Batch Code for ${mat?.name || 'raw material'}`);
+        return;
+      }
+    }
     mutation.mutate();
   };
 

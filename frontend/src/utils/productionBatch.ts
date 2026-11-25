@@ -199,6 +199,16 @@ export const isProductionCompleted = (production: any): boolean => {
 export const getEffectiveIntakes = (production: any): any[] => {
   if (!production) return [];
   if (Array.isArray(production.intakes) && production.intakes.length > 0) {
+    if (production.intakes.length === 1) {
+      const first = production.intakes[0];
+      return [
+        {
+          ...first,
+          materialCode: first.materialCode || production.materialCode || '',
+          materialBatchCode: first.materialBatchCode || production.materialBatchCode || '',
+        },
+      ];
+    }
     return production.intakes;
   }
   if (production.rawMaterialId) {
