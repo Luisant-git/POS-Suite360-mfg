@@ -17,6 +17,7 @@ import {
   getEffectiveOutcomeEntries,
   getEffectiveOutcomes,
   getRawMaterialBatchOptions,
+  getRawMaterialDistinctBatches,
   isProductionCompleted,
   parseBatchWorkName,
 } from '../../utils/productionBatch';
@@ -201,13 +202,18 @@ const Production = () => {
     } else if (field === 'materialBatchCode') {
       const material = rawMaterials.find((m: any) => m.id === row.rawMaterialId);
       const batchOpts = getRawMaterialBatchOptions(material);
-      const matchedBatch = batchOpts.find((b) => b.batchCode === String(value).trim());
+      const matchedBatch =
+        batchOpts.find(
+          (b) =>
+            b.batchCode === String(value).trim() &&
+            (!row.materialCode || b.materialCode.toLowerCase() === row.materialCode.toLowerCase())
+        ) || batchOpts.find((b) => b.batchCode === String(value).trim());
       const nextSqMPerRoll =
         matchedBatch?.sqM ||
         row.sqMPerRoll ||
         Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
       row.materialBatchCode = String(value);
-      if (matchedBatch?.materialCode) {
+      if (!row.materialCode && matchedBatch?.materialCode) {
         row.materialCode = matchedBatch.materialCode;
       }
       row.sqMPerRoll = nextSqMPerRoll;
@@ -594,7 +600,7 @@ const Production = () => {
       origMap[rmId] = (origMap[rmId] || 0) + qty;
       const material = rawMaterials.find((m: any) => m.id === rmId) || i.rawMaterial;
       const batchOpts = getRawMaterialBatchOptions(material);
-      const batch = i.materialBatchCode || material?.batchCode || batchOpts[0]?.batchCode || '';
+      const batch = i.materialBatchCode || '';
       const matchedOpt = batchOpts.find((b) => b.batchCode === batch);
       const sqMPerRoll =
         matchedOpt?.sqM ||
@@ -603,11 +609,7 @@ const Production = () => {
       const sqMVal = Number(i.sqM || 0) > 0 ? Number(i.sqM) : qty * sqMPerRoll;
       return {
         rawMaterialId: rmId,
-        materialCode:
-          i.materialCode ||
-          matchedOpt?.materialCode ||
-          material?.rawMaterialPurchaseItems?.[0]?.materialCode ||
-          '',
+        materialCode: i.materialCode || '',
         materialBatchCode: batch,
         sqMPerRoll,
         intakeQuantity: String(qty),
@@ -925,10 +927,11 @@ const Production = () => {
                     {intakes.map((item, index) => {
                       const selectedMat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
                       const batchOptions = getRawMaterialBatchOptions(selectedMat);
+                      const distinctBatches = getRawMaterialDistinctBatches(selectedMat, item.materialCode);
                       const batchSelectOptions = [
                         { label: 'Select batch code...', value: '' },
-                        ...batchOptions.map((b) => ({
-                          label: `${b.batchCode}${b.materialCode ? ` (${b.materialCode})` : ''}${b.sqM > 0 ? ` - ${b.sqM.toFixed(3)} m²/roll` : ''}`,
+                        ...distinctBatches.map((b) => ({
+                          label: b.batchCode,
                           value: b.batchCode,
                         })),
                       ];
@@ -975,7 +978,7 @@ const Production = () => {
                               />
                               <datalist id={`mat-code-opts-${index}`}>
                                 {Array.from(new Set(batchOptions.map((b) => b.materialCode).filter(Boolean))).map((code) => (
-                                  <option key={code} value={code} />
+                                  <option key={String(code)} value={String(code)} />
                                 ))}
                               </datalist>
                             </div>

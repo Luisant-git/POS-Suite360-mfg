@@ -10,6 +10,7 @@ import LeaveConfirmModal from '../../components/LeaveConfirmModal';
 import {
   generateNextBatchCode,
   getRawMaterialBatchOptions,
+  getRawMaterialDistinctBatches,
 } from '../../utils/productionBatch';
 
 const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => void }) => {
@@ -135,10 +136,15 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
     if (field === 'materialBatchCode') {
       const material = rawMaterials.find((m: any) => m.id === newItems[index].rawMaterialId);
       const batchOpts = getRawMaterialBatchOptions(material);
-      const matched = batchOpts.find((b) => b.batchCode === String(value).trim());
+      const matched =
+        batchOpts.find(
+          (b) =>
+            b.batchCode === String(value).trim() &&
+            (!newItems[index].materialCode || b.materialCode.toLowerCase() === newItems[index].materialCode.toLowerCase())
+        ) || batchOpts.find((b) => b.batchCode === String(value).trim());
       const nextSqMPerRoll = matched?.sqM || newItems[index].sqMPerRoll || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
       newItems[index].materialBatchCode = String(value);
-      if (matched?.materialCode) {
+      if (!newItems[index].materialCode && matched?.materialCode) {
         newItems[index].materialCode = matched.materialCode;
       }
       newItems[index].sqMPerRoll = nextSqMPerRoll;
@@ -173,13 +179,12 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
         const material = rawMaterials.find((m: any) => m.id === autoRawMatId);
         const batchOpts = getRawMaterialBatchOptions(material);
         const defaultOpt = batchOpts.find((b) => b.batchCode === (material?.batchCode || '')) || batchOpts[0];
-        const defaultBatch = defaultOpt?.batchCode || material?.batchCode || '';
         const defaultMatCode = defaultOpt?.materialCode || material?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
         const sqMPerRoll = defaultOpt?.sqM || Number(material?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
         const currentQty = Number(newItems[index].intakeQuantity) || 0;
         newItems[index].rawMaterialId = autoRawMatId;
         newItems[index].materialCode = defaultMatCode;
-        newItems[index].materialBatchCode = defaultBatch;
+        newItems[index].materialBatchCode = '';
         newItems[index].sqMPerRoll = sqMPerRoll;
         newItems[index].sqM = (currentQty * sqMPerRoll).toFixed(3);
 
@@ -190,13 +195,12 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
              const rmMat = rawMaterials.find((m: any) => m.id === rmId);
              const rmBatchOpts = getRawMaterialBatchOptions(rmMat);
              const rmDefaultOpt = rmBatchOpts.find((b) => b.batchCode === (rmMat?.batchCode || '')) || rmBatchOpts[0];
-             const rmBatch = rmDefaultOpt?.batchCode || rmMat?.batchCode || '';
              const rmMatCode = rmDefaultOpt?.materialCode || rmMat?.rawMaterialPurchaseItems?.[0]?.materialCode || '';
              const rmSqMPerRoll = rmDefaultOpt?.sqM || Number(rmMat?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
              return {
                rawMaterialId: rmId,
                materialCode: rmMatCode,
-               materialBatchCode: rmBatch,
+               materialBatchCode: '',
                sqMPerRoll: rmSqMPerRoll,
                sqM: '0.000',
                intakeQuantity: '',
@@ -510,19 +514,28 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                     />
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
-                    <SearchableSelect
-                      value={item.materialBatchCode || ''}
-                      onChange={val => updateItem(index, 'materialBatchCode', val || '')}
-                      placeholder="Select batch..."
-                      options={[
+                    {(() => {
+                      const mat = rawMaterials.find((m: any) => m.id === item.rawMaterialId);
+                      const distinctBatches = getRawMaterialDistinctBatches(mat, item.materialCode);
+                      const batchSelectOptions = [
                         { label: 'Select batch code...', value: '' },
-                        ...getRawMaterialBatchOptions(rawMaterials.find((m: any) => m.id === item.rawMaterialId)).map((b) => ({
-                          label: `${b.batchCode}${b.materialCode ? ` (${b.materialCode})` : ''}`,
+                        ...distinctBatches.map((b) => ({
+                          label: b.batchCode,
                           value: b.batchCode,
                         })),
-                        ...(item.materialBatchCode ? [{ label: item.materialBatchCode, value: item.materialBatchCode }] : [])
-                      ]}
-                    />
+                        ...(item.materialBatchCode && !distinctBatches.some((b) => b.batchCode === item.materialBatchCode)
+                          ? [{ label: item.materialBatchCode, value: item.materialBatchCode }]
+                          : []),
+                      ];
+                      return (
+                        <SearchableSelect
+                          value={item.materialBatchCode || ''}
+                          onChange={val => updateItem(index, 'materialBatchCode', val || '')}
+                          placeholder="Select batch..."
+                          options={batchSelectOptions}
+                        />
+                      );
+                    })()}
                   </td>
                   <td className="px-2 py-1 border-r border-[#E5E7EB]">
                     <input 
@@ -843,19 +856,28 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                   />
                   <div className="mt-2">
                     <label className="block text-[10px] font-bold text-slate-600 mb-1">Material Batch Code</label>
-                    <SearchableSelect
-                      value={item.materialBatchCode || ''}
-                      onChange={val => updateItem(index, 'materialBatchCode', val || '')}
-                      placeholder="Select / search batch code..."
-                      options={[
+                    {(() => {
+                      const mat = material;
+                      const distinctBatches = getRawMaterialDistinctBatches(mat, item.materialCode);
+                      const batchSelectOptions = [
                         { label: 'Select batch code...', value: '' },
-                        ...getRawMaterialBatchOptions(material).map((b) => ({
-                          label: `${b.batchCode}${b.materialCode ? ` (${b.materialCode})` : ''}`,
+                        ...distinctBatches.map((b) => ({
+                          label: b.batchCode,
                           value: b.batchCode,
                         })),
-                        ...(item.materialBatchCode ? [{ label: item.materialBatchCode, value: item.materialBatchCode }] : [])
-                      ]}
-                    />
+                        ...(item.materialBatchCode && !distinctBatches.some((b) => b.batchCode === item.materialBatchCode)
+                          ? [{ label: item.materialBatchCode, value: item.materialBatchCode }]
+                          : []),
+                      ];
+                      return (
+                        <SearchableSelect
+                          value={item.materialBatchCode || ''}
+                          onChange={val => updateItem(index, 'materialBatchCode', val || '')}
+                          placeholder="Select / search batch code..."
+                          options={batchSelectOptions}
+                        />
+                      );
+                    })()}
                   </div>
                 </div>
 

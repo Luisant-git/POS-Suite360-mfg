@@ -45,27 +45,82 @@ export const formatRawMaterialLabel = (
   overrideMaterialCode?: string | null
 ): string => {
   if (!material) return '-';
-  const effectiveBatch =
-    (overrideBatchCode !== undefined ? overrideBatchCode : null) ||
-    material.rawMaterialPurchaseItems?.[0]?.batchCode ||
-    material.batchCode ||
-    '';
 
-  const matchedPurchaseItem = Array.isArray(material.rawMaterialPurchaseItems) && effectiveBatch
-    ? material.rawMaterialPurchaseItems.find(
-        (pi: any) => String(pi?.batchCode || '').trim() === String(effectiveBatch).trim()
-      )
-    : undefined;
+  // 1. Determine effective batch code:
+  // If explicitly passed (even as empty string/null), strictly respect it and do NOT inject unrelated purchase items
+  let effectiveBatch = '';
+  if (overrideBatchCode !== undefined && overrideBatchCode !== null) {
+    effectiveBatch = String(overrideBatchCode).trim();
+  } else {
+    effectiveBatch = String(material.batchCode || '').trim();
+  }
 
-  const effectiveCode =
-    (overrideMaterialCode !== undefined ? overrideMaterialCode : null) ||
-    matchedPurchaseItem?.materialCode ||
-    material.rawMaterialPurchaseItems?.[0]?.materialCode ||
-    material.code ||
-    '';
+  // 2. Determine effective material code:
+  let effectiveCode = '';
+  if (overrideMaterialCode !== undefined && overrideMaterialCode !== null) {
+    effectiveCode = String(overrideMaterialCode).trim();
+  } else {
+    effectiveCode = String(material.code || '').trim();
+  }
 
-  const parts = [material.name, effectiveCode, effectiveBatch].map((p) => String(p || '').trim()).filter(Boolean);
+  const parts = [material.name, effectiveCode, effectiveBatch]
+    .map((p) => String(p || '').trim())
+    .filter(Boolean);
   return parts.join('-') || '-';
+};
+
+/** Extracts distinct batch options (batch code only, deduplicated) for a material. */
+export const getRawMaterialDistinctBatches = (
+  material: any,
+  filterMaterialCode?: string | null
+): { batchCode: string; materialCode: string; sqM: number }[] => {
+  if (!material) return [];
+  const map = new Map<string, { batchCode: string; materialCode: string; sqM: number }>();
+  const cleanFilter = filterMaterialCode ? String(filterMaterialCode).trim().toLowerCase() : '';
+
+  if (Array.isArray(material.rawMaterialPurchaseItems)) {
+    for (const pi of material.rawMaterialPurchaseItems) {
+      const batchCode = String(pi?.batchCode || '').trim();
+      const materialCode = String(pi?.materialCode || '').trim();
+      const sqM = Number(pi?.sqM || 0);
+      if (!batchCode) continue;
+
+      if (cleanFilter && materialCode && materialCode.toLowerCase() !== cleanFilter) {
+        continue;
+      }
+
+      if (!map.has(batchCode)) {
+        map.set(batchCode, { batchCode, materialCode, sqM });
+      }
+    }
+  }
+
+  const masterBatch = String(material.batchCode || '').trim();
+  const masterCode = String(material.code || '').trim();
+  if (masterBatch && !map.has(masterBatch)) {
+    if (!cleanFilter || !masterCode || masterCode.toLowerCase() === cleanFilter) {
+      const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+      map.set(masterBatch, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
+    }
+  }
+
+  // If filtering yielded 0 batches but material has purchases, fallback to all batches of this material
+  if (map.size === 0 && cleanFilter && Array.isArray(material.rawMaterialPurchaseItems)) {
+    for (const pi of material.rawMaterialPurchaseItems) {
+      const batchCode = String(pi?.batchCode || '').trim();
+      const materialCode = String(pi?.materialCode || '').trim();
+      const sqM = Number(pi?.sqM || 0);
+      if (batchCode && !map.has(batchCode)) {
+        map.set(batchCode, { batchCode, materialCode, sqM });
+      }
+    }
+    if (masterBatch && !map.has(masterBatch)) {
+      const defaultSqM = Number(material.rawMaterialPurchaseItems?.[0]?.sqM || 0);
+      map.set(masterBatch, { batchCode: masterBatch, materialCode: masterCode, sqM: defaultSqM });
+    }
+  }
+
+  return Array.from(map.values());
 };
 
 /** Extracts distinct material code + batch options (with latest sqM per roll) from purchases. */
