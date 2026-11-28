@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '../utils/permissions';
 import {
   ShoppingCart,
   TrendingDown,
@@ -42,7 +43,7 @@ const menuData = [
     colorClass: 'hover:border-emerald-500 [&>div]:text-emerald-600 [&>div]:bg-emerald-50',
     items: [
       { name: 'Purchase Entry', path: '/purchase/new', icon: ShoppingCart, authKey: 'purchase_entry' },
-      { name: 'Purchase List', path: '/purchase', icon: ListOrdered, authKey: 'purchase_entry' },
+      { name: 'Purchase List', path: '/purchase', icon: ListOrdered, authKey: ['purchase_list', 'purchase_entry'] },
       { name: 'Purchase Return', path: '/purchase/return', icon: RotateCcw, authKey: 'purchase_return' },
       { name: 'Supplier Payments', path: '/purchase/payments', icon: CreditCard, authKey: 'purchase_payments' },
     ]
@@ -84,22 +85,11 @@ const menuData = [
 const QuickStart = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const { hasPerm: checkPerm, hasAnyPerm } = usePermissions();
 
-  const storedUser = localStorage.getItem('user');
-  let user = null;
-  let permissions: string[] = [];
-  if (storedUser) {
-    try {
-      user = JSON.parse(storedUser);
-      permissions = user?.role?.permissions || [];
-    } catch (e) {}
-  }
-
-  const hasPerm = (perm?: string) => {
+  const hasPerm = (perm?: string | string[]) => {
     if (!perm) return true;
-    if (permissions.includes('ALL')) return true;
-    if (permissions.length === 0 && !user?.roleId) return true;
-    return permissions.includes(perm);
+    return Array.isArray(perm) ? hasAnyPerm(perm) : checkPerm(perm);
   };
 
   const filteredMenuData = menuData.map(cat => ({

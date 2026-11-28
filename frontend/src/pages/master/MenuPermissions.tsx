@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Check, Save, Shield, Settings2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import { notifyUserPermissionsUpdated } from '../../utils/permissions';
 
 const MODULES = [
   {
@@ -113,6 +114,16 @@ const MODULES = [
   }
 ];
 
+const ALL_PERMISSION_IDS = MODULES.flatMap(m => m.permissions.map(p => p.id));
+
+const expandRolePermissions = (perms?: string[]): string[] => {
+  if (!Array.isArray(perms)) return [];
+  if (perms.includes('ALL')) {
+    return ALL_PERMISSION_IDS;
+  }
+  return perms;
+};
+
 const MenuPermissions = () => {
   const [roles, setRoles] = useState<any[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
@@ -140,7 +151,7 @@ const MenuPermissions = () => {
         setSelectedRoleId(initialRoleId);
 
         const targetRole = data.find((r: any) => r.id === initialRoleId) || data[0];
-        setActivePermissions(targetRole.permissions || []);
+        setActivePermissions(expandRolePermissions(targetRole.permissions));
       }
     } catch (error) {
       console.error(error);
@@ -152,7 +163,7 @@ const MenuPermissions = () => {
     setSelectedRoleId(roleId);
     try {
       const { data } = await api.get(`/roles/${roleId}`);
-      setActivePermissions(data.permissions || []);
+      setActivePermissions(expandRolePermissions(data.permissions));
     } catch (error) {
       toast.error('Failed to load permissions');
     }
@@ -179,29 +190,26 @@ const MenuPermissions = () => {
     if (!selectedRoleId) return;
     setIsSaving(true);
     try {
-      await api.put(`/roles/${selectedRoleId}/permissions`, { permissions: activePermissions });
+      const cleanPermissions = activePermissions.filter(p => p !== 'ALL');
+      await api.put(`/roles/${selectedRoleId}/permissions`, { permissions: cleanPermissions });
+
+      setRoles(prev =>
+        prev.map(r => (r.id === selectedRoleId ? { ...r, permissions: cleanPermissions } : r))
+      );
 
       const storedUser = localStorage.getItem('user');
-      let isCurrentUserRole = false;
       if (storedUser) {
         try {
           const parsed = JSON.parse(storedUser);
-          if (parsed.roleId === selectedRoleId) {
-            isCurrentUserRole = true;
+          if (Number(parsed.roleId) === Number(selectedRoleId)) {
             parsed.role = parsed.role || {};
-            parsed.role.permissions = activePermissions;
-            localStorage.setItem('user', JSON.stringify(parsed));
+            parsed.role.permissions = cleanPermissions;
+            notifyUserPermissionsUpdated(parsed);
           }
         } catch (e) { }
       }
 
       toast.success('Permissions saved successfully!');
-
-      if (isCurrentUserRole) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      }
     } catch (error) {
       toast.error('Failed to save permissions');
     } finally {
@@ -210,8 +218,7 @@ const MenuPermissions = () => {
   };
 
   const selectAll = () => {
-    const allPerms = MODULES.flatMap(m => m.permissions.map(p => p.id));
-    setActivePermissions(allPerms);
+    setActivePermissions(ALL_PERMISSION_IDS);
   };
 
   const deselectAll = () => {
@@ -227,6 +234,7 @@ const MenuPermissions = () => {
       setIsCreatingRole(false);
       await fetchRoles();
       setSelectedRoleId(data.id);
+      setActivePermissions(expandRolePermissions(data.permissions));
     } catch (error) {
       toast.error('Failed to create role');
     }

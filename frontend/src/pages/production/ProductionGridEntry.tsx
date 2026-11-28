@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -13,6 +13,7 @@ import {
   getRawMaterialDistinctBatches,
   getRawMaterialDistinctMaterialCodes,
 } from '../../utils/productionBatch';
+import { usePermissions } from '../../utils/permissions';
 
 const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => void }) => {
   const navigate = useNavigate();
@@ -22,19 +23,8 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
   const [batchCode, setBatchCode] = useState('');
   const [showLeaveModal, setShowLeaveModal] = useState(false);
 
-  const canEditProdSqM = useMemo(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      if (!storedUser) return true;
-      const user = JSON.parse(storedUser);
-      const perms: string[] = user?.role?.permissions || [];
-      if (perms.includes('ALL')) return true;
-      if (perms.length === 0 && !user?.roleId) return true;
-      return perms.includes('mfg_production_edit_sqm');
-    } catch {
-      return false;
-    }
-  }, []);
+  const { hasPerm } = usePermissions();
+  const canEditProdSqM = hasPerm('mfg_production_edit_sqm');
   
   const [items, setItems] = useState<any[]>([
     { rawMaterialId: 0, materialCode: '', materialBatchCode: '', sqMPerRoll: 0, sqM: '', intakeQuantity: '', finishedProductId: 0, prodSqM: '', outcomeQuantity: '' }

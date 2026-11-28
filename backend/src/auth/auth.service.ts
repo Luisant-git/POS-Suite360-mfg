@@ -47,6 +47,28 @@ export class AuthService {
     };
   }
 
+  async getMe(userId: number) {
+    if (userId === -1) {
+      return {
+        id: -1,
+        username: 'developer',
+        name: 'Developer',
+        roleId: -1,
+        role: {
+          id: -1,
+          name: 'Developer',
+          permissions: ['ALL'],
+        },
+      };
+    }
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      return null;
+    }
+    const { password, ...result } = user as any;
+    return result;
+  }
+
   async register(username: string, pass: string) {
     const hashedPassword = await bcrypt.hash(pass, 10);
     const user = await this.usersService.create(username, hashedPassword);

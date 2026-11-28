@@ -57,8 +57,9 @@ export class UsersService {
         username,
         password,
         name,
-        roleId,
+        roleId: Number(roleId),
       },
+      include: { role: true },
     });
   }
 
@@ -70,17 +71,18 @@ export class UsersService {
   }
 
   async updateUser(id: number, data: any) {
-    const updateData: any = { ...data };
-    if (updateData.password) {
-      // Password hashing should ideally be in a service that calls this, but we'll let controller handle it or do it here
-      // For safety, remove it if it's empty
-      if (updateData.password.trim() === '') {
-        delete updateData.password;
-      }
+    const { id: _ignoredId, ...rest } = data || {};
+    const updateData: any = { ...rest };
+    if (updateData.roleId !== undefined && updateData.roleId !== '') {
+      updateData.roleId = Number(updateData.roleId);
+    }
+    if (!updateData.password || String(updateData.password).trim() === '') {
+      delete updateData.password;
     }
     return this.prisma.user.update({
       where: { id },
       data: updateData,
+      include: { role: true },
     });
   }
 

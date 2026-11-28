@@ -3,6 +3,7 @@ import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-do
 import { ChevronDown, LogOut, Settings as SettingsIcon, Zap, ArrowLeft, Menu, X, Shield, Users as UsersIcon } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import api from '../services/api';
+import { usePermissions, notifyUserPermissionsUpdated } from '../utils/permissions';
 const NavItem = ({ title, icon, to, onClick, compact, isCrowded }: { title: string, icon: string, to: string, onClick?: () => void, compact?: boolean, isCrowded?: boolean }) => {
   const sizeClass = isCrowded
     ? (compact ? 'gap-1 lg:gap-1.5 px-1.5 lg:px-2 xl:px-2.5 text-[12px] lg:text-[12.5px] xl:text-[13px]' : 'gap-1.5 lg:gap-2 px-2 lg:px-2.5 xl:px-3 text-[12.5px] lg:text-[13px] xl:text-[14px]')
@@ -118,52 +119,19 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { settings } = useSettings();
-  const [user] = useState<any>(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        return JSON.parse(storedUser);
-      } catch (e) { }
-    }
-    return { name: 'Pro X Admin' };
-  });
-
-  const [permissions, setPermissions] = useState<string[]>(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed?.role?.permissions) {
-          return parsed.role.permissions;
-        }
-      } catch (e) { }
-    }
-    return [];
-  });
+  const { user: authUser, permissions, hasPerm, hasAnyPerm } = usePermissions();
+  const user = authUser || { name: 'Pro X Admin' };
 
   useEffect(() => {
-    if (!user?.roleId && permissions.length === 0) {
+    if (!authUser?.roleId && permissions.length === 0) {
       // Fallback for demo before setup
       api.get('/roles').then(res => {
         if (res.data.length > 0) {
-          setPermissions(res.data[0].permissions || []);
+          notifyUserPermissionsUpdated({ ...(authUser || { name: 'Pro X Admin' }), role: res.data[0] });
         }
       }).catch(err => console.error(err));
     }
-  }, [user?.roleId, permissions.length]);
-
-  const hasPerm = (perm: string) => {
-    if (permissions.includes('ALL')) return true;
-    // If no permissions are set and it's a demo user, default to showing everything
-    if (permissions.length === 0 && !user?.roleId) return true;
-    return permissions.includes(perm);
-  };
-
-  const hasAnyPerm = (perms: string[]) => {
-    if (permissions.includes('ALL')) return true;
-    if (permissions.length === 0 && !user?.roleId) return true;
-    return perms.some(p => permissions.includes(p));
-  };
+  }, [authUser, permissions.length]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [desktopLayout] = useState(() => localStorage.getItem('desktopLayout') || 'topbar');
@@ -232,7 +200,7 @@ const MainLayout = () => {
     hasPerm('sales_estimation'),
     hasPerm('expenses_entry'),
     hasAnyPerm(['services_items', 'services_sales', 'services_sales_list']),
-    hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments'])
+    hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_product_wise_sales', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments'])
   ].filter(Boolean).length;
 
   const isCrowded = visibleMenusCount >= 8;
@@ -253,46 +221,54 @@ const MainLayout = () => {
           <nav className="flex-1 py-2 overflow-y-auto custom-scrollbar">
             <NavItem to="/dashboard" icon="fa-dashboard" title="Dashboard" />
 
-            <MobileNavDropdown title="Master" icon="fa-database" isActive={isMasterActive}>
-              {hasPerm('master_users') && <MobileDropdownItem to="/master/users" icon="fa-users" title="Users & Roles" />}
-              {hasPerm('master_permissions') && <MobileDropdownItem to="/master/permissions" icon="fa-shield" title="Menu Permissions" />}
-              {hasPerm('master_products') && <MobileDropdownItem to="/master/products" icon="fa-cubes" title="Products" />}
-              {hasPerm('master_brands') && <MobileDropdownItem to="/master/brands" icon="fa-tags" title="Brands" />}
-              {hasPerm('master_categories') && <MobileDropdownItem to="/master/categories" icon="fa-sitemap" title="Categories" />}
-              {hasPerm('master_units') && <MobileDropdownItem to="/master/units" icon="fa-balance-scale" title="Units" />}
-              <div className="my-1 border-t border-[#2A3F54]/30"></div>
-              {hasPerm('master_suppliers') && <MobileDropdownItem to="/master/suppliers" icon="fa-building-o" title="Suppliers" />}
-              {hasPerm('master_customers') && <MobileDropdownItem to="/master/customers" icon="fa-users" title="Customers" />}
-              <div className="my-1 border-t border-[#2A3F54]/30"></div>
-              {hasPerm('master_payment_modes') && <MobileDropdownItem to="/master/payment-modes" icon="fa-credit-card-alt" title="Payment Modes" />}
-              <MobileDropdownItem to="/master/payment-types" icon="fa-money" title="Payment Types" />
-              <MobileDropdownItem to="/master/expense-categories" icon="fa-list-alt" title="Expense Categories" />
-              {settings?.enableTax && (
-                <MobileDropdownItem to="/master/taxes" icon="fa-percent" title="Tax GST" />
-              )}
-            </MobileNavDropdown>
+            {hasAnyPerm(['master_users', 'master_permissions', 'master_products', 'master_brands', 'master_categories', 'master_units', 'master_suppliers', 'master_customers', 'master_payment_modes', 'master_payment_types', 'master_expense_categories']) && (
+              <MobileNavDropdown title="Master" icon="fa-database" isActive={isMasterActive}>
+                {hasPerm('master_users') && <MobileDropdownItem to="/master/users" icon="fa-users" title="Users & Roles" />}
+                {hasPerm('master_permissions') && <MobileDropdownItem to="/master/permissions" icon="fa-shield" title="Menu Permissions" />}
+                {hasPerm('master_products') && <MobileDropdownItem to="/master/products" icon="fa-cubes" title="Products" />}
+                {hasPerm('master_brands') && <MobileDropdownItem to="/master/brands" icon="fa-tags" title="Brands" />}
+                {hasPerm('master_categories') && <MobileDropdownItem to="/master/categories" icon="fa-sitemap" title="Categories" />}
+                {hasPerm('master_units') && <MobileDropdownItem to="/master/units" icon="fa-balance-scale" title="Units" />}
+                <div className="my-1 border-t border-[#2A3F54]/30"></div>
+                {hasPerm('master_suppliers') && <MobileDropdownItem to="/master/suppliers" icon="fa-building-o" title="Suppliers" />}
+                {hasPerm('master_customers') && <MobileDropdownItem to="/master/customers" icon="fa-users" title="Customers" />}
+                <div className="my-1 border-t border-[#2A3F54]/30"></div>
+                {hasPerm('master_payment_modes') && <MobileDropdownItem to="/master/payment-modes" icon="fa-credit-card-alt" title="Payment Modes" />}
+                {hasPerm('master_payment_types') && <MobileDropdownItem to="/master/payment-types" icon="fa-money" title="Payment Types" />}
+                {hasPerm('master_expense_categories') && <MobileDropdownItem to="/master/expense-categories" icon="fa-list-alt" title="Expense Categories" />}
+                {settings?.enableTax && (
+                  <MobileDropdownItem to="/master/taxes" icon="fa-percent" title="Tax GST" />
+                )}
+              </MobileNavDropdown>
+            )}
 
-            <MobileNavDropdown title="Purchases" icon="fa-truck" isActive={isPurchaseActive}>
-              {hasPerm('purchase_entry') && <MobileDropdownItem to="/purchase/new" icon="fa-shopping-basket" title="Purchase Entry" />}
-              {(hasPerm('purchase_list') || hasPerm('purchase_entry')) && <MobileDropdownItem to="/purchase" icon="fa-list-alt" title="Purchase List" />}
-              {hasPerm('purchase_return') && <MobileDropdownItem to="/purchase/return" icon="fa-undo" title="Purchase Return" isWarning />}
-              {hasPerm('purchase_payments') && <MobileDropdownItem to="/purchase/payments" icon="fa-credit-card" title="Supplier Payments" />}
-            </MobileNavDropdown>
+            {hasAnyPerm(['purchase_entry', 'purchase_list', 'purchase_return', 'purchase_payments']) && (
+              <MobileNavDropdown title="Purchases" icon="fa-truck" isActive={isPurchaseActive}>
+                {hasPerm('purchase_entry') && <MobileDropdownItem to="/purchase/new" icon="fa-shopping-basket" title="Purchase Entry" />}
+                {(hasPerm('purchase_list') || hasPerm('purchase_entry')) && <MobileDropdownItem to="/purchase" icon="fa-list-alt" title="Purchase List" />}
+                {hasPerm('purchase_return') && <MobileDropdownItem to="/purchase/return" icon="fa-undo" title="Purchase Return" isWarning />}
+                {hasPerm('purchase_payments') && <MobileDropdownItem to="/purchase/payments" icon="fa-credit-card" title="Supplier Payments" />}
+              </MobileNavDropdown>
+            )}
 
-            <MobileNavDropdown title="Manufacturing" icon="fa-industry" isActive={isManufacturingActive}>
-              <MobileDropdownItem to="/production/products" icon="fa-cubes" title="Product Master" />
-              <MobileDropdownItem to="/raw-materials/master" icon="fa-database" title="Raw Material Master" />
-              <MobileDropdownItem to="/raw-materials/purchase" icon="fa-shopping-cart" title="Raw Material Purchase" />
-              <MobileDropdownItem to="/raw-materials/purchase-list" icon="fa-list-alt" title="RM Purchase List" />
-              {hasPerm('mfg_production') && <MobileDropdownItem to="/production" icon="fa-cogs" title="Production Entry" />}
-            </MobileNavDropdown>
+            {hasAnyPerm(['mfg_product_master', 'mfg_rm_master', 'mfg_rm_purchase', 'mfg_production']) && (
+              <MobileNavDropdown title="Manufacturing" icon="fa-industry" isActive={isManufacturingActive}>
+                {hasPerm('mfg_product_master') && <MobileDropdownItem to="/production/products" icon="fa-cubes" title="Product Master" />}
+                {hasPerm('mfg_rm_master') && <MobileDropdownItem to="/raw-materials/master" icon="fa-database" title="Raw Material Master" />}
+                {hasPerm('mfg_rm_purchase') && <MobileDropdownItem to="/raw-materials/purchase" icon="fa-shopping-cart" title="Raw Material Purchase" />}
+                {hasPerm('mfg_rm_purchase') && <MobileDropdownItem to="/raw-materials/purchase-list" icon="fa-list-alt" title="RM Purchase List" />}
+                {hasPerm('mfg_production') && <MobileDropdownItem to="/production" icon="fa-cogs" title="Production Entry" />}
+              </MobileNavDropdown>
+            )}
 
-            <MobileNavDropdown title="Sales" icon="fa-shopping-cart" isActive={isSalesActive && location.pathname !== '/sales/estimation'}>
-              <MobileDropdownItem to="/sales/pos" icon="fa-th-large" title="Sales Entry (POS)" />
-              <MobileDropdownItem to="/sales" icon="fa-list" title="Sales List" end />
-              <MobileDropdownItem to="/sales/return" icon="fa-reply" title="Sales Return" isDanger />
-              <MobileDropdownItem to="/sales/receipts" icon="fa-money" title="Customer Receipts" />
-            </MobileNavDropdown>
+            {hasAnyPerm(['sales_pos', 'sales_return', 'sales_receipts']) && (
+              <MobileNavDropdown title="Sales" icon="fa-shopping-cart" isActive={isSalesActive && !location.pathname.startsWith('/sales/estimation')}>
+                {hasPerm('sales_pos') && <MobileDropdownItem to="/sales/pos" icon="fa-th-large" title="Sales Entry (POS)" />}
+                {hasPerm('sales_pos') && <MobileDropdownItem to="/sales" icon="fa-list" title="Sales List" end />}
+                {hasPerm('sales_return') && <MobileDropdownItem to="/sales/return" icon="fa-reply" title="Sales Return" isDanger />}
+                {hasPerm('sales_receipts') && <MobileDropdownItem to="/sales/receipts" icon="fa-money" title="Customer Receipts" />}
+              </MobileNavDropdown>
+            )}
 
             {hasPerm('sales_estimation') && (
               <MobileNavDropdown title="Estimation" icon="fa-file-invoice" isActive={location.pathname.startsWith('/sales/estimation')}>
@@ -301,7 +277,7 @@ const MainLayout = () => {
               </MobileNavDropdown>
             )}
 
-            <NavItem to="/expenses/new" icon="fa-calculator" title="Expenses" />
+            {hasPerm('expenses_entry') && <NavItem to="/expenses/new" icon="fa-calculator" title="Expenses" />}
 
             {hasAnyPerm(['services_items', 'services_sales', 'services_sales_list']) && (
               <MobileNavDropdown title="Services" icon="fa-scissors" isActive={isServiceActive}>
@@ -311,23 +287,27 @@ const MainLayout = () => {
               </MobileNavDropdown>
             )}
 
-            <MobileNavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive}>
-              <MobileDropdownItem to="/reports/sales" icon="fa-line-chart" title="Sales Report" />
-              <MobileDropdownItem to="/reports/sales-return" icon="fa-mail-reply" title="Sales Return Report" isDanger />
-              <MobileDropdownItem to="/reports/estimations" icon="fa-file-text-o" title="Estimation Report" />
-              <MobileDropdownItem to="/reports/purchase" icon="fa-file-text-o" title="Purchase Report" />
-              <MobileDropdownItem to="/reports/purchase-return" icon="fa-mail-reply" title="Purchase Return Report" isWarning />
-              <div className="my-1 border-t border-[#2A3F54]/30"></div>
-              {hasPerm('reports_customer_receipts') && <MobileDropdownItem to="/reports/customer-receipts" icon="fa-users" title="Customer Receipts & Dues Report" />}
-              {hasPerm('reports_supplier_payments') && <MobileDropdownItem to="/reports/supplier-payments" icon="fa-credit-card" title="Supplier Payments & Payables Report" />}
-              <div className="my-1 border-t border-[#2A3F54]/30"></div>
-              <MobileDropdownItem to="/reports/raw-material-purchase" icon="fa-truck" title="RM Purchase Report" />
-              <MobileDropdownItem to="/reports/production" icon="fa-industry" title="Production Report" />
-              <MobileDropdownItem to="/reports/batch-pnl" icon="fa-pie-chart" title="Batch P&L Report" />
-              <div className="my-1 border-t border-[#2A3F54]/30"></div>
-              <MobileDropdownItem to="/reports/stock" icon="fa-cubes" title="Stock As On Date" />
-              <MobileDropdownItem to="/reports/profit-ledger" icon="fa-bar-chart" title="Profit / Ledger" />
-            </MobileNavDropdown>
+            {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_product_wise_sales', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments']) && (
+              <MobileNavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive}>
+                {hasPerm('reports_sales') && <MobileDropdownItem to="/reports/sales" icon="fa-line-chart" title="Sales Report" />}
+                {hasPerm('reports_sales_return') && <MobileDropdownItem to="/reports/sales-return" icon="fa-mail-reply" title="Sales Return Report" isDanger />}
+                {(hasPerm('reports_sales') || hasPerm('reports_product_wise_sales')) && <MobileDropdownItem to="/reports/product-wise-sales" icon="fa-cubes" title="Product & Supplier Wise Sales" />}
+                {hasPerm('reports_estimations') && <MobileDropdownItem to="/reports/estimations" icon="fa-file-text-o" title="Estimation Report" />}
+                {hasPerm('reports_purchase') && <MobileDropdownItem to="/reports/purchase" icon="fa-file-text-o" title="Purchase Report" />}
+                {hasPerm('reports_purchase_return') && <MobileDropdownItem to="/reports/purchase-return" icon="fa-mail-reply" title="Purchase Return Report" isWarning />}
+                <div className="my-1 border-t border-[#2A3F54]/30"></div>
+                {hasPerm('reports_customer_receipts') && <MobileDropdownItem to="/reports/customer-receipts" icon="fa-users" title="Customer Receipts & Dues Report" />}
+                {hasPerm('reports_supplier_payments') && <MobileDropdownItem to="/reports/supplier-payments" icon="fa-credit-card" title="Supplier Payments & Payables Report" />}
+                <div className="my-1 border-t border-[#2A3F54]/30"></div>
+                {hasPerm('reports_rm_purchase') && <MobileDropdownItem to="/reports/raw-material-purchase" icon="fa-truck" title="RM Purchase Report" />}
+                {hasPerm('reports_production') && <MobileDropdownItem to="/reports/production" icon="fa-industry" title="Production Report" />}
+                {hasPerm('reports_batch_pnl') && <MobileDropdownItem to="/reports/batch-pnl" icon="fa-pie-chart" title="Batch P&L Report" />}
+                <div className="my-1 border-t border-[#2A3F54]/30"></div>
+                {hasPerm('reports_stock') && <MobileDropdownItem to="/reports/stock" icon="fa-cubes" title="Stock As On Date" />}
+                {hasPerm('reports_profit_ledger') && <MobileDropdownItem to="/reports/profit-ledger" icon="fa-bar-chart" title="Profit / Ledger" />}
+                {hasPerm('reports_service_sales') && <MobileDropdownItem to="/reports/service-sales" icon="fa-scissors" title="Service Sales Report" />}
+              </MobileNavDropdown>
+            )}
           </nav>
         </aside>
       )}
@@ -455,7 +435,7 @@ const MainLayout = () => {
                     </NavDropdown>
                   )}
 
-                  {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments']) && (
+                  {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_product_wise_sales', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments']) && (
                     <NavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive} rightAligned compact={showBackButton} isCrowded={isCrowded} widthClass="w-max min-w-[340px]">
                       {(hasPerm('reports_purchase') || hasPerm('reports_purchase_return') || hasPerm('reports_sales') || hasPerm('reports_sales_return') || hasPerm('reports_estimations') || hasPerm('reports_customer_receipts') || hasPerm('reports_supplier_payments')) && (
                         <div className="px-4 py-1.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Purchase & Sales</div>
@@ -576,7 +556,11 @@ const MainLayout = () => {
                   </button>
                   */}
                     <button
-                      onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}
+                      onClick={() => {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        navigate('/login');
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-bold mt-1"
                     >
                       <div className="w-8 h-8 rounded-md bg-red-100 flex items-center justify-center text-red-500">
@@ -649,12 +633,18 @@ const MainLayout = () => {
                 )}
 
                 {hasAnyPerm(['sales_pos', 'sales_return', 'sales_receipts']) && (
-                  <MobileNavDropdown title="Sales" icon="fa-shopping-cart" isActive={isSalesActive}>
+                  <MobileNavDropdown title="Sales" icon="fa-shopping-cart" isActive={isSalesActive && !location.pathname.startsWith('/sales/estimation')}>
                     {hasPerm('sales_pos') && <MobileDropdownItem to="/sales/pos" icon="fa-th-large" title="Sales Entry (POS)" onClick={closeMobileMenu} />}
                     {hasPerm('sales_pos') && <MobileDropdownItem to="/sales" icon="fa-list" title="Sales List" end onClick={closeMobileMenu} />}
-                    {hasPerm('sales_pos') && <MobileDropdownItem to="/sales/estimation" icon="fa-file-invoice" title="Estimation" onClick={closeMobileMenu} />}
                     {hasPerm('sales_return') && <MobileDropdownItem to="/sales/return" icon="fa-reply" title="Sales Return" isDanger onClick={closeMobileMenu} />}
                     {hasPerm('sales_receipts') && <MobileDropdownItem to="/sales/receipts" icon="fa-money" title="Customer Receipts" onClick={closeMobileMenu} />}
+                  </MobileNavDropdown>
+                )}
+
+                {hasPerm('sales_estimation') && (
+                  <MobileNavDropdown title="Estimation" icon="fa-file-invoice" isActive={location.pathname.startsWith('/sales/estimation')}>
+                    <MobileDropdownItem to="/sales/estimation" icon="fa-plus-circle" title="Estimation Entry" onClick={closeMobileMenu} />
+                    <MobileDropdownItem to="/sales/estimation-list" icon="fa-list-ul" title="Estimation List" onClick={closeMobileMenu} />
                   </MobileNavDropdown>
                 )}
 
@@ -668,7 +658,7 @@ const MainLayout = () => {
                   </MobileNavDropdown>
                 )}
 
-                {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_customer_receipts', 'reports_supplier_payments']) && (
+                {hasAnyPerm(['reports_sales', 'reports_sales_return', 'reports_product_wise_sales', 'reports_estimations', 'reports_purchase', 'reports_purchase_return', 'reports_rm_purchase', 'reports_production', 'reports_batch_pnl', 'reports_stock', 'reports_profit_ledger', 'reports_service_sales', 'reports_customer_receipts', 'reports_supplier_payments']) && (
                   <MobileNavDropdown title="Reports" icon="fa-pie-chart" isActive={isReportsActive}>
                     {hasPerm('reports_sales') && <MobileDropdownItem to="/reports/sales" icon="fa-line-chart" title="Sales Report" onClick={closeMobileMenu} />}
                     {hasPerm('reports_sales_return') && <MobileDropdownItem to="/reports/sales-return" icon="fa-mail-reply" title="Sales Return Report" isDanger onClick={closeMobileMenu} />}
@@ -679,14 +669,14 @@ const MainLayout = () => {
                     {hasPerm('reports_customer_receipts') && <MobileDropdownItem to="/reports/customer-receipts" icon="fa-users" title="Customer Receipts & Overdue" onClick={closeMobileMenu} />}
                     {hasPerm('reports_supplier_payments') && <MobileDropdownItem to="/reports/supplier-payments" icon="fa-credit-card" title="Supplier Payments & Payables" onClick={closeMobileMenu} />}
 
-                    {hasPerm('reports_rm_purchase') && <MobileDropdownItem to="/reports/raw-material-purchase" icon="fa-truck" title="RM Purchase Report" />}
-                    {hasPerm('reports_production') && <MobileDropdownItem to="/reports/production" icon="fa-industry" title="Production Report" />}
-                    {hasPerm('reports_batch_pnl') && <MobileDropdownItem to="/reports/batch-pnl" icon="fa-pie-chart" title="Batch P&L Report" />}
+                    {hasPerm('reports_rm_purchase') && <MobileDropdownItem to="/reports/raw-material-purchase" icon="fa-truck" title="RM Purchase Report" onClick={closeMobileMenu} />}
+                    {hasPerm('reports_production') && <MobileDropdownItem to="/reports/production" icon="fa-industry" title="Production Report" onClick={closeMobileMenu} />}
+                    {hasPerm('reports_batch_pnl') && <MobileDropdownItem to="/reports/batch-pnl" icon="fa-pie-chart" title="Batch P&L Report" onClick={closeMobileMenu} />}
 
-                    {hasPerm('reports_stock') && <MobileDropdownItem to="/reports/stock" icon="fa-cubes" title="Stock As On Date" />}
-                    {hasPerm('reports_profit_ledger') && <MobileDropdownItem to="/reports/profit-ledger" icon="fa-bar-chart" title="Profit / Ledger" />}
+                    {hasPerm('reports_stock') && <MobileDropdownItem to="/reports/stock" icon="fa-cubes" title="Stock As On Date" onClick={closeMobileMenu} />}
+                    {hasPerm('reports_profit_ledger') && <MobileDropdownItem to="/reports/profit-ledger" icon="fa-bar-chart" title="Profit / Ledger" onClick={closeMobileMenu} />}
                     {hasPerm('reports_service_sales') && (
-                      <MobileDropdownItem to="/reports/service-sales" icon="fa-scissors" title="Service Sales Report" />
+                      <MobileDropdownItem to="/reports/service-sales" icon="fa-scissors" title="Service Sales Report" onClick={closeMobileMenu} />
                     )}
                   </MobileNavDropdown>
                 )}

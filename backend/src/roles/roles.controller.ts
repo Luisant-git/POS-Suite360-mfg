@@ -26,11 +26,7 @@ export class RolesController {
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    try {
-      return await this.rolesService.remove(+id);
-    } catch (e: any) {
-      return { error: e.message };
-    }
+  remove(@Param('id') id: string) {
+    return this.rolesService.remove(+id);
   }
 }

@@ -9,6 +9,7 @@ import ProductionGridEntry from './ProductionGridEntry';
 import ProductionViewModal from '../../components/ProductionViewModal';
 import LeaveConfirmModal from '../../components/LeaveConfirmModal';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '../../utils/permissions';
 import {
   formatDateTime,
   formatRawMaterialLabel,
@@ -69,19 +70,8 @@ const Production = () => {
   const [workName, setWorkName] = useState('');
   const [batchCode, setBatchCode] = useState('');
 
-  const canEditProdSqM = useMemo(() => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      if (!storedUser) return true;
-      const user = JSON.parse(storedUser);
-      const perms: string[] = user?.role?.permissions || [];
-      if (perms.includes('ALL')) return true;
-      if (perms.length === 0 && !user?.roleId) return true;
-      return perms.includes('mfg_production_edit_sqm');
-    } catch {
-      return false;
-    }
-  }, []);
+  const { hasPerm } = usePermissions();
+  const canEditProdSqM = hasPerm('mfg_production_edit_sqm');
 
   const [intakes, setIntakes] = useState<IntakeRow[]>([createEmptyIntake()]);
   const [outcomes, setOutcomes] = useState<OutcomeRow[]>([createEmptyOutcome()]);

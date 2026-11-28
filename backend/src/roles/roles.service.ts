@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -43,7 +43,7 @@ export class RolesService {
       where: { roleId: id }
     });
     if (usersWithRole) {
-      throw new Error("Cannot delete role because it is assigned to one or more users");
+      throw new BadRequestException("Cannot delete role because it is assigned to one or more users");
     }
     return this.prisma.role.delete({
       where: { id },
