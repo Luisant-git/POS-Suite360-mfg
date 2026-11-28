@@ -13,6 +13,7 @@ import Select from 'react-select';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import TableLoader from '../../components/TableLoader';
 import {
+  computeBatchWastage,
   formatDateTime,
   formatRawMaterialLabel,
   getEffectiveIntakes,
@@ -20,6 +21,7 @@ import {
   getEffectiveOutcomes,
   isProductionCompleted,
   parseBatchWorkName,
+  resolveIntakeSqM,
 } from '../../utils/productionBatch';
 const ProductionReport = () => {
   const navigate = useNavigate();
@@ -118,79 +120,54 @@ const ProductionReport = () => {
 
   const computeRowWastage = (p: any) => {
     if (p.hasStructuredRows) {
-      const totalBatchRawSqM = (p.intakes || []).reduce((sum: number, bp: any) => {
-        if (Number(bp.sqM || 0) > 0) return sum + Number(bp.sqM);
-        const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId) || bp.rawMaterial;
-        const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-        return sum + Number(bp.intakeQuantity || 0) * sqMPerRoll;
-      }, 0);
+      return computeBatchWastage(p, rawMaterials, products);
+    }
 
-      const outcomes = p.outcomes || [];
-      const totalOutcomeSqM = outcomes.reduce((sum: number, o: any) => {
-        const prod = products.find((pr: any) => pr.id === o.finishedProductId) || o.finishedProduct;
-        return sum + Number(o.outcomeQuantity || 0) * Number(prod?.sqM || 0);
-      }, 0);
+    // Legacy single-row grouping fallback
+    const batchRows = productions.filter(
+      (bp: any) => !bp.hasStructuredRows && bp.workName === p.workName && bp.finishedProductId === p.finishedProductId,
+    );
+    const totalBatchRawSqM = batchRows.reduce((sum: number, bp: any) => sum + resolveIntakeSqM(bp, rawMaterials), 0);
+    const prod = products.find((prod: any) => prod.id === p.finishedProductId);
+    const productSqM = Number(prod?.sqM || 0);
+    const batchOutcome = Number(
+      batchRows.find((bp: any) => bp.outcomeQuantity > 0)?.outcomeQuantity || p.outcomeQuantity || 0,
+    );
+    const totalOutcomeSqM = batchOutcome * productSqM;
+    const wastageSqM = totalBatchRawSqM > 0 ? Math.max(0, totalBatchRawSqM - totalOutcomeSqM) : 0;
 
-      const batchOutcome = p.outcomeQuantity || 0;
-      const singleProd =
-        outcomes.length === 1
-          ? products.find((pr: any) => pr.id === outcomes[0].finishedProductId) || outcomes[0].finishedProduct
-          : null;
-      const singleProdSqM = Number(singleProd?.sqM || 0);
-
-      if (!p.completed && batchOutcome <= 0) {
-        return { batchOutcome, displayWastage: '-', wastagePercentage: '-', wastageNum: 0 };
-      }
-
-      if (singleProd && singleProdSqM > 0) {
-        const theoreticalYield = totalBatchRawSqM / singleProdSqM;
-        const maxWastage = Math.max(0, theoreticalYield - batchOutcome);
-        const pct = theoreticalYield > 0 ? ((maxWastage / theoreticalYield) * 100).toFixed(2) + '%' : '-';
-        return { batchOutcome, displayWastage: maxWastage.toFixed(2), wastagePercentage: pct, wastageNum: maxWastage };
-      }
-
-      const wastageSqM = totalBatchRawSqM > 0 ? Math.max(0, totalBatchRawSqM - totalOutcomeSqM) : 0;
-      const pct = totalBatchRawSqM > 0 ? ((wastageSqM / totalBatchRawSqM) * 100).toFixed(2) + '%' : '-';
+    if (!p.completed && batchOutcome <= 0) {
       return {
         batchOutcome,
-        displayWastage: totalBatchRawSqM > 0 ? `${wastageSqM.toFixed(2)} m²` : '-',
+        displayWastage: '-',
+        wastagePercentage: '-',
+        wastageNum: 0,
+        totalBatchRawSqM,
+        totalOutcomeSqM: 0,
+        wastageSqM: 0,
+      };
+    }
+
+    const pct = totalBatchRawSqM > 0 ? ((wastageSqM / totalBatchRawSqM) * 100).toFixed(2) + '%' : '-';
+    if (productSqM > 0) {
+      const totalTheoreticalYield = totalBatchRawSqM / productSqM;
+      const wastageNum = Math.max(0, totalTheoreticalYield - batchOutcome);
+      return {
+        batchOutcome,
+        displayWastage: totalBatchRawSqM > 0 ? wastageNum.toFixed(2) : '-',
         wastagePercentage: pct,
-        wastageNum: wastageSqM,
+        wastageNum,
         totalBatchRawSqM,
         totalOutcomeSqM,
         wastageSqM,
       };
     }
 
-    // Legacy single-row grouping fallback
-    const batchRows = productions.filter((bp: any) => !bp.hasStructuredRows && bp.workName === p.workName && bp.finishedProductId === p.finishedProductId);
-    const totalBatchRawSqM = batchRows.reduce((sum: number, bp: any) => {
-      const rm = rawMaterials.find((r: any) => r.id === bp.rawMaterialId);
-      const sqMPerRoll = Number(rm?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-      return sum + (bp.intakeQuantity * sqMPerRoll);
-    }, 0);
-    const prod = products.find((prod: any) => prod.id === p.finishedProductId);
-    const productSqM = Number(prod?.sqM || 0);
-    const batchOutcome = batchRows.find((bp: any) => bp.outcomeQuantity > 0)?.outcomeQuantity || p.outcomeQuantity;
-    const totalTheoreticalYield = productSqM > 0 ? (totalBatchRawSqM / productSqM) : 0;
-    let displayWastage = '-';
-    let wastagePercentage = '-';
-    let wastageNum = 0;
-    if (batchOutcome && batchOutcome > 0) {
-      const wastage = totalTheoreticalYield > 0 ? (totalTheoreticalYield - batchOutcome) : 0;
-      wastageNum = Math.max(0, wastage);
-      displayWastage = wastageNum.toFixed(2);
-      if (totalTheoreticalYield > 0) {
-        wastagePercentage = ((wastageNum / totalTheoreticalYield) * 100).toFixed(2) + '%';
-      }
-    }
-    const totalOutcomeSqM = (Number(batchOutcome) || 0) * productSqM;
-    const wastageSqM = totalBatchRawSqM > 0 ? Math.max(0, totalBatchRawSqM - totalOutcomeSqM) : 0;
     return {
       batchOutcome,
-      displayWastage,
-      wastagePercentage,
-      wastageNum,
+      displayWastage: totalBatchRawSqM > 0 ? `${wastageSqM.toFixed(2)} m²` : '-',
+      wastagePercentage: pct,
+      wastageNum: wastageSqM,
       totalBatchRawSqM,
       totalOutcomeSqM,
       wastageSqM,
@@ -274,9 +251,9 @@ const ProductionReport = () => {
   filteredProductions.forEach((p: any) => {
     const key = p.hasStructuredRows ? `id-${p.id}` : p.workName;
     if (processedBatches.has(key)) return;
-    const { batchOutcome, totalOutcomeSqM = 0, wastageSqM = 0 } = computeRowWastage(p);
-    if (batchOutcome > 0) {
-      if (totalOutcomeSqM > 0) {
+    const { batchOutcome, totalBatchRawSqM = 0, totalOutcomeSqM = 0, wastageSqM = 0 } = computeRowWastage(p);
+    if (batchOutcome > 0 || p.completed) {
+      if (totalBatchRawSqM > 0 || totalOutcomeSqM > 0) {
         totalProduced += totalOutcomeSqM;
         totalWastage += wastageSqM;
       } else {
@@ -756,7 +733,9 @@ const ProductionReport = () => {
                 <div className="mt-4 text-center w-full bg-emerald-50 p-3 rounded-lg border border-emerald-100">
                   <div className="text-[11px] font-bold text-emerald-800 uppercase">Total Efficiency</div>
                   <div className="text-[20px] font-black text-emerald-600">
-                    {(((totalProduced) / (totalProduced + totalWastage)) * 100).toFixed(1)}%
+                    {totalProduced + totalWastage > 0
+                      ? (((totalProduced) / (totalProduced + totalWastage)) * 100).toFixed(1)
+                      : '0.0'}%
                   </div>
                 </div>
               </>

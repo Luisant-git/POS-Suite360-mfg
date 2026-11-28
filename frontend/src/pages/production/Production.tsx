@@ -282,7 +282,7 @@ const Production = () => {
       }
       row.finishedProductId = prodId;
       const product = products.find((p: any) => p.id === prodId);
-      row.prodSqM = product?.sqM && Number(product.sqM) > 0 ? Number(product.sqM).toFixed(3) : '';
+      row.prodSqM = product?.sqM && Number(product.sqM) > 0 ? String(Number(product.sqM)) : '';
       // Auto-populate intake only when starting fresh and user hasn't picked a raw material yet
       if (
         !editingId &&
@@ -672,9 +672,9 @@ const Production = () => {
       const prod = products.find((p: any) => p.id === Number(o.finishedProductId));
       const calcProdSqM =
         Number(o.outcomeQuantity) > 0 && Number(o.sqM) > 0
-          ? (Number(o.sqM) / Number(o.outcomeQuantity)).toFixed(3)
+          ? String(Number((Number(o.sqM) / Number(o.outcomeQuantity)).toFixed(5)))
           : prod?.sqM && Number(prod.sqM) > 0
-            ? Number(prod.sqM).toFixed(3)
+            ? String(Number(prod.sqM))
             : '';
       return {
         finishedProductId: Number(o.finishedProductId),

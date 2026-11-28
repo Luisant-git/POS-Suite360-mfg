@@ -144,6 +144,16 @@ export class ReportsService {
     let isSingleProductBatch = true;
     const allCompleted = productions.length > 0 && productions.every((p: any) => p.status === 'COMPLETED');
 
+    const normalizeCode = (s?: string | null) =>
+      String(s || '').replace(/[\s\-_]+/g, '').toLowerCase().trim();
+
+    const resolveOutcomeSqM = (o: any) => {
+      const qty = Number(o.outcomeQuantity || 0);
+      const savedSqM = Number(o.sqM || 0);
+      if (savedSqM > 0) return savedSqM;
+      return qty * Number(o.finishedProduct?.sqM || 0);
+    };
+
     productions.forEach(prod => {
       const intakes = prod.intakes?.length
         ? prod.intakes
@@ -161,20 +171,45 @@ export class ReportsService {
         ? rawOutcomes.filter((o: any) => Number(o.finishedProductId || o.finishedProduct?.id) === Number(productId))
         : rawOutcomes;
 
+      // Apportion intake cost & area when filtering a multi-product batch by a single product
+      let allocationRatio = 1;
+      if (productId && rawOutcomes.length > 1) {
+        const totalProdOutcomeSqM = rawOutcomes.reduce((s: number, o: any) => s + resolveOutcomeSqM(o), 0);
+        const filteredProdOutcomeSqM = outcomes.reduce((s: number, o: any) => s + resolveOutcomeSqM(o), 0);
+        if (totalProdOutcomeSqM > 0) {
+          allocationRatio = filteredProdOutcomeSqM / totalProdOutcomeSqM;
+        }
+      }
+
       intakes.forEach((intake: any) => {
         const intakeQty = Number(intake.intakeQuantity || 0);
         const purchaseRate = Number(intake.rawMaterial?.purchaseRate || 0);
-        const cost = intakeQty * purchaseRate;
+        const cost = intakeQty * purchaseRate * allocationRatio;
         totalCost += cost;
 
-        const fallbackSqM = Number(intake.rawMaterial?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-        const intakeSqM = Number(intake.sqM) > 0 ? Number(intake.sqM) : intakeQty * fallbackSqM;
+        const batchVal = intake.materialBatchCode || '';
+        const purchaseItems = intake.rawMaterial?.rawMaterialPurchaseItems || [];
+        const normIntakeCode = normalizeCode(intake.materialCode);
+        const matchedPi =
+          (batchVal &&
+            purchaseItems.find(
+              (pi: any) =>
+                pi.batchCode &&
+                String(pi.batchCode).trim().toLowerCase() === String(batchVal).trim().toLowerCase() &&
+                (!normIntakeCode || normalizeCode(pi.materialCode) === normIntakeCode),
+            )) ||
+          (batchVal &&
+            purchaseItems.find(
+              (pi: any) =>
+                pi.batchCode &&
+                String(pi.batchCode).trim().toLowerCase() === String(batchVal).trim().toLowerCase(),
+            )) ||
+          (normIntakeCode && purchaseItems.find((pi: any) => normalizeCode(pi.materialCode) === normIntakeCode));
+
+        const fallbackSqM = Number(matchedPi?.sqM || purchaseItems[0]?.sqM || 0);
+        const intakeSqM = (Number(intake.sqM) > 0 ? Number(intake.sqM) : intakeQty * fallbackSqM) * allocationRatio;
         totalRawSqM += intakeSqM;
 
-        const batchVal = intake.materialBatchCode || '';
-        const matchedPi = (intake.rawMaterial?.rawMaterialPurchaseItems || []).find(
-          (pi: any) => pi.batchCode && batchVal && String(pi.batchCode).trim() === String(batchVal).trim()
-        );
         const codeVal = intake.materialCode || matchedPi?.materialCode || '';
         const matName = intake.rawMaterial?.name || 'Unknown';
         const matLabel = [matName, codeVal, batchVal]
@@ -191,7 +226,7 @@ export class ReportsService {
             batchCode: batchVal || '-',
           };
         }
-        materialsUsed[matLabel].quantity += intakeQty;
+        materialsUsed[matLabel].quantity += intakeQty * allocationRatio;
         materialsUsed[matLabel].cost += cost;
         materialsUsed[matLabel].sqM += intakeSqM;
       });
@@ -217,8 +252,9 @@ export class ReportsService {
         totalRevenue += revenue;
         totalProducedQty += outcomeQty;
 
-        const prodSqM = Number(outcome.finishedProduct?.sqM || 0);
-        const outSqM = outcomeQty * prodSqM;
+        const masterProdSqM = Number(outcome.finishedProduct?.sqM || 0);
+        const outSqM = resolveOutcomeSqM(outcome);
+        const effectiveUnitSqM = outcomeQty > 0 && outSqM > 0 ? outSqM / outcomeQty : masterProdSqM;
         totalOutcomeSqM += outSqM;
 
         const prodName = outcome.finishedProduct?.name || 'Unknown';
@@ -229,17 +265,17 @@ export class ReportsService {
         productsProduced[prodName].sqM += outSqM;
         productsProduced[prodName].revenue += revenue;
 
-        if (prodSqM > 0) {
-          if (singleProductSqM === null) singleProductSqM = prodSqM;
-          else if (singleProductSqM !== prodSqM) isSingleProductBatch = false;
+        if (effectiveUnitSqM > 0) {
+          if (singleProductSqM === null) singleProductSqM = effectiveUnitSqM;
+          else if (Math.abs(singleProductSqM - effectiveUnitSqM) > 1e-6) isSingleProductBatch = false;
         }
       });
     });
 
     const profit = totalRevenue - totalCost;
-
-    const wastageSqM = Math.max(0, totalRawSqM - totalOutcomeSqM);
-    const wastagePercentage = totalRawSqM > 0 ? (wastageSqM / totalRawSqM) * 100 : 0;
+    const hasWastageBasis = allCompleted || totalProducedQty > 0;
+    const wastageSqM = hasWastageBasis ? Math.max(0, totalRawSqM - totalOutcomeSqM) : 0;
+    const wastagePercentage = hasWastageBasis && totalRawSqM > 0 ? (wastageSqM / totalRawSqM) * 100 : 0;
     const wastageQty =
       isSingleProductBatch && singleProductSqM && singleProductSqM > 0
         ? wastageSqM / singleProductSqM

@@ -329,3 +329,116 @@ export const getEffectiveOutcomeEntries = (production: any): any[] => {
     };
   });
 };
+
+/** Resolves per-roll Sq.M for an intake row, matching batch/material code before falling back to latest purchase. */
+export const resolveIntakeSqM = (intake: any, rawMaterials: any[] = []): number => {
+  if (!intake) return 0;
+  const savedSqM = Number(intake.sqM || 0);
+  if (savedSqM > 0) return savedSqM;
+
+  const rm = rawMaterials.find((r: any) => r.id === intake.rawMaterialId) || intake.rawMaterial;
+  const purchaseItems = Array.isArray(rm?.rawMaterialPurchaseItems) ? rm.rawMaterialPurchaseItems : [];
+  const batchVal = String(intake.materialBatchCode || '').trim().toLowerCase();
+  const normCodeVal = normalizeCode(intake.materialCode);
+
+  const matchedItem =
+    (batchVal &&
+      purchaseItems.find(
+        (pi: any) =>
+          String(pi?.batchCode || '').trim().toLowerCase() === batchVal &&
+          (!normCodeVal || normalizeCode(pi?.materialCode) === normCodeVal),
+      )) ||
+    (batchVal && purchaseItems.find((pi: any) => String(pi?.batchCode || '').trim().toLowerCase() === batchVal)) ||
+    (normCodeVal && purchaseItems.find((pi: any) => normalizeCode(pi?.materialCode) === normCodeVal)) ||
+    purchaseItems[0];
+
+  const sqMPerRoll = Number(matchedItem?.sqM || 0);
+  return Number(intake.intakeQuantity || 0) * sqMPerRoll;
+};
+
+/** Resolves effective per-unit Sq.M for an outcome row, preferring batch-saved Sq.M over master product Sq.M. */
+export const resolveOutcomePerUnitSqM = (outcome: any, products: any[] = []): number => {
+  if (!outcome) return 0;
+  const qty = Number(outcome.outcomeQuantity || 0);
+  const savedSqM = Number(outcome.sqM || 0);
+  if (qty > 0 && savedSqM > 0) return savedSqM / qty;
+  const prod = products.find((pr: any) => pr.id === outcome.finishedProductId) || outcome.finishedProduct;
+  return Number(prod?.sqM || 0);
+};
+
+/** Resolves total Sq.M for an outcome row, preferring batch-saved Sq.M over master product Sq.M. */
+export const resolveOutcomeSqM = (outcome: any, products: any[] = []): number => {
+  if (!outcome) return 0;
+  const savedSqM = Number(outcome.sqM || 0);
+  if (savedSqM > 0) return savedSqM;
+  return Number(outcome.outcomeQuantity || 0) * resolveOutcomePerUnitSqM(outcome, products);
+};
+
+export interface BatchWastageResult {
+  batchOutcome: number;
+  displayWastage: string;
+  wastagePercentage: string;
+  wastageNum: number;
+  totalBatchRawSqM: number;
+  totalOutcomeSqM: number;
+  wastageSqM: number;
+}
+
+/** Computes batch wastage metrics consistently in both unit count (single-product) and Sq.M. */
+export const computeBatchWastage = (
+  p: any,
+  rawMaterials: any[] = [],
+  products: any[] = [],
+): BatchWastageResult => {
+  const intakes = getEffectiveIntakes(p);
+  const outcomes = getEffectiveOutcomes(p);
+  const completed = isProductionCompleted(p);
+
+  const totalBatchRawSqM = intakes.reduce((sum: number, bp: any) => sum + resolveIntakeSqM(bp, rawMaterials), 0);
+  const totalOutcomeSqM = outcomes.reduce((sum: number, o: any) => sum + resolveOutcomeSqM(o, products), 0);
+  const batchOutcome =
+    p.outcomeQuantity !== undefined
+      ? Number(p.outcomeQuantity || 0)
+      : outcomes.reduce((sum: number, o: any) => sum + Number(o.outcomeQuantity || 0), 0);
+
+  if (!completed && batchOutcome <= 0) {
+    return {
+      batchOutcome,
+      displayWastage: '-',
+      wastagePercentage: '-',
+      wastageNum: 0,
+      totalBatchRawSqM,
+      totalOutcomeSqM: 0,
+      wastageSqM: 0,
+    };
+  }
+
+  const wastageSqM = totalBatchRawSqM > 0 ? Math.max(0, totalBatchRawSqM - totalOutcomeSqM) : 0;
+  const wastagePctNum = totalBatchRawSqM > 0 ? (wastageSqM / totalBatchRawSqM) * 100 : 0;
+  const pct = totalBatchRawSqM > 0 ? wastagePctNum.toFixed(2) + '%' : '-';
+
+  const singleProdSqM = outcomes.length === 1 ? resolveOutcomePerUnitSqM(outcomes[0], products) : 0;
+  if (outcomes.length === 1 && singleProdSqM > 0) {
+    const theoreticalYield = totalBatchRawSqM / singleProdSqM;
+    const maxWastage = Math.max(0, theoreticalYield - batchOutcome);
+    return {
+      batchOutcome,
+      displayWastage: totalBatchRawSqM > 0 ? maxWastage.toFixed(2) : '-',
+      wastagePercentage: pct,
+      wastageNum: maxWastage,
+      totalBatchRawSqM,
+      totalOutcomeSqM,
+      wastageSqM,
+    };
+  }
+
+  return {
+    batchOutcome,
+    displayWastage: totalBatchRawSqM > 0 ? `${wastageSqM.toFixed(2)} m²` : '-',
+    wastagePercentage: pct,
+    wastageNum: wastageSqM,
+    totalBatchRawSqM,
+    totalOutcomeSqM,
+    wastageSqM,
+  };
+};

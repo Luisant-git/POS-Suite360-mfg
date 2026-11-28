@@ -7,6 +7,9 @@ import {
   getEffectiveOutcomes,
   isProductionCompleted,
   parseBatchWorkName,
+  resolveIntakeSqM,
+  resolveOutcomePerUnitSqM,
+  resolveOutcomeSqM,
 } from '../utils/productionBatch';
 
 interface ProductionViewModalProps {
@@ -38,21 +41,11 @@ const ProductionViewModal = ({
     ? outcomeEntries.reduce((sum: number, e: any) => sum + Number(e.outcomeQuantity || 0), 0)
     : outcomes.reduce((sum: number, o: any) => sum + Number(o.outcomeQuantity || 0), 0);
 
-  const totalIntakeSqM = intakes.reduce((sum: number, i: any) => {
-    const fallbackPerRoll = Number(i.rawMaterial?.rawMaterialPurchaseItems?.[0]?.sqM || 0);
-    const sqM = Number(i.sqM || 0) > 0 ? Number(i.sqM) : Number(i.intakeQuantity || 0) * fallbackPerRoll;
-    return sum + sqM;
-  }, 0);
+  const totalIntakeSqM = intakes.reduce((sum: number, i: any) => sum + resolveIntakeSqM(i), 0);
 
-  const totalOutcomeSqM = outcomeEntries.length > 0
-    ? outcomeEntries.reduce((sum: number, e: any) => {
-        const prodSqM = Number(e.finishedProduct?.sqM || 0);
-        return sum + Number(e.outcomeQuantity || 0) * prodSqM;
-      }, 0)
-    : outcomes.reduce((sum: number, o: any) => {
-        const prodSqM = Number(o.finishedProduct?.sqM || 0);
-        return sum + Number(o.outcomeQuantity || 0) * prodSqM;
-      }, 0);
+  const totalOutcomeSqM = outcomes.length > 0
+    ? outcomes.reduce((sum: number, o: any) => sum + resolveOutcomeSqM(o), 0)
+    : outcomeEntries.reduce((sum: number, e: any) => sum + resolveOutcomeSqM(e), 0);
 
   const wastageSqM = totalIntakeSqM > 0 ? Math.max(0, totalIntakeSqM - totalOutcomeSqM) : 0;
   const wastagePct = totalIntakeSqM > 0 ? (wastageSqM / totalIntakeSqM) * 100 : 0;
@@ -194,7 +187,7 @@ const ProductionViewModal = ({
                           <p className="text-xs font-bold text-gray-900 break-words">{entry.finishedProduct?.name || '-'}</p>
                         </div>
                         <p className="text-[11px] text-gray-500 mt-0.5">
-                          {formatDateTime(entry.date || production.date)} · Product Sq.M: {Number(entry.finishedProduct?.sqM || 0).toFixed(3)}
+                          {formatDateTime(entry.date || production.date)} · Product Sq.M: {resolveOutcomePerUnitSqM(entry).toFixed(3)}
                         </p>
                       </div>
                       <div className="text-right shrink-0">

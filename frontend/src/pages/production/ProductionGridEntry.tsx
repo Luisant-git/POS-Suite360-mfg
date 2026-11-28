@@ -204,7 +204,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
       const product = products.find((p: any) => p.id === Number(value));
       const isSameProduct = Number(newItems[index].finishedProductId) === Number(value);
       newItems[index].finishedProductId = value;
-      newItems[index].prodSqM = product?.sqM && Number(product.sqM) > 0 ? Number(product.sqM).toFixed(3) : '';
+      newItems[index].prodSqM = product?.sqM && Number(product.sqM) > 0 ? String(Number(product.sqM)) : '';
 
       if (Number(value) > 0 && !isSameProduct && product && product.rawMaterials && product.rawMaterials.length > 0) {
         // Update current row with the first raw material
@@ -255,7 +255,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                sqM: '0.000',
                intakeQuantity: '',
                finishedProductId: value,
-               prodSqM: product?.sqM && Number(product.sqM) > 0 ? Number(product.sqM).toFixed(3) : '',
+               prodSqM: product?.sqM && Number(product.sqM) > 0 ? String(Number(product.sqM)) : '',
                outcomeQuantity: ''
              };
           });
@@ -541,7 +541,7 @@ const ProductionGridEntry = ({ onSwitchToMaster }: { onSwitchToMaster?: () => vo
                         item.prodSqM !== undefined && item.prodSqM !== ''
                           ? item.prodSqM
                           : products.find((p: any) => p.id === item.finishedProductId)?.sqM && Number(products.find((p: any) => p.id === item.finishedProductId)?.sqM) > 0
-                          ? Number(products.find((p: any) => p.id === item.finishedProductId)?.sqM).toFixed(3)
+                          ? String(Number(products.find((p: any) => p.id === item.finishedProductId)?.sqM))
                           : ''
                       }
                       onChange={(e) => updateItem(index, 'prodSqM', e.target.value)}

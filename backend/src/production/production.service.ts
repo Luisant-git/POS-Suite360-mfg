@@ -471,8 +471,9 @@ export class ProductionService {
         throw new NotFoundException('Finished product not found');
       }
 
-      const productSqM = Number(product.sqM || 0);
       const oldQty = Number(outcomeRow.outcomeQuantity || 0);
+      const oldSqM = Number(outcomeRow.sqM || 0);
+      const productSqM = oldQty > 0 && oldSqM > 0 ? oldSqM / oldQty : Number(product.sqM || 0);
       const newQty = oldQty + addedQty;
       const newSqM = Number((newQty * productSqM).toFixed(4));
       const logSqM = Number((addedQty * productSqM).toFixed(4));
